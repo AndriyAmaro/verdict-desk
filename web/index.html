@@ -13,14 +13,24 @@ tbody tr{cursor:pointer}tbody tr:hover{background:var(--card)}
 #detail{border:1px solid var(--line);border-radius:8px;padding:4px 14px 12px;margin-top:14px;background:var(--card)}
 #detail[hidden]{display:none}ul{margin:4px 0 4px 18px;padding:0}li{margin:2px 0}
 input[type=file]{margin-left:6px}
+.stats{border:1px solid var(--line);border-radius:8px;padding:2px 14px 10px;margin:12px 0;background:var(--card)}
+.stats table{font-size:13px}
 </style></head><body>
 <h1>Verdict Desk: simulated decision ledger</h1>
 <p class="mut">Every row is a frozen dossier. Decisions are simulated; no real orders are placed. This page recomputes every SHA-256 hash in your browser from the ledger text. It does not trust the server that hosts the file.</p>
 <p class="mut">Ledger: <code id="source"></code> <label>or open a file <input id="file" type="file" accept=".jsonl,.json,.txt"></label></p>
 <div id="banner" class="mut">Loading...</div>
+<section class="stats" id="stats" hidden>
+  <h2>Cadence of the live history</h2>
+  <p id="cadence" class="mut"></p>
+  <h2>Simulated portfolio (start capital 10,000, risk 1% per position, fees not included)</h2>
+  <p id="portfolio" class="mut"></p>
+  <div id="positions"></div>
+</section>
 <table><thead><tr><th>#</th><th>Symbol</th><th>Action</th><th>Edge</th><th>LLM claims</th><th>Integrity</th><th>Hash</th></tr></thead><tbody id="rows"></tbody></table>
 <section id="detail" hidden></section>
 <script src="canonical.js"></script>
+<script src="stats.js"></script>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
@@ -32,9 +42,9 @@ function el(tag, text, cls) { const e = document.createElement(tag); if (text !=
 function render(result, name) {
   $("source").textContent = name;
   const rows = $("rows"); rows.replaceChildren(); $("detail").hidden = true;
-  for (const r of result.rows) {
+  for (const r of result.rows.slice().reverse()) {
     const d = r.dossier, tr = document.createElement("tr");
-    const claims = d.llm ? ((d.llm.bull.accepted || []).length + (d.llm.bear.accepted || []).length) : "off";
+    const claims = d.llm ? ((d.llm.bull.error && d.llm.bear.error) ? "model call failed" : (d.llm.bull.accepted || []).length + (d.llm.bear.accepted || []).length) : "off";
     const ok = r.linked && r.intact;
     for (const [v, cls] of [[d.seq], [d.evidence.symbol], [d.verdict.action, d.verdict.action], [d.verdict.edge], [claims], [ok ? "verified" : (r.intact ? "chain broken" : "ALTERED"), ok ? "ok" : "bad"], [d.hash.slice(0, 16)]]) {
       tr.appendChild(el("td", v, cls));
@@ -42,11 +52,37 @@ function render(result, name) {
     tr.addEventListener("click", () => showDetail(r));
     rows.appendChild(tr);
   }
+  renderStats(result.rows.map((r) => r.dossier));
   const banner = $("banner");
   banner.className = result.problems.length ? "bad" : "ok";
   banner.textContent = result.problems.length
     ? `${result.rows.length} dossiers. PROBLEMS: ${result.problems.join("; ")}`
     : `${result.rows.length} dossiers. Every hash recomputed in this browser matches and every link in the chain is consistent.`;
+}
+
+function renderStats(dossiers) {
+  const box = $("stats");
+  if (!dossiers.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const c = VerdictStats.cadence(dossiers);
+  const per = Object.keys(c.per_symbol).sort().map((k) => `${k} ${c.per_symbol[k]}`).join(", ");
+  const gap = c.longest_gap_minutes >= 60 ? `${Math.floor(c.longest_gap_minutes / 60)} h ${c.longest_gap_minutes % 60} min` : `${c.longest_gap_minutes} min`;
+  $("cadence").textContent = `${c.total} dossiers (${per}) from ${c.first} to ${c.last}. Longest gap between consecutive dossiers of the same symbol: ${gap}${c.longest_gap_symbol ? " (" + c.longest_gap_symbol + ")" : ""}. Gaps over 90 minutes: ${c.gaps_over_90_minutes}. A scheduled run that GitHub delayed or skipped shows up here; nothing is filled in.`;
+  const p = VerdictStats.portfolio(dossiers);
+  $("portfolio").textContent = `${p.decisions} decisions, ${p.flat} flat, ${p.positions.length} simulated positions (${p.closed} closed, ${p.open} open). Win rate ${p.win_rate_pct === null ? "n/a" : p.win_rate_pct + "%"}, realized ${p.realized_pnl}, unrealized ${p.unrealized_pnl}, max drawdown ${p.max_drawdown_pct}%. Decisions are simulated; no real orders are placed. Recomputed in this browser from the ledger with the same rule as portfolio.py.`;
+  const holder = $("positions");
+  holder.replaceChildren();
+  if (!p.positions.length) { holder.appendChild(el("p", "No position has been opened yet: every decision so far stayed flat.", "mut")); return; }
+  const table = document.createElement("table");
+  const head = document.createElement("tr");
+  for (const h of ["#", "Symbol", "Action", "Entry", "Status", "Exit or mark", "P&L", "Bars"]) head.appendChild(el("th", h));
+  table.appendChild(head);
+  for (const x of p.positions) {
+    const tr = document.createElement("tr");
+    for (const [v, cls] of [[x.seq], [x.symbol], [x.action, x.action], [x.entry], [x.status], [x.exit], [x.pnl, x.pnl >= 0 ? "ok" : "bad"], [x.bars]]) tr.appendChild(el("td", v, cls));
+    table.appendChild(tr);
+  }
+  holder.appendChild(table);
 }
 
 function list(parent, title, items) {
@@ -83,6 +119,7 @@ function showDetail(r) {
     const idx = d.llm.evidence_index || {};
     for (const side of ["bull", "bear"]) {
       const accepted = d.llm[side].accepted || [], rejected = d.llm[side].rejected || [];
+      if (d.llm[side].error) box.appendChild(el("p", `The ${side} analyst call failed and nothing was recorded for it: ${d.llm[side].error}`, "bad"));
       list(box, `${side} analyst (LLM ${d.llm.model}): ${accepted.length} accepted, ${rejected.length} rejected by the citation validator`,
         accepted.map((c) => `${c.claim} cites ${c.cites.map((id) => `${id}: "${idx[id]}"`).join("; ")}`)
           .concat(rejected.map((c) => `REJECTED (${c.rejected_because}): ${c.claim}`)));

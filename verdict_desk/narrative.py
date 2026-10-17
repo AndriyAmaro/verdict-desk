@@ -28,6 +28,7 @@ PER_FEED = 8
 CHUNK = 10  # titulos por chamada ao LLM (lotes menores gastam menos tokens de raciocinio)
 MAX_WORKERS = 4  # lotes em paralelo
 LLM_TIMEOUT = 240  # segundos por chamada de extracao: modelo de raciocinio no tier gratuito oscila
+INDEX_VERSION = 2  # 2: o indice de evidencia lista so as vozes e convergencias do ativo da decisao (1: todas)
 LLM_MAX_TOKENS = 6000  # com 3000 um lote chegou a gastar tudo raciocinando e devolver conteudo vazio
 STANCES = ("bullish", "bearish", "neutral")
 LEVELS = ("low", "medium", "high")
@@ -139,6 +140,14 @@ def _squash(text: str) -> str:
 def _names(title: str, token: str) -> bool:
     """O token aparece no titulo por nome ou ticker, como palavra inteira."""
     return any(re.search(rf"\b{re.escape(w)}s?\b", title) for w in (*TOKENS[token], token.lower()))
+
+
+def mentions(title: str, base: str) -> bool:
+    """O titulo cita o ativo (`BTC` para BTCUSDT) por nome ou ticker, como palavra inteira."""
+    low = title.lower()
+    if base in TOKENS:
+        return _names(low, base)
+    return re.search(rf"\b{re.escape(base.lower())}\b", low) is not None
 
 
 def parse_extractions(text) -> list[dict]:
@@ -262,14 +271,15 @@ def converge_extractions(accepted: list[dict]) -> list[dict]:
 def build(voices: list[dict], ask=None, model: str = "") -> dict:
     """Monta o bloco `narrative` do pacote de evidencia. Sem `ask`, usa palavras-chave."""
     if ask is None:
-        return {"method": "keywords", "voices": voices, "convergence": converge(voices)}
+        return {"method": "keywords", "index_version": INDEX_VERSION, "voices": voices, "convergence": converge(voices)}
     try:
         result = extract(voices, ask)
     except (OSError, ValueError, KeyError) as err:
         # Falha do LLM nao derruba a decisao: volta ao modo por palavras-chave, dizendo isso.
-        return {"method": "keywords", "voices": voices, "convergence": converge(voices), "llm_error": str(err)}
+        return {"method": "keywords", "index_version": INDEX_VERSION, "voices": voices, "convergence": converge(voices), "llm_error": str(err)}
     block = {
         "method": "llm",
+        "index_version": INDEX_VERSION,
         "model": model,
         "voices": voices,
         "extractions": result["accepted"],

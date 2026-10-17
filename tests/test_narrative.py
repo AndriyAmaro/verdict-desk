@@ -228,3 +228,73 @@ class CitationIndexTest(unittest.TestCase):
         items = citations.index(new_style, features.compute(new_style))
         last = items[f"E{len(items)}"]
         self.assertIn("Narrative convergence: 2 voices (A, B) are bullish on BTC, top conviction high", last)
+
+
+class RelevantVoicesTest(unittest.TestCase):
+    def packet(self, block):
+        from tests.test_dossier import packet
+
+        return {**packet(0.004, funding=-0.0001), "narrative": block}
+
+    def voices(self):
+        return [
+            {"name": "A", "title": "Bitcoin ETF inflow hits a record"},
+            {"name": "B", "title": "Solana validators ship a client upgrade"},
+            {"name": "C", "title": "Circle plans stablecoin push in 40 markets"},
+        ]
+
+    def test_mentions_matches_name_ticker_and_whole_words_only(self):
+        self.assertTrue(narrative.mentions("Bitcoin ETF inflow", "BTC"))
+        self.assertTrue(narrative.mentions("BTC breaks out", "BTC"))
+        self.assertFalse(narrative.mentions("Solana validators", "BTC"))
+        self.assertFalse(narrative.mentions("Pete's method for ethical sourcing", "ETH"))
+        self.assertTrue(narrative.mentions("Dogecoin rallies, DOGE up 9%", "DOGE"))
+        self.assertFalse(narrative.mentions("Dogecoin rallies", "DOGE"))  # nome longo nao e o ticker
+
+    def test_new_blocks_only_index_voices_and_convergence_of_the_decision_asset(self):
+        from verdict_desk import citations, features
+
+        block = {
+            "method": "keywords",
+            "index_version": narrative.INDEX_VERSION,
+            "voices": self.voices(),
+            "convergence": [
+                {"token": "BTC", "bias": "bullish", "voices": ["A", "D"]},
+                {"token": "SOL", "bias": "bullish", "voices": ["B", "E"]},
+            ],
+        }
+        pkt = self.packet(block)
+        text = "\n".join(citations.index(pkt, features.compute(pkt)).values())
+        self.assertIn("Voice A: Bitcoin ETF inflow hits a record", text)
+        self.assertNotIn("Solana validators", text)
+        self.assertNotIn("Circle plans", text)
+        self.assertIn("are bullish on BTC", text)
+        self.assertNotIn("are bullish on SOL", text)
+
+    def test_old_blocks_keep_every_voice_so_their_replay_does_not_change(self):
+        from verdict_desk import citations, features
+
+        block = {"method": "keywords", "voices": self.voices(), "convergence": [{"token": "SOL", "bias": "bullish", "voices": ["B", "E"]}]}
+        pkt = self.packet(block)
+        text = "\n".join(citations.index(pkt, features.compute(pkt)).values())
+        for needle in ("Solana validators", "Circle plans", "are bullish on SOL"):
+            self.assertIn(needle, text)
+
+    def test_a_dossier_with_a_new_block_replays_and_an_old_one_still_does(self):
+        import tempfile
+        from pathlib import Path
+
+        from verdict_desk import dossier
+
+        path = Path(tempfile.mkdtemp()) / "ledger.jsonl"
+        new = {"method": "keywords", "index_version": narrative.INDEX_VERSION, "voices": self.voices(), "convergence": []}
+        old = {"method": "keywords", "voices": self.voices(), "convergence": []}
+
+        def ask(system, user):
+            return json.dumps([{"claim": "Bitcoin ETF inflow hits a record", "cites": ["E4"]}])
+
+        dossier.append(self.packet(new), path, ask=ask)
+        dossier.append(self.packet(old), path, ask=ask)
+        ledger = dossier.read_ledger(path)
+        self.assertEqual([dossier.replay(d)["matches"] for d in ledger], [True, True])
+        self.assertLess(len(ledger[0]["llm"]["evidence_index"]), len(ledger[1]["llm"]["evidence_index"]))

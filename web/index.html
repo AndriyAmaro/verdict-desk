@@ -52,7 +52,7 @@ function render(result, name) {
     tr.addEventListener("click", () => showDetail(r));
     rows.appendChild(tr);
   }
-  renderStats(result.rows.map((r) => r.dossier));
+  renderStats(result.rows.map((r) => r.dossier), result.problems.length > 0);
   const banner = $("banner");
   banner.className = result.problems.length ? "bad" : "ok";
   banner.textContent = result.problems.length
@@ -60,7 +60,7 @@ function render(result, name) {
     : `${result.rows.length} dossiers. Every hash recomputed in this browser matches and every link in the chain is consistent.`;
 }
 
-function renderStats(dossiers) {
+function renderStats(dossiers, broken) {
   const box = $("stats");
   if (!dossiers.length) { box.hidden = true; return; }
   box.hidden = false;
@@ -68,6 +68,11 @@ function renderStats(dossiers) {
   const per = Object.keys(c.per_symbol).sort().map((k) => `${k} ${c.per_symbol[k]}`).join(", ");
   const gap = c.longest_gap_minutes >= 60 ? `${Math.floor(c.longest_gap_minutes / 60)} h ${c.longest_gap_minutes % 60} min` : `${c.longest_gap_minutes} min`;
   $("cadence").textContent = `${c.total} dossiers (${per}) from ${c.first} to ${c.last}. Longest gap between consecutive dossiers of the same symbol: ${gap}${c.longest_gap_symbol ? " (" + c.longest_gap_symbol + ")" : ""}. Gaps over 90 minutes: ${c.gaps_over_90_minutes}. A scheduled run that GitHub delayed or skipped shows up here; nothing is filled in.`;
+  if (broken) {
+    $("portfolio").textContent = "Not computed: this ledger failed verification, so nothing derived from it can be trusted.";
+    $("positions").replaceChildren();
+    return;
+  }
   const p = VerdictStats.portfolio(dossiers);
   $("portfolio").textContent = `${p.decisions} decisions, ${p.flat} flat, ${p.positions.length} simulated positions (${p.closed} closed, ${p.open} open). Win rate ${p.win_rate_pct === null ? "n/a" : p.win_rate_pct + "%"}, realized ${p.realized_pnl}, unrealized ${p.unrealized_pnl}, max drawdown ${p.max_drawdown_pct}%. Decisions are simulated; no real orders are placed. Recomputed in this browser from the ledger with the same rule as portfolio.py.`;
   const holder = $("positions");

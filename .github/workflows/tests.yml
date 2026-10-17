@@ -26,6 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+      - name: Install generated binding dependencies
+        working-directory: cre/contracts
+        run: bun install --frozen-lockfile
       - run: bun install --frozen-lockfile
       - run: bun test
       - run: bunx tsc --noEmit

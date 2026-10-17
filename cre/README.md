@@ -36,7 +36,7 @@ cre workflow simulate ./anchor -T staging-settings
 # add --broadcast to send the report for real (needs a funded Sepolia key in .env)
 ```
 
-Before a real run, fill `anchor/config.staging.json`: `headUrl` (raw URL of `ledger/head.json` in the public repo) and `anchorAddress` (the deployed `LedgerAnchor`). Deploy `LedgerAnchor(forwarder, expectedWorkflowOwner)` with the Sepolia `MockKeystoneForwarder` for simulation or the production CRE forwarder for a deployed workflow; confirm both addresses in the CRE Forwarder Directory first.
+`anchor/config.staging.json` already points `headUrl` at the raw `ledger/head.json` of this repository; before a real transaction, set `anchorAddress` to the deployed `LedgerAnchor` (it is the zero address while only simulating). Deploy `LedgerAnchor(forwarder, expectedWorkflowOwner)` with the Sepolia `MockKeystoneForwarder` for simulation or the production CRE forwarder for a deployed workflow; confirm both addresses in the CRE Forwarder Directory first.
 
 | Reference | Value | Source |
 |---|---|---|

@@ -13,6 +13,7 @@ Convergencia: ao menos `MIN_VOICES` vozes distintas com o mesmo token e o mesmo
 vies. O pacote congela as extracoes, entao o replay nunca chama o modelo de novo.
 """
 
+import concurrent.futures
 import json
 import re
 import urllib.request
@@ -24,7 +25,10 @@ BEAR = ("crash", "hack", "ban", "lawsuit", "outflow", "plunge", "exploit")
 MIN_VOICES = 2
 MAX_VOICES = 20  # limite de feeds por decisao
 PER_FEED = 8
-CHUNK = 20  # titulos por chamada ao LLM
+CHUNK = 10  # titulos por chamada ao LLM (lotes menores gastam menos tokens de raciocinio)
+MAX_WORKERS = 4  # lotes em paralelo
+LLM_TIMEOUT = 240  # segundos por chamada de extracao: modelo de raciocinio no tier gratuito oscila
+LLM_MAX_TOKENS = 6000  # com 3000 um lote chegou a gastar tudo raciocinando e devolver conteudo vazio
 STANCES = ("bullish", "bearish", "neutral")
 LEVELS = ("low", "medium", "high")
 USER_AGENT = "verdict-desk/0.1"
@@ -200,14 +204,33 @@ def validate_extractions(items: list[dict], labeled: dict[str, dict]) -> dict:
 
 
 def extract(voices: list[dict], ask) -> dict:
-    """Pede ao LLM as extracoes dos titulos, em lotes, e passa tudo pelo portao."""
+    """Pede ao LLM as extracoes dos titulos, em lotes paralelos, e passa tudo pelo portao.
+
+    Um lote que falha (tempo esgotado, resposta vazia) nao descarta os outros: o que veio dos
+    lotes bons fica e o erro de cada lote ruim vai em `chunk_errors`. Se todos falham, levanta.
+    """
     labeled = label_voices(voices)
     ids = list(labeled)
+    chunks = [ids[start : start + CHUNK] for start in range(0, len(ids), CHUNK)]
+
+    def one(chunk: list[str]) -> list[dict]:
+        user = "\n".join(f"{vid}: {labeled[vid]['title']}" for vid in chunk)
+        return parse_extractions(ask(SYSTEM, user))
+
     items: list[dict] = []
-    for start in range(0, len(ids), CHUNK):
-        user = "\n".join(f"{vid}: {labeled[vid]['title']}" for vid in ids[start : start + CHUNK])
-        items += parse_extractions(ask(SYSTEM, user))
-    return validate_extractions(items, labeled)
+    errors: list[str] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+        futures = [pool.submit(one, chunk) for chunk in chunks]
+        for n, future in enumerate(futures, 1):  # na ordem dos lotes, para o resultado ser estavel
+            try:
+                items += future.result()
+            except (OSError, ValueError, KeyError) as err:
+                errors.append(f"batch {n} of {len(chunks)}: {err}")
+    if chunks and len(errors) == len(chunks):
+        raise ValueError("; ".join(errors))
+    result = validate_extractions(items, labeled)
+    result["chunk_errors"] = errors
+    return result
 
 
 def converge_extractions(accepted: list[dict]) -> list[dict]:
@@ -245,7 +268,7 @@ def build(voices: list[dict], ask=None, model: str = "") -> dict:
     except (OSError, ValueError, KeyError) as err:
         # Falha do LLM nao derruba a decisao: volta ao modo por palavras-chave, dizendo isso.
         return {"method": "keywords", "voices": voices, "convergence": converge(voices), "llm_error": str(err)}
-    return {
+    block = {
         "method": "llm",
         "model": model,
         "voices": voices,
@@ -253,3 +276,7 @@ def build(voices: list[dict], ask=None, model: str = "") -> dict:
         "rejected": result["rejected"],
         "convergence": converge_extractions(result["accepted"]),
     }
+    if result["chunk_errors"]:
+        block["partial"] = True
+        block["chunk_errors"] = result["chunk_errors"]
+    return block

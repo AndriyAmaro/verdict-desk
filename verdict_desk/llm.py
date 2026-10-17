@@ -22,9 +22,9 @@ def available() -> bool:
     return bool(_key())
 
 
-def chat(system: str, user: str, timeout: int = 90) -> str:
+def chat(system: str, user: str, timeout: int = 90, max_tokens: int | None = None) -> str:
     body = json.dumps(
-        {"model": MODEL, "temperature": 0, "max_tokens": MAX_TOKENS, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+        {"model": MODEL, "temperature": 0, "max_tokens": max_tokens or MAX_TOKENS, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
     ).encode("utf-8")
     key = _key()
     request = urllib.request.Request(

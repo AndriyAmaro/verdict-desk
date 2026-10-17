@@ -17,9 +17,9 @@ def available() -> bool:
     return bool(os.environ.get("NVIDIA_API_KEY"))
 
 
-def chat(system: str, user: str, timeout: int = 90) -> str:
+def chat(system: str, user: str, timeout: int = 90, max_tokens: int | None = None) -> str:
     body = json.dumps(
-        {"model": MODEL, "temperature": 0, "max_tokens": MAX_TOKENS, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+        {"model": MODEL, "temperature": 0, "max_tokens": max_tokens or MAX_TOKENS, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
     ).encode("utf-8")
     request = urllib.request.Request(
         f"{BASE_URL}/chat/completions",

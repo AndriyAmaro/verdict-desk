@@ -153,7 +153,56 @@ class LlmNarrativeTest(unittest.TestCase):
         many = [{"name": f"F{i % 3}", "title": f"Bitcoin item {i}"} for i in range(45)]
         sizes = []
         narrative.extract(many, lambda system, user: sizes.append(len(user.splitlines())) or "[]")
-        self.assertEqual(sizes, [20, 20, 5])
+        full, rest = divmod(45, narrative.CHUNK)
+        self.assertEqual(sorted(sizes), sorted([narrative.CHUNK] * full + ([rest] if rest else [])))
+
+    def test_one_failed_batch_keeps_the_good_ones_and_says_so(self):
+        many = [{"name": f"F{i % 3}", "title": f"Bitcoin ETF inflow item {i}"} for i in range(45)]
+
+        def ask(system, user):
+            first = user.splitlines()[0].split(":")[0]
+            if first == f"V{narrative.CHUNK + 1}":  # o segundo lote estoura o tempo
+                raise TimeoutError("The read operation timed out")
+            ids = [line.split(":")[0] for line in user.splitlines()][:2]
+            return json.dumps([good(v, ["BTC"], "bullish", "Bitcoin ETF inflow") for v in ids])
+
+        block = narrative.build(many, ask, model="m")
+        self.assertEqual(block["method"], "llm")
+        self.assertTrue(block["partial"])
+        self.assertEqual(len(block["chunk_errors"]), 1)
+        batches = -(-45 // narrative.CHUNK)
+        self.assertIn(f"batch 2 of {batches}", block["chunk_errors"][0])
+        self.assertIn("timed out", block["chunk_errors"][0])
+        good_starts = [i * narrative.CHUNK + 1 for i in range(batches) if i != 1]
+        expected = [f"V{s + k}" for s in good_starts for k in (0, 1)]
+        self.assertEqual([x["voice"] for x in block["extractions"]], expected)
+
+    def test_results_keep_batch_order_even_when_batches_finish_out_of_order(self):
+        import time
+
+        many = [{"name": f"F{i % 3}", "title": f"Bitcoin item {i}"} for i in range(45)]
+
+        def ask(system, user):
+            first = user.splitlines()[0].split(":")[0]
+            if first == "V1":
+                time.sleep(0.2)  # o primeiro lote termina por ultimo
+            return json.dumps([good(first, ["BTC"], "bullish", "Bitcoin item")])
+
+        block = narrative.build(many, ask)
+        starts = [f"V{i * narrative.CHUNK + 1}" for i in range(-(-45 // narrative.CHUNK))]
+        self.assertEqual([x["voice"] for x in block["extractions"]], starts)
+        self.assertNotIn("partial", block)
+
+    def test_every_batch_failing_falls_back_and_lists_each_error(self):
+        many = [{"name": "A", "title": "Bitcoin x"}] * (narrative.CHUNK + 5)
+
+        def boom(system, user):
+            raise TimeoutError("slow")
+
+        block = narrative.build(many, boom)
+        self.assertEqual(block["method"], "keywords")
+        self.assertIn("batch 1 of 2", block["llm_error"])
+        self.assertIn("batch 2 of 2", block["llm_error"])
 
     def test_llm_failure_falls_back_to_keywords_and_says_so(self):
         def boom(system, user):

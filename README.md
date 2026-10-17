@@ -19,7 +19,7 @@ Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Cha
 ## Five-minute judge path
 
 1. Open the dashboard (the GitHub Pages site of this repository). It loads `ledger/ledger.jsonl` and shows the banner "Every hash recomputed in this browser matches". It does not trust the server: the hashing runs locally in `web/canonical.js`.
-2. Click a row. You see the deterministic bull and bear arguments with the exact indicator behind each one, then the LLM analysts' claims with the evidence id each one cites, and the claims the citation validator **rejected**, with the reason.
+2. Read the two panels above the table: the **cadence** of the live history (every gap between runs, nothing filled in) and the **simulated portfolio** (recomputed in your browser from the ledger with the same rule as `portfolio.py`). Then click a row. You see the deterministic bull and bear arguments with the exact indicator behind each one, then the LLM analysts' claims with the evidence id each one cites, and the claims the citation validator **rejected**, with the reason.
 3. Edit one character of the ledger in a text editor, load it with the file picker, and watch the row turn red (`ALTERED`) and the chain break from there on.
 4. Run it yourself:
 

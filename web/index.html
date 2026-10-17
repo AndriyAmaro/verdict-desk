@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verdict Desk</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mut:#666;--line:#ddd;--ok:#0a7a3d;--bad:#b3261e;--card:#f6f6f6}
+@media(prefers-color-scheme:dark){:root{--bg:#111;--fg:#eee;--mut:#999;--line:#333;--ok:#4cc38a;--bad:#ff6b5e;--card:#1b1b1b}}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif;margin:0 auto;max-width:900px;padding:16px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:16px 0 4px}.mut{color:var(--mut)}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+tbody tr{cursor:pointer}tbody tr:hover{background:var(--card)}
+.LONG,.ok{color:var(--ok)}.SHORT,.bad{color:var(--bad)}code{font-size:12px;word-break:break-all}
+#banner{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);margin:12px 0}
+#detail{border:1px solid var(--line);border-radius:8px;padding:4px 14px 12px;margin-top:14px;background:var(--card)}
+#detail[hidden]{display:none}ul{margin:4px 0 4px 18px;padding:0}li{margin:2px 0}
+input[type=file]{margin-left:6px}
+</style></head><body>
+<h1>Verdict Desk: simulated decision ledger</h1>
+<p class="mut">Every row is a frozen dossier. Decisions are simulated; no real orders are placed. This page recomputes every SHA-256 hash in your browser from the ledger text. It does not trust the server that hosts the file.</p>
+<p class="mut">Ledger: <code id="source"></code> <label>or open a file <input id="file" type="file" accept=".jsonl,.json,.txt"></label></p>
+<div id="banner" class="mut">Loading...</div>
+<table><thead><tr><th>#</th><th>Symbol</th><th>Action</th><th>Edge</th><th>LLM claims</th><th>Integrity</th><th>Hash</th></tr></thead><tbody id="rows"></tbody></table>
+<section id="detail" hidden></section>
+<script src="canonical.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const defaultSource = params.get("ledger") || "ledger/ledger.jsonl";
+
+function el(tag, text, cls) { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; }
+
+function render(result, name) {
+  $("source").textContent = name;
+  const rows = $("rows"); rows.replaceChildren(); $("detail").hidden = true;
+  for (const r of result.rows) {
+    const d = r.dossier, tr = document.createElement("tr");
+    const claims = d.llm ? ((d.llm.bull.accepted || []).length + (d.llm.bear.accepted || []).length) : "off";
+    const ok = r.linked && r.intact;
+    for (const [v, cls] of [[d.seq], [d.evidence.symbol], [d.verdict.action, d.verdict.action], [d.verdict.edge], [claims], [ok ? "verified" : (r.intact ? "chain broken" : "ALTERED"), ok ? "ok" : "bad"], [d.hash.slice(0, 16)]]) {
+      tr.appendChild(el("td", v, cls));
+    }
+    tr.addEventListener("click", () => showDetail(r));
+    rows.appendChild(tr);
+  }
+  const banner = $("banner");
+  banner.className = result.problems.length ? "bad" : "ok";
+  banner.textContent = result.problems.length
+    ? `${result.rows.length} dossiers. PROBLEMS: ${result.problems.join("; ")}`
+    : `${result.rows.length} dossiers. Every hash recomputed in this browser matches and every link in the chain is consistent.`;
+}
+
+function list(parent, title, items) {
+  parent.appendChild(el("h2", title));
+  const ul = document.createElement("ul");
+  for (const text of items.length ? items : ["none"]) ul.appendChild(el("li", text));
+  parent.appendChild(ul);
+}
+
+function showDetail(r) {
+  const d = r.dossier, box = $("detail"); box.replaceChildren(); box.hidden = false;
+  box.appendChild(el("h2", `Dossier #${d.seq}: ${d.evidence.symbol} ${d.verdict.action}`));
+  box.appendChild(el("p", d.verdict.rationale));
+  const e = d.evidence;
+  box.appendChild(el("p", `Evidence collected ${e.collected_at}. Candles: ${e.market.source}. Funding: ${e.funding.source}.`, "mut"));
+  const sens = d.sensitivity;
+  if (sens) {
+    const drops = sens.drop_one.map((x) => `Without the ${x.side} argument "${x.claim}" (weight ${x.weight}): edge ${x.edge_without}, verdict ${x.action_without}${x.flips ? " (this alone flips the verdict)" : ""}`);
+    list(box, `What would change this verdict: ${sens.needs_for_long} more net edge for LONG, ${sens.needs_for_short} more for SHORT`, drops);
+  }
+  if (e.origin) box.appendChild(el("p", `Origin: ${e.origin.kind}, journal turn ${e.origin.turn_id} (the agent itself did: ${e.origin.automaton_decision}). Shadow replay, not a trade result.`, "mut"));
+  const n = e.narrative;
+  if (n) {
+    const accepted = n.extractions || [], rejected = n.rejected || [];
+    list(box, `Narrative agent (${n.method}${n.model ? ", " + n.model : ""}): ${(n.voices || []).length} headlines, ${accepted.length} extractions accepted, ${rejected.length} rejected by the grounding gate`,
+      (n.convergence || []).map((c) => `Convergence: ${c.token} ${c.bias} across ${c.voices.join(", ")}${c.max_conviction ? ` (top conviction ${c.max_conviction}, top urgency ${c.max_urgency})` : ""}`));
+    if (n.llm_error) box.appendChild(el("p", `The model call failed (${n.llm_error}); keyword fallback used.`, "bad"));
+    list(box, "Accepted extractions", accepted.map((x) => `${x.name}: ${x.tokens.join("/")} ${x.stance}, conviction ${x.conviction}, urgency ${x.urgency}, quote "${x.quote}"`));
+    if (rejected.length) list(box, "Rejected extractions", rejected.map((x) => `REJECTED (${x.rejected_because}): ${x.voice} ${JSON.stringify(x.quote || "")}`));
+  }
+  list(box, "Bull arguments (deterministic rules)", d.bull.map((a) => `${a.claim} [${a.evidence_ref} = ${JSON.stringify(a.value)}, weight ${a.weight}]`));
+  list(box, "Bear arguments (deterministic rules)", d.bear.map((a) => `${a.claim} [${a.evidence_ref} = ${JSON.stringify(a.value)}, weight ${a.weight}]`));
+  if (d.llm) {
+    const idx = d.llm.evidence_index || {};
+    for (const side of ["bull", "bear"]) {
+      const accepted = d.llm[side].accepted || [], rejected = d.llm[side].rejected || [];
+      list(box, `${side} analyst (LLM ${d.llm.model}): ${accepted.length} accepted, ${rejected.length} rejected by the citation validator`,
+        accepted.map((c) => `${c.claim} cites ${c.cites.map((id) => `${id}: "${idx[id]}"`).join("; ")}`)
+          .concat(rejected.map((c) => `REJECTED (${c.rejected_because}): ${c.claim}`)));
+    }
+  }
+  box.appendChild(el("h2", "Integrity"));
+  box.appendChild(el("p", `Recorded hash ${d.hash}`, "mut")); box.appendChild(el("p", `Recomputed here ${r.recomputed}`, "mut"));
+  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function load(text, name) {
+  try { render(await VerdictDesk.verifyLedger(text, VerdictDesk.webSha256), name); }
+  catch (err) { $("banner").className = "bad"; $("banner").textContent = "Could not verify this ledger: " + err; }
+}
+
+$("file").addEventListener("change", async (ev) => { const f = ev.target.files[0]; if (f) load(await f.text(), f.name); });
+fetch(defaultSource).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+  .then((t) => load(t, defaultSource))
+  .catch((err) => { $("source").textContent = defaultSource; $("banner").textContent = "Could not load " + defaultSource + " (" + err + "). Open a ledger file above."; });
+</script></body></html>

@@ -1,0 +1,69 @@
+name: hourly-decision
+
+# Appends simulated decisions to ledger/ledger.jsonl every hour, verifies the hash chain,
+# publishes ledger/head.json and redeploys the dashboard. Scheduled runs are best effort:
+# GitHub may delay or skip them, and the ledger shows those gaps instead of hiding them.
+# Setup: add the secret NVIDIA_API_KEY (free NVIDIA NIM key) and set Pages to "GitHub Actions".
+# Without the key the run still records the deterministic core and labels the LLM layers as off.
+
+on:
+  schedule:
+    - cron: "11 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ledger
+  cancel-in-progress: false
+
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Record decisions (evidence, narrative, debate, verdict)
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/nemotron-3-super-120b-a12b' }}
+        run: python -m verdict_desk decide BTCUSDT ETHUSDT --default-feeds
+      - name: Verify the chain and write the head
+        run: |
+          python -m verdict_desk verify
+          python -m verdict_desk head --out ledger/head.json
+      - name: Commit the ledger
+        run: |
+          git config user.name "verdict-desk-bot"
+          git config user.email "verdict-desk-bot@users.noreply.github.com"
+          git add ledger
+          git commit -m "ledger: $(date -u +%Y-%m-%dT%H:%MZ)" || { echo "nothing recorded this hour"; exit 0; }
+          git push
+
+  pages:
+    needs: decide
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Build the site (dashboard plus the public ledger)
+        run: |
+          mkdir site
+          cp -r web/. site/
+          cp -r ledger site/ledger
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

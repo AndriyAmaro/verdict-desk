@@ -1,0 +1,8 @@
+{
+  "schedule": "0 0 0 * * *",
+  "headUrl": "https://raw.githubusercontent.com/OWNER/verdict-desk/main/ledger/head.json",
+  "chainSelectorName": "ethereum-testnet-sepolia",
+  "priceFeedAddress": "0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43",
+  "anchorAddress": "0x0000000000000000000000000000000000000000",
+  "gasLimit": "500000"
+}

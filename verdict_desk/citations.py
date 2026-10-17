@@ -7,6 +7,8 @@ com numero que nao aparece nos itens citados.
 
 import re
 
+from . import narrative as narrative_mod
+
 NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 
 
@@ -27,7 +29,12 @@ def index(packet: dict, feats: dict | None = None) -> dict[str, str]:
         items.append(f"Perpetual funding rate {rate} ({packet['funding'].get('instrument', '')})")
     for article in packet.get("news", {}).get("articles", []):
         items.append(f"News ({article.get('domain', '')}): {article.get('title', '')}")
-    for voice in packet.get("narrative", {}).get("voices", []):
+    block = packet.get("narrative") or {}
+    base = packet["symbol"].upper().removesuffix("USDT")
+    relevant_only = block.get("index_version", 1) >= 2  # blocos antigos mantem o indice antigo: o replay deles nao muda
+    for voice in block.get("voices", []):
+        if relevant_only and not narrative_mod.mentions(voice.get("title", ""), base):
+            continue
         items.append(f"Voice {voice.get('name', '')}: {voice.get('title', '')}")
     if feats:
         items.append(f"Trend: fast EMA {feats['ema_fast']} versus slow EMA {feats['ema_slow']}")
@@ -37,9 +44,10 @@ def index(packet: dict, feats: dict | None = None) -> dict[str, str]:
         )
         items.append(f"Last candle volume is {feats['volume_ratio']} times the 24-candle average")
         items.append(f"Average true range over 14 candles: {feats['atr_14']}")
-    narrative = packet.get("narrative") or {}
-    if "method" in narrative:  # pacotes antigos nao tinham o campo; seus ids nao mudam
-        for c in narrative.get("convergence", []):
+    if "method" in block:  # pacotes antigos nao tinham o campo; seus ids nao mudam
+        for c in block.get("convergence", []):
+            if relevant_only and c.get("token") != base:
+                continue
             extra = f", top conviction {c['max_conviction']}, top urgency {c['max_urgency']}" if "max_conviction" in c else ""
             items.append(f"Narrative convergence: {len(c['voices'])} voices ({', '.join(c['voices'])}) are {c['bias']} on {c['token']}{extra}")
     return {f"E{i}": text for i, text in enumerate(items, 1)}

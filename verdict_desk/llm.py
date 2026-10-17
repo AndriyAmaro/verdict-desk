@@ -6,6 +6,7 @@ e falso e os agentes LLM nao rodam (o nucleo deterministico segue sozinho).
 
 import json
 import os
+import urllib.error
 import urllib.request
 
 BASE_URL = os.environ.get("NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
@@ -13,21 +14,31 @@ MODEL = os.environ.get("NIM_MODEL", "nvidia/nemotron-3-ultra-550b-a55b")
 MAX_TOKENS = int(os.environ.get("NIM_MAX_TOKENS", "3000"))  # modelos de raciocinio gastam tokens antes da resposta
 
 
+def _key() -> str:
+    return os.environ.get("NVIDIA_API_KEY", "").strip()
+
+
 def available() -> bool:
-    return bool(os.environ.get("NVIDIA_API_KEY"))
+    return bool(_key())
 
 
 def chat(system: str, user: str, timeout: int = 90) -> str:
     body = json.dumps(
         {"model": MODEL, "temperature": 0, "max_tokens": MAX_TOKENS, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
     ).encode("utf-8")
+    key = _key()
     request = urllib.request.Request(
         f"{BASE_URL}/chat/completions",
         data=body,
-        headers={"Authorization": f"Bearer {os.environ['NVIDIA_API_KEY']}", "Content-Type": "application/json"},
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        choice = json.loads(response.read().decode("utf-8"))["choices"][0]
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            choice = json.loads(response.read().decode("utf-8"))["choices"][0]
+    except urllib.error.HTTPError as err:
+        # O erro vai para o dossie: inclui o corpo da resposta (curto, sem a chave) para a causa aparecer no historico.
+        detail = err.read(300).decode("utf-8", "replace").replace(key, "***").replace("\n", " ").strip()
+        raise OSError(f"HTTP {err.code} {err.reason} from {BASE_URL} model {MODEL}: {detail or 'no body'}") from err
     content = choice["message"].get("content")
     if not content:
         raise ValueError(f"model returned no content (finish_reason={choice.get('finish_reason')}); raise NIM_MAX_TOKENS")

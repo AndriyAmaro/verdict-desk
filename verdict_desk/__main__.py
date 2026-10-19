@@ -56,7 +56,7 @@ def print_record(record: dict) -> None:
                 print(f"  [llm {side}] {c['claim']} cites {c['cites']}")
             print(f"  [llm {side}] {len(layer[side]['rejected'])} claims rejected by the citation validator")
     else:
-        print("  LLM analysts off (no NVIDIA_API_KEY): deterministic core only")
+        print("  LLM analysts off (no MISTRAL_API_KEY): deterministic core only")
 
 
 def cmd_replay(opts) -> int:

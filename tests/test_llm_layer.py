@@ -55,8 +55,8 @@ class LlmHttpErrorTest(unittest.TestCase):
         from verdict_desk import llm
 
         original = urllib.request.urlopen
-        old_key = os.environ.get("NVIDIA_API_KEY")
-        os.environ["NVIDIA_API_KEY"] = "  nvapi-SECRET-VALUE \n"
+        old_key = os.environ.get("MISTRAL_API_KEY")
+        os.environ["MISTRAL_API_KEY"] = "  SECRET-VALUE-123 \n"
         urllib.request.urlopen = lambda request, timeout=0: (_ for _ in ()).throw(error)
         try:
             with self.assertRaises(OSError) as ctx:
@@ -64,31 +64,31 @@ class LlmHttpErrorTest(unittest.TestCase):
         finally:
             urllib.request.urlopen = original
             if old_key is None:
-                del os.environ["NVIDIA_API_KEY"]
+                del os.environ["MISTRAL_API_KEY"]
             else:
-                os.environ["NVIDIA_API_KEY"] = old_key
+                os.environ["MISTRAL_API_KEY"] = old_key
         return str(ctx.exception)
 
     def test_http_error_message_carries_status_and_body_but_never_the_key(self):
         import io
         import urllib.error
 
-        body = io.BytesIO(b'{"status":403,"detail":"Forbidden for nvapi-SECRET-VALUE"}')
+        body = io.BytesIO(b'{"status":403,"detail":"Forbidden for SECRET-VALUE-123"}')
         message = self.call_with(urllib.error.HTTPError("https://x", 403, "Forbidden", {}, body))
         self.assertIn("HTTP 403 Forbidden", message)
         self.assertIn("Forbidden for ***", message)
-        self.assertNotIn("nvapi-SECRET-VALUE", message)
+        self.assertNotIn("SECRET-VALUE-123", message)
 
     def test_key_with_stray_whitespace_is_trimmed(self):
         import os
 
         from verdict_desk import llm
 
-        os.environ["NVIDIA_API_KEY"] = "  \n"
+        os.environ["MISTRAL_API_KEY"] = "  \n"
         try:
             self.assertFalse(llm.available())
         finally:
-            del os.environ["NVIDIA_API_KEY"]
+            del os.environ["MISTRAL_API_KEY"]
 
 
 if __name__ == "__main__":

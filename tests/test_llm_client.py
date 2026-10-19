@@ -188,6 +188,47 @@ class ClientTest(unittest.TestCase):
         for earlier, later in zip(waits, waits[1:]):
             self.assertAlmostEqual(later - earlier, 0.5, delta=0.05)
 
+    def test_model_defaults_to_mistral_small_latest_and_follows_MISTRAL_MODEL(self):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        code = f"import sys; sys.path.insert(0, {root!r}); from verdict_desk import llm; print(llm.MODEL)"
+        for value, expected in ((None, "mistral-small-latest"), ("", "mistral-small-latest"), ("mistral-medium-latest", "mistral-medium-latest")):
+            with self.subTest(value=value):
+                env = {k: v for k, v in os.environ.items() if k != "MISTRAL_MODEL"}
+                if value is not None:
+                    env["MISTRAL_MODEL"] = value
+                out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True).stdout.strip()
+                self.assertEqual(out, expected)
+
+    def test_bull_bear_and_narrative_all_send_the_one_configured_model(self):
+        from tests.test_dossier import packet
+        from verdict_desk import dossier, narrative
+
+        sent = []
+
+        def fake_urlopen(request, timeout=0):
+            sent.append(json.loads(request.data)["model"])
+            return reply("[]")
+
+        voices = [{"name": f"Voice{i % 3}", "title": f"BTC headline {i}", "url": f"http://x/{i}"} for i in range(12)]
+        batches = -(-len(voices) // narrative.CHUNK)
+        with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen), mock.patch.object(llm, "MODEL", "model-under-test"):
+            layer = dossier.analyst_layer(packet(0.004, titles=("Bitcoin rally hits record",)))  # touro e urso
+            block = narrative.build(voices, llm.chat, llm.MODEL)  # narrativa, em lotes
+        self.assertEqual(len(sent), 2 + batches)
+        self.assertEqual(set(sent), {"model-under-test"})
+        self.assertEqual(layer["model"], "model-under-test")
+        self.assertEqual(block["model"], "model-under-test")
+
+    def test_no_previous_provider_model_name_is_left_in_the_package(self):
+        package = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "verdict_desk")
+        hits = []
+        for name in sorted(os.listdir(package)):
+            if name.endswith(".py"):
+                with open(os.path.join(package, name), encoding="utf-8") as handle:
+                    if "nemotron" in handle.read().lower():
+                        hits.append(name)
+        self.assertEqual(hits, [])
+
     def test_numeric_env_falls_back_when_invalid_empty_or_out_of_range(self):
         positive = lambda v: v > 0
         for raw, cast, default, expected in (("abc", int, 7, 7), ("", float, 1.5, 1.5), ("9", int, 7, 9), ("-5", int, 7, 7), ("0", int, 7, 7)):

@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tests.test_dossier import packet
 from verdict_desk import dossier
@@ -37,6 +38,26 @@ class LlmLayerTest(unittest.TestCase):
         d["llm"]["bull"]["accepted"][0]["claim"] = "Bitcoin rally hits 99999"
         self.assertFalse(dossier.replay(d)["matches"])
 
+    def test_claims_cited_by_bare_numbers_are_rejected_and_the_same_claims_cited_by_id_pass(self):
+        # O que o modelo fez no seq 36 (cites: [14]) contra o que o prompt manda (cites: ["E14"]).
+        bare = lambda system, user: json.dumps([{"claim": "Bitcoin rally hits record", "cites": [4]}])
+        by_id = lambda system, user: json.dumps([{"claim": "Bitcoin rally hits record", "cites": ["E4"]}])
+        for ask, accepted in ((bare, 0), (by_id, 1)):
+            layer = dossier.build(self.pkt, dossier.GENESIS, 1, ask=ask)["llm"]
+            for side in ("bull", "bear"):
+                self.assertEqual(len(layer[side]["accepted"]), accepted)
+                self.assertEqual([c["rejected_because"] for c in layer[side]["rejected"]], ["unknown evidence id"] * (1 - accepted))
+
+    def test_malformed_citations_are_rejected_and_do_not_stop_the_dossier(self):
+        weird = lambda system, user: json.dumps(
+            [{"claim": "x", "cites": [["E4"]]}, {"claim": "y", "cites": {"id": "E4"}}, {"claim": "z", "cites": 4}]
+        )
+        d = dossier.build(self.pkt, dossier.GENESIS, 1, ask=weird)
+        for side in ("bull", "bear"):
+            self.assertEqual(d["llm"][side]["accepted"], [])
+            self.assertEqual(len(d["llm"][side]["rejected"]), 3)
+        self.assertEqual(dossier.verify([d]), [])
+
     def test_llm_failure_is_recorded_not_fatal(self):
         def boom(system, user):
             raise OSError("down")
@@ -59,7 +80,8 @@ class LlmHttpErrorTest(unittest.TestCase):
         os.environ["MISTRAL_API_KEY"] = "  SECRET-VALUE-123 \n"
         urllib.request.urlopen = lambda request, timeout=0: (_ for _ in ()).throw(error)
         try:
-            with self.assertRaises(OSError) as ctx:
+            # Sem espacamento aqui: a chamada nao dorme de verdade e nao deixa `_next_start` no futuro para os outros testes.
+            with mock.patch.object(llm, "MIN_INTERVAL", 0.0), mock.patch.object(llm, "_next_start", 0.0), self.assertRaises(OSError) as ctx:
                 llm.chat("system", "user")
         finally:
             urllib.request.urlopen = original

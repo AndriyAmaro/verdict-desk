@@ -64,7 +64,9 @@ def validate(claims: list[dict], evidence_items: dict[str, str]) -> dict:
             reason = "empty claim"
         elif not cites:
             reason = "no citation"
-        elif any(c not in evidence_items for c in cites):
+        elif not isinstance(cites, list) or any(not isinstance(c, str) or c not in evidence_items for c in cites):
+            # Id e a string do indice ("E3"): numero solto ou valor aninhado nao e citacao, e um valor
+            # nao hashavel tem de ser recusado aqui em vez de derrubar a rodada inteira no teste `in`.
             reason = "unknown evidence id"
         else:
             cited = " ".join(evidence_items[c] for c in cites)

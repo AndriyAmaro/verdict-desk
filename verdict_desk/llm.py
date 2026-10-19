@@ -187,9 +187,12 @@ def argue(side: str, evidence_items: dict[str, str], ask=chat) -> list[dict]:
         "Pick the evidence items that best support your side and say what each one implies for the next move. "
         "Be honest: if the evidence does not support your side, return fewer claims or an empty list. "
         'Reply ONLY with a JSON list of objects {"claim": str, "cites": [evidence ids]}. '
+        "Every evidence item starts with its id (E1, E2, ...) before the colon. You MUST cite items by those ids, "
+        'written as strings exactly as listed: a claim that rests on items E3 and E14 has "cites": ["E3", "E14"]. '
+        "A bare number such as 14 is not an id: a claim that does not cite by id is discarded. "
         "Rules: cite at least one evidence id per claim; every number in a claim must appear in a cited item, "
-        "so never invent horizons, thresholds or percentages; at most 4 claims; "
-        "the two sides pick different facts because each side favors different ones."
+        "copied exactly as written (never rounded), so never invent horizons, thresholds or percentages; "
+        "at most 4 claims; the two sides pick different facts because each side favors different ones."
     )
     user = "\n".join(f"{k}: {v}" for k, v in evidence_items.items())
     return parse_claims(ask(system, user))

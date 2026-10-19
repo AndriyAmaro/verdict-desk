@@ -26,7 +26,7 @@ The legal angle fits the organizer (Blockchain Legal Institute): a dossier is bu
 | Submission due 2026-10-31 22:01 (DoraHacks time); internal cut-off 2026-10-22 for an end-to-end demo with LLM | Small modular core, reuse of what exists, no new platforms |
 | Budget zero | Public keyless data, free LLM tier only, free hosting (GitHub) |
 | Brazil-based maintainer | Binance futures API is blocked by location; the public spot mirror is used |
-| LLM key (NVIDIA NIM) currently absent in the cloud environment | LLM layer is optional and injectable; the core runs alone |
+| LLM key (Mistral API) not configured yet in the cloud environment | LLM layer is optional and injectable; the core runs alone |
 | No X (Twitter) API | Narrative agent reads public RSS feeds instead |
 | Original code, MIT license, third-party code only credited | The automaton's journal is used as a data source only, never as submitted code |
 | Judge-facing text in American English | This document, README, dashboard and video script |
@@ -45,7 +45,7 @@ graph TB
     okx["OKX public API<br/>(external) funding rate"]
     gdelt["GDELT DOC API<br/>(external) news"]
     rss["Public RSS feeds<br/>(external) narrative voices"]
-    nim["NVIDIA NIM<br/>(external, optional) LLM analysts"]
+    mistral["Mistral API<br/>(external, optional) LLM analysts"]
     github["GitHub<br/>(external) repo, Actions, Pages"]
     cre["Chainlink CRE + Data Feed + testnet<br/>(external, planned) anchoring"]
 
@@ -55,7 +55,7 @@ graph TB
     system -->|"GET funding"| okx
     system -->|"GET articles"| gdelt
     system -->|"GET feeds"| rss
-    system -->|"POST chat completions"| nim
+    system -->|"POST chat completions"| mistral
     system -->|"commits ledger hourly"| github
     cre -->|"reads ledger head, writes hash"| system
 
@@ -64,7 +64,7 @@ graph TB
     classDef external fill:#999,stroke:#666,color:#fff
     class judge,operator person
     class system internal
-    class binance,okx,gdelt,rss,nim,github,cre external
+    class binance,okx,gdelt,rss,mistral,github,cre external
 ```
 
 **Inside the boundary:** evidence collection, feature computation, the debate and judge, the LLM citation validator, the ledger, replay and verification, the simulated portfolio, the backtest, the static dashboard and browser verifier.
@@ -95,11 +95,11 @@ graph TB
     end
 
     data["Public data sources<br/>Binance, OKX, GDELT, RSS"]
-    nim["NVIDIA NIM (optional)"]
+    mistral["Mistral API (optional)"]
 
     actions -->|"runs"| cli
     cli -->|"GET"| data
-    cli -->|"chat, optional"| nim
+    cli -->|"chat, optional"| mistral
     cli -->|"appends"| ledger
     actions -->|"commits"| ledger
     web -->|"fetch ledger"| ledger
@@ -116,7 +116,7 @@ graph TB
     class judge person
     class cli,web,ledger container
     class actions,flow,anchor planned
-    class data,nim external
+    class data,mistral external
 ```
 
 Dashed blocks are planned. The engine's modules (package `verdict_desk`):
@@ -128,7 +128,7 @@ Dashed blocks are planned. The engine's modules (package `verdict_desk`):
 | `features` | Compute indicators (EMA, 24-candle range, ATR, volume ratio, news tone) from the packet only | pure |
 | `agents` | Bull and bear rule sets; deterministic judge sizing a simulated position (1% risk, ATR stop and target) | pure |
 | `citations` | Build the evidence index (E1, E2, ...) and validate LLM claims against it | pure |
-| `llm` | NVIDIA NIM client, tolerant JSON parser, injectable `ask` for offline tests | I/O (optional) |
+| `llm` | Mistral API client (spaced calls, retry on 429 and 5xx, no key in errors), tolerant JSON parser, injectable `ask` for offline tests | I/O (optional) |
 | `dossier` | Build, chain, append, replay and verify dossiers | pure + file append |
 | `portfolio` | Mark simulated positions against later recorded candles; stop wins ties | pure |
 | `backtest` | Walk-forward run of the same rules on past candles, with fees and a series hash | I/O + pure |
@@ -156,7 +156,7 @@ sequenceDiagram
     Ev-->>CLI: frozen evidence packet
     CLI->>D: append(packet)
     D->>D: features, bull, bear, judge (pure)
-    opt NVIDIA_API_KEY present
+    opt MISTRAL_API_KEY present
         D->>L: argue(bull), argue(bear)
         L-->>D: claims, validated against evidence index
     end
@@ -180,7 +180,7 @@ No server, database or container is needed. Hosting cost is zero. The live envir
 
 ## 8. Cross-cutting Concepts
 
-**Security and trust model.** The hash chain proves **integrity after recording**, not **authenticity at collection time**: an operator could in principle fabricate a packet before hashing it. The design narrows that gap with independent witnesses: (1) every packet carries its source URL and timestamp, and historical candles can be re-fetched by anyone and compared; (2) git history, written by an hourly job in a public repo, timestamps each commit outside the operator's clock; (3) the planned CRE anchor writes the head hash to a testnet with an oracle price, which a later edit cannot rewrite. Secrets: the only secret is `NVIDIA_API_KEY`, read from the environment and never written to a dossier or log. There is no key with trading rights anywhere.
+**Security and trust model.** The hash chain proves **integrity after recording**, not **authenticity at collection time**: an operator could in principle fabricate a packet before hashing it. The design narrows that gap with independent witnesses: (1) every packet carries its source URL and timestamp, and historical candles can be re-fetched by anyone and compared; (2) git history, written by an hourly job in a public repo, timestamps each commit outside the operator's clock; (3) the planned CRE anchor writes the head hash to a testnet with an oracle price, which a later edit cannot rewrite. Secrets: the only secret is `MISTRAL_API_KEY`, read from the environment and never written to a dossier or log. There is no key with trading rights anywhere.
 
 **Data.** One append-only JSONL file; one line per dossier; canonical JSON (sorted keys, compact separators) hashed with SHA-256; genesis hash is 64 zeros. Each dossier embeds its own evidence (about 72 candles), so lines are self-contained and verifiable in isolation. Migration: the rules carry `rules_version` ("v1"); a new rule set ships as v2 and never rewrites v1 history.
 

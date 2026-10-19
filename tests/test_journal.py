@@ -114,11 +114,11 @@ class AuditTest(unittest.TestCase):
         ]
 
     def run_audit(self):
-        os.environ["NVIDIA_API_KEY"] = "must-not-be-used"
+        os.environ["MISTRAL_API_KEY"] = "must-not-be-used"
         try:
             return journal.audit(self.rows, get=make_get())
         finally:
-            del os.environ["NVIDIA_API_KEY"]
+            del os.environ["MISTRAL_API_KEY"]
 
     def test_one_shadow_decision_per_symbol_hour_and_chain_verifies(self):
         result = self.run_audit()

@@ -40,7 +40,7 @@ public data ──> frozen evidence packet ──> bull agent ┐
 ```
 
 - **Evidence.** Binance public spot mirror (candles), OKX public funding, GDELT news, and public RSS or Atom feeds. No API key is needed for any of them. A source that fails reduces the evidence and is recorded as a gap; it never fakes a decision.
-- **Agents.** The bull and bear analysts are LLM agents (NVIDIA NIM, free tier) that must cite evidence ids. A validator discards any claim with no citation, an unknown id, or a number that is not in the cited items. The judge that decides action, size, stop and target is deterministic code, so the same frozen packet always yields the same verdict.
+- **Agents.** The bull and bear analysts are LLM agents (Mistral API, free tier) that must cite evidence ids. A validator discards any claim with no citation, an unknown id, or a number that is not in the cited items. The judge that decides action, size, stop and target is deterministic code, so the same frozen packet always yields the same verdict.
 - **Cause and effect.** Each dossier also freezes a sensitivity table: how much more net edge would flip the verdict to LONG or SHORT, and, for each argument, what the verdict would be without it (and whether that single argument decides it). It comes from the same arguments and weights the judge used, so it is deterministic and replayed too.
 - **Narrative agent.** Reads up to 20 public voices. The LLM extracts token, stance, conviction and urgency per headline. Headlines are untrusted input, so each extraction must carry a quote that is a literal part of the headline, a voice id that exists and values from a closed vocabulary; anything else is dropped and logged in the packet. Convergence needs at least two distinct voices on the same token and stance. If the model is down the packet says `keywords` and uses a plain word-list fallback.
 - **Ledger.** JSONL, one dossier per line, each with `prev_hash` and its own `hash` over RFC 8785 canonical JSON. The same canonicalization runs in Python and JavaScript, with shared test vectors, which is what lets the browser recompute the exact hash Python wrote.
@@ -86,8 +86,8 @@ Status, stated plainly: the workflow is covered by 10 tests with the SDK mocks a
 Python 3.10 or newer, standard library only. Optional: Node (cross-language hash test), Bun (CRE workflow tests).
 
 ```bash
-export NVIDIA_API_KEY=...          # optional, free NVIDIA NIM key; without it the LLM layers are off and labeled so
-export NIM_MODEL=nvidia/nemotron-3-super-120b-a12b   # optional
+export MISTRAL_API_KEY=...         # optional, free Mistral API key; without it the LLM layers are off and labeled so
+export MISTRAL_MODEL=mistral-small-latest   # optional
 python3 -m verdict_desk decide BTCUSDT ETHUSDT --default-feeds
 python3 -m verdict_desk decide SOLUSDT --feed "My voice=https://example.com/feed.xml"
 python3 -m verdict_desk backtest BTCUSDT

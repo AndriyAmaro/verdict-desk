@@ -8,7 +8,10 @@ o inicio das chamadas (tambem entre threads, como nos lotes paralelos da narrati
 tenta de novo em 429 e 5xx. Nenhuma excecao deste modulo carrega a chave.
 """
 
+import datetime
+import email.utils
 import json
+import math
 import os
 import threading
 import time
@@ -16,17 +19,19 @@ import urllib.error
 import urllib.request
 
 
-def _number(name: str, default, cast):
+def _number(name: str, default, cast, valid):
+    """Le um numero do ambiente; vazio, ilegivel ou fora do intervalo valido volta ao padrao."""
     try:
-        return cast(os.environ.get(name) or default)
+        value = cast(os.environ.get(name) or default)
     except ValueError:
         return default
+    return value if valid(value) else default
 
 
 BASE_URL = os.environ.get("MISTRAL_BASE_URL") or "https://api.mistral.ai/v1"
 MODEL = os.environ.get("MISTRAL_MODEL") or "mistral-small-latest"
-MAX_TOKENS = _number("MISTRAL_MAX_TOKENS", 3000, int)  # modelos com raciocinio gastam tokens antes da resposta
-MIN_INTERVAL = _number("MISTRAL_MIN_INTERVAL", 1.1, float)  # segundos entre inicios de chamada
+MAX_TOKENS = _number("MISTRAL_MAX_TOKENS", 3000, int, lambda v: v > 0)  # modelos com raciocinio gastam tokens antes da resposta
+MIN_INTERVAL = _number("MISTRAL_MIN_INTERVAL", 1.1, float, lambda v: math.isfinite(v) and v >= 0)  # segundos entre inicios de chamada
 MAX_RETRIES = 4
 RETRY_STATUS = {429, 500, 502, 503, 504}
 MAX_WAIT = 60.0
@@ -77,11 +82,27 @@ def _wait_turn() -> None:
         _pause(start - now)
 
 
-def _retry_delay(err: urllib.error.HTTPError, attempt: int) -> float:
-    try:
-        return max(0.0, min(float((err.headers or {}).get("Retry-After")), MAX_WAIT))
-    except (TypeError, ValueError):
+def _retry_delay(err: urllib.error.HTTPError, attempt: int) -> float | None:
+    """Segundos ate a proxima tentativa, ou None quando o servidor pede mais que MAX_WAIT.
+
+    `Retry-After` vale em segundos ou como data HTTP. Tentar antes do pedido so gastaria
+    tentativas contra o mesmo limite, e esperar mais que MAX_WAIT seguraria a rodada horaria:
+    nesse caso o erro e registrado na hora. Sem cabecalho utilizavel, recuo exponencial.
+    """
+    value = (err.headers or {}).get("Retry-After")
+    wait = None
+    if value is not None:
+        try:
+            wait = float(value)
+        except (TypeError, ValueError):
+            try:
+                wait = (email.utils.parsedate_to_datetime(value) - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+            except (TypeError, ValueError):
+                wait = None
+    if wait is None or math.isnan(wait):
         return min(2.0 ** (attempt + 1), MAX_WAIT)
+    wait = max(0.0, wait)
+    return wait if wait <= MAX_WAIT else None
 
 
 def _http_error(err: urllib.error.HTTPError, key: str) -> LLMError:
@@ -128,9 +149,10 @@ def chat(system: str, user: str, timeout: int = 90, max_tokens: int | None = Non
                 choice = _first_choice(response.read())
             break
         except urllib.error.HTTPError as err:
-            if err.code not in RETRY_STATUS or attempt == MAX_RETRIES:
+            delay = _retry_delay(err, attempt) if err.code in RETRY_STATUS and attempt < MAX_RETRIES else None
+            if delay is None:
                 raise _http_error(err, key) from err
-            _pause(_retry_delay(err, attempt))
+            _pause(delay)
     message = choice.get("message")
     content = message_text(message.get("content") if isinstance(message, dict) else None)
     if not content:

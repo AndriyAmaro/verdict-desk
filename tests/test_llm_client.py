@@ -1,6 +1,10 @@
+import datetime
+import email.utils
 import io
 import json
 import os
+import subprocess
+import sys
 import threading
 import unittest
 import urllib.error
@@ -112,6 +116,33 @@ class ClientTest(unittest.TestCase):
             self.assertEqual(llm.chat("s", "u"), "done")
         self.assertEqual([c.args[0] for c in self.pause.call_args_list], [2.0, 4.0])
 
+    def test_retry_after_as_http_date_is_honored(self):
+        when = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=30)
+        header = email.utils.format_datetime(when, usegmt=True)
+        with mock.patch("urllib.request.urlopen", side_effect=[http_error(429, retry_after=header), reply("done")]):
+            self.assertEqual(llm.chat("s", "u"), "done")
+        (waited,), _ = self.pause.call_args
+        self.assertAlmostEqual(waited, 30.0, delta=2.0)
+
+    def test_retry_after_beyond_the_cap_fails_fast_instead_of_retrying_early(self):
+        for header in ("120", "inf", "Mon, 19 Oct 2099 06:10:00 GMT"):
+            with self.subTest(header=header):
+                self.pause.reset_mock()
+                error = http_error(429, b'{"message":"quota"}', retry_after=header)
+                with mock.patch("urllib.request.urlopen", side_effect=[error]) as urlopen:
+                    with self.assertRaisesRegex(llm.LLMError, "429"):
+                        llm.chat("s", "u")
+                self.assertEqual(urlopen.call_count, 1)
+                self.pause.assert_not_called()
+
+    def test_unusable_retry_after_falls_back_to_backoff(self):
+        for header in ("soon", "nan", ""):
+            with self.subTest(header=header):
+                self.pause.reset_mock()
+                with mock.patch("urllib.request.urlopen", side_effect=[http_error(429, retry_after=header), reply("done")]):
+                    self.assertEqual(llm.chat("s", "u"), "done")
+                self.pause.assert_called_once_with(2.0)
+
     def test_gives_up_after_the_retry_budget(self):
         errors = [http_error(429, b'{"message":"rate limit"}') for _ in range(llm.MAX_RETRIES + 1)]
         with mock.patch("urllib.request.urlopen", side_effect=errors) as urlopen:
@@ -157,13 +188,27 @@ class ClientTest(unittest.TestCase):
         for earlier, later in zip(waits, waits[1:]):
             self.assertAlmostEqual(later - earlier, 0.5, delta=0.05)
 
-    def test_numeric_env_falls_back_when_invalid_or_empty(self):
-        with mock.patch.dict(os.environ, {"X_NUM": "abc"}):
-            self.assertEqual(llm._number("X_NUM", 7, int), 7)
-        with mock.patch.dict(os.environ, {"X_NUM": ""}):
-            self.assertEqual(llm._number("X_NUM", 1.5, float), 1.5)
-        with mock.patch.dict(os.environ, {"X_NUM": "9"}):
-            self.assertEqual(llm._number("X_NUM", 7, int), 9)
+    def test_numeric_env_falls_back_when_invalid_empty_or_out_of_range(self):
+        positive = lambda v: v > 0
+        for raw, cast, default, expected in (("abc", int, 7, 7), ("", float, 1.5, 1.5), ("9", int, 7, 9), ("-5", int, 7, 7), ("0", int, 7, 7)):
+            with self.subTest(raw=raw):
+                with mock.patch.dict(os.environ, {"X_NUM": raw}):
+                    self.assertEqual(llm._number("X_NUM", default, cast, positive), expected)
+
+    def test_bad_numeric_env_values_fall_back_to_the_defaults_at_import(self):
+        # MISTRAL_MIN_INTERVAL=inf fazia a segunda chamada levantar OverflowError, que o dossie nao captura.
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        code = f"import sys; sys.path.insert(0, {root!r}); from verdict_desk import llm; print(llm.MAX_TOKENS, llm.MIN_INTERVAL)"
+        for tokens, interval, expected in (
+            ("-5", "inf", "3000 1.1"),
+            ("0", "nan", "3000 1.1"),
+            ("abc", "-3", "3000 1.1"),
+            ("6000", "0", "6000 0.0"),  # espacamento zero e permitido (plano pago)
+        ):
+            with self.subTest(tokens=tokens, interval=interval):
+                env = {**os.environ, "MISTRAL_MAX_TOKENS": tokens, "MISTRAL_MIN_INTERVAL": interval}
+                out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True).stdout.strip()
+                self.assertEqual(out, expected)
 
 
 class LocalServerTest(unittest.TestCase):

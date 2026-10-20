@@ -1,3 +1,4 @@
+import re
 import unittest
 
 from tests.test_dossier import packet
@@ -28,6 +29,18 @@ class CitationsTest(unittest.TestCase):
     def test_accepts_number_present_in_cited_item(self):
         claims = [{"claim": "Funding rate is 0.0001", "cites": ["E3"]}]
         self.assertEqual(len(citations.validate(claims, self.items)["accepted"]), 1)
+
+    def test_bare_numbers_and_nested_values_are_not_citations(self):
+        claims = [
+            {"claim": "Bitcoin rally hits record", "cites": [4]},  # numero solto, o que o modelo fez no seq 36
+            {"claim": "Bitcoin rally hits record", "cites": "E4"},  # string em vez de lista
+            {"claim": "Bitcoin rally hits record", "cites": [["E4"]]},  # nao hashavel
+            {"claim": "Bitcoin rally hits record", "cites": [{"id": "E4"}]},  # nao hashavel
+            {"claim": "Bitcoin rally hits record", "cites": ["E4"]},
+        ]
+        result = citations.validate(claims, self.items)
+        self.assertEqual([c["cites"] for c in result["accepted"]], [["E4"]])
+        self.assertEqual([c["rejected_because"] for c in result["rejected"]], ["unknown evidence id"] * 4)
 
 
 class FeatureEvidenceTest(unittest.TestCase):
@@ -79,3 +92,24 @@ class LlmTest(unittest.TestCase):
     def test_argue_uses_injected_ask(self):
         out = llm.argue("bull", {"E1": "x"}, ask=lambda s, u: '[{"claim":"x","cites":["E1"]}]')
         self.assertEqual(out[0]["cites"], ["E1"])
+
+    def test_prompt_requires_citing_by_the_index_ids(self):
+        seen = []
+        items = {"E1": "first item", "E2": "second item"}
+        for side in ("bull", "bear"):
+            llm.argue(side, items, ask=lambda system, user: seen.append((system, user)) or "[]")
+        self.assertEqual(len(seen), 2)
+        for system, user in seen:
+            self.assertIn("starts with its id (E1, E2, ...)", system)
+            self.assertIn("You MUST cite items by those ids", system)
+            self.assertIn('has "cites": ["E3", "E14"]', system)
+            self.assertIn("A bare number such as 14 is not an id", system)
+            self.assertIn("copied exactly as written", system)
+            self.assertEqual(user.splitlines(), ["E1: first item", "E2: second item"])  # o modelo ve os ids como o prompt os descreve
+
+    def test_prompt_examples_use_the_same_id_format_as_the_index(self):
+        pkt = packet(0.004, titles=("Bitcoin rally hits record",))
+        self.assertTrue(all(re.fullmatch(r"E\d+", key) for key in citations.index(pkt)))
+        seen = []
+        llm.argue("bull", {"E1": "x"}, ask=lambda system, user: seen.append(system) or "[]")
+        self.assertEqual(re.findall(r'"(E\d+)"', seen[0]), ["E3", "E14"])

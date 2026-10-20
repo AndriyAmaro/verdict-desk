@@ -285,7 +285,7 @@ class LocalServerTest(unittest.TestCase):
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         with mock.patch.dict(os.environ, {"MISTRAL_API_KEY": KEY}), mock.patch.object(llm, "BASE_URL", f"http://127.0.0.1:{server.server_port}/v1"), mock.patch.object(
             llm, "MIN_INTERVAL", 0.0
-        ), mock.patch.object(llm, "_pause") as pause, mock.patch("urllib.request.urlopen", side_effect=opener.open):
+        ), mock.patch.object(llm, "_next_start", 0.0), mock.patch.object(llm, "_pause") as pause, mock.patch("urllib.request.urlopen", side_effect=opener.open):
             self.assertEqual(llm.chat("sys", "usr"), "from server")
         pause.assert_called_once_with(2.0)
         self.assertEqual([s[0] for s in seen], ["/v1/chat/completions"] * 2)

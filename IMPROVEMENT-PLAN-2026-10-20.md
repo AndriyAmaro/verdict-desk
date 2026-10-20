@@ -61,11 +61,11 @@ Steps:
 2. Record in this file what was missing and what was filled.
 Acceptance: no empty field on the build page.
 
-## Decision gate · Chainlink CRE (owner only, decide by 2026-10-23)
+## Decision gate · Chainlink CRE · DECIDED 2026-10-20: GO (owner's call)
 
 What is at stake: 2 x US$ 1,000 CRE prizes, plus the differentiation claim of an on-chain anchor.
 Current state: CRE workflow and the `LedgerAnchor` contract are written and mock-tested (`cre/`), but `cre workflow simulate` has never run, there is no Sepolia deployment and no anchor transaction, and the demo video does not show the CRE workflow. The Chainlink standard for these prizes expects: a successful simulation via the CRE CLI or a live deployment integrating an external API/agent, a public 3-5 minute video showing the CRE workflow running, public code, and a README pointing to the Chainlink files (the last two are already done).
-If GO, the sequence is:
+The sequence (owner sets up the local environment; kalme guides step by step):
 1. Owner creates the CRE account (his act; cannot be delegated).
 2. Run `cre workflow simulate` with the MockKeystoneForwarder.
 3. Deploy `LedgerAnchor` on Sepolia (faucet-funded testnet key) and anchor the current ledger head in one real transaction.

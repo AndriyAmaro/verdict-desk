@@ -29,7 +29,7 @@ jobs:
       - name: Record decisions (evidence, narrative, debate, verdict)
         env:
           MISTRAL_API_KEY: ${{ secrets.LLM }}
-          NIM_MODEL: ${{ vars.NIM_MODEL || 'mistral-small-latest' }}
+          # MISTRAL_MODEL is optional; defaults to mistral-small-latest in code
         run: python -m verdict_desk decide BTCUSDT ETHUSDT --default-feeds
       - name: Verify the chain and write the head
         run: |

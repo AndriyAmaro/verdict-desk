@@ -319,10 +319,10 @@ No server, database or container is needed. Hosting cost is zero. The live envir
 ## 11. Risks and Technical Debt
 
 1. **Rules v1 do not make money after costs** (BTC -19.8% in the backtest). Mitigation: ADR-006 stance, v2 with a train/test split, and keep the pitch on traceability.
-2. **The LLM layer has never run against the real API.** No key in the cloud environment; behavior, latency and the claim format are untested. This is the cut-off item for 2026-10-22.
+2. ~~The LLM layer has never run against the real API~~ Closed on 2026-10-19: LLM agents run against the Mistral API since dossier seq 35. Dossiers 35-45 had 100% rejected claims because the model used numeric evidence ids (1, 2, ...) instead of string ids ("E1", "E2", ...). Fixed in 2026-10-20 (PR #10) with explicit character-for-character number-copy rules and worked examples in the prompt. Dossiers 46+ show accepted claims on both sides.
 3. ~~Browser verifier cannot recompute hashes~~ Closed on 2026-10-17 (ADR-007): `verdict_desk/canonical.py` and `web/canonical.js` produce the same RFC 8785 text. Remaining gap: the browser checks hashes and links, not `replay` (features and judge are Python).
-4. **Ledger path is gitignored and the public repo does not exist yet** (ADR-009). The live-history argument starts only when this is fixed; every day of delay is lost history.
-5. **Integrity is not authenticity.** See the trust model in section 8; the anchor (ADR-008) is the strongest mitigation and is not built.
+4. ~~Ledger path is gitignored and the public repo does not exist yet~~ Closed on 2026-10-17 (ADR-009): the public repo `AndriyAmaro/verdict-desk` exists, `ledger/` is tracked, and hourly GitHub Actions commits live dossiers. 50 dossiers published as of 2026-10-20.
+5. ~~Integrity is not authenticity~~ Partially closed: the CRE workflow (`cre/`) and `LedgerAnchor` contract are written and mock-tested (10 workflow tests + 6 EVM tests). `cre workflow simulate` and a live Sepolia deployment have not been run yet (see IMPROVEMENT-PLAN-2026-10-20.md decision gate).
 6. **Rules, eligibility and payout terms are unpublished** by the organizer, and the Q&A page is not reachable from the cloud environment. Risk that deliverables change late.
 7. **Closest rival (EvidenceTrail)** also claims a hash-chained, replayable trail. Differentiators to keep sharp: the independent verifier, the legal-report dossier format, the narrative agent, the honest walk-forward backtest, and the CRE anchor.
 8. **Free data fragility.** GDELT throttles to one call per 5 seconds; the Binance mirror and OKX can change without notice.

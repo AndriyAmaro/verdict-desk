@@ -7,7 +7,7 @@ Adiciona argumentos baseados em indicadores que geram edge mais alto.
 from typing import NamedTuple
 
 RULES_VERSION = "v2"
-ENTRY_THRESHOLD = 2.0  # mantido para compatibilidade
+ENTRY_THRESHOLD = 1.5  # Reduced from 2.0 to allow more decisions while still requiring real signal
 MAX_RISK_PCT = 1.0
 STOP_ATR = 1.5
 TAKE_ATR = 3.0

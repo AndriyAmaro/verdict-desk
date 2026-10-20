@@ -8,6 +8,7 @@ body{background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif;mar
 h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:16px 0 4px}.mut{color:var(--mut)}
 table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 tbody tr{cursor:pointer}tbody tr:hover{background:var(--card)}
+tr.latest{background:var(--card);outline:2px solid var(--accent);outline-offset:-2px}
 .LONG,.ok{color:var(--ok)}.SHORT,.bad{color:var(--bad)}code{font-size:12px;word-break:break-all}
 #banner{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);margin:12px 0}
 #detail{border:1px solid var(--line);border-radius:8px;padding:4px 14px 12px;margin-top:14px;background:var(--card)}
@@ -53,6 +54,9 @@ function render(result, name) {
     rows.appendChild(tr);
   }
   renderStats(result.rows.map((r) => r.dossier), result.problems.length > 0);
+  // Highlight the latest dossier row
+  const latestRow = rows.querySelector("tr");
+  if (latestRow) latestRow.classList.add("latest");
   const banner = $("banner");
   banner.className = result.problems.length ? "bad" : "ok";
   banner.textContent = result.problems.length

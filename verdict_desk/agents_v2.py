@@ -71,7 +71,9 @@ def bear(f: dict) -> list[dict]:
     if f["last_close"] < f["range_low_24"]:
         args.append(_arg("Close broke below the 24-candle range low", "features.range_low_24", f["range_low_24"], 2.0))
     if f["return_24"] < -2:
-        args.append(_arg("Strong downside momentum over the last 24 candles", "features.return_24", f["return_24"], 0.75))
+        args.append(_arg("Strong downside momentum over the last 24 candles", "features.return_24", f["return_24"], 1.0))
+    if f["return_24"] < -4:
+        args.append(_arg("Severe drop over 24 candles: selloff intensifying", "features.return_24", f["return_24"], 1.5))
     if f["volume_ratio"] > 1.5 and f["return_24"] < 0:
         args.append(_arg("Falling price on above-average volume", "features.volume_ratio", f["volume_ratio"], 0.75))
     if f["funding_rate"] is not None and f["funding_rate"] > 0.0005:
@@ -81,20 +83,30 @@ def bear(f: dict) -> list[dict]:
 
     # === Novos indicadores v2 ===
     # RSI overbought = pullback coming
-    if f.get("rsi_14") is not None and f["rsi_14"] > 70:
-        args.append(_arg("RSI overbought (>70): pullback likely", "features.rsi_14", f["rsi_14"], 1.25))
+    if f.get("rsi_14") is not None and f["rsi_14"] > 65:
+        args.append(_arg("RSI elevated (>65): overbought, pullback risk", "features.rsi_14", f["rsi_14"], 1.0))
+    if f.get("rsi_14") is not None and f["rsi_14"] > 75:
+        args.append(_arg("RSI very high (>75): extreme overbought", "features.rsi_14", f["rsi_14"], 1.25))
     # MACD bearish crossover
     if f.get("macd_histogram") is not None and f["macd_histogram"] < 0:
         args.append(_arg("MACD histogram negative: bearish momentum", "features.macd_histogram", f["macd_histogram"], 1.0))
     # Bollinger: price at upper band = overbought
-    if f.get("bb_pct_b") is not None and f["bb_pct_b"] > 0.9:
-        args.append(_arg("Price near Bollinger upper band (%B>0.9): overbought", "features.bb_pct_b", f["bb_pct_b"], 1.0))
-    # Volume surge on downside
-    if f["volume_ratio"] > 2.0 and f["return_24"] < 0:
-        args.append(_arg("Volume surge on decline (>2x): strong selling", "features.volume_ratio", f["volume_ratio"], 1.0))
+    if f.get("bb_pct_b") is not None and f["bb_pct_b"] > 0.85:
+        args.append(_arg("Price near Bollinger upper band (%B>0.85): stretched", "features.bb_pct_b", f["bb_pct_b"], 1.0))
+    if f.get("bb_pct_b") is not None and f["bb_pct_b"] > 0.95:
+        args.append(_arg("Price above Bollinger upper band (%B>0.95): extreme", "features.bb_pct_b", f["bb_pct_b"], 1.25))
     # Mean reversion from Bollinger upper
     if f.get("bb_upper") is not None and f["last_close"] > f["bb_upper"]:
-        args.append(_arg("Price above Bollinger upper band: mean reversion likely", "features.bb_upper", f["bb_upper"], 1.25))
+        args.append(_arg("Price above Bollinger upper: mean reversion due", "features.bb_upper", f["bb_upper"], 1.25))
+    # Divergence: price up but momentum weakening
+    if f.get("macd_histogram") is not None and f["return_24"] > 0 and f["macd_histogram"] < 0:
+        args.append(_arg("Price up but MACD negative: bearish divergence", "features.macd_histogram", f["macd_histogram"], 1.5))
+    # Price below both EMAs = strong downtrend
+    if f["last_close"] < f["ema_fast"] < f["ema_slow"]:
+        args.append(_arg("Price below both EMAs: confirmed downtrend", "features.ema_fast<ema_slow", [f["ema_fast"], f["ema_slow"]], 1.0))
+    # Close at/near 24-candle low = distribution
+    if f["last_close"] <= f["range_low_24"] * 1.002:
+        args.append(_arg("Close at 24-candle low: distribution pattern", "features.range_low_24", f["range_low_24"], 0.75))
     return args
 
 

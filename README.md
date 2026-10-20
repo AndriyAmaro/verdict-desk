@@ -71,7 +71,7 @@ Rules v2 were searched with a fixed protocol (choose on the first 60%, judge on 
 
 ## Live history
 
-The workflow [`.github/workflows/hourly.yml`](.github/workflows/hourly.yml) appends decisions for BTCUSDT and ETHUSDT every hour, verifies the chain, writes `ledger/head.json`, commits, and redeploys the dashboard. Git commit times are an independent clock. GitHub scheduled runs are best effort and can be delayed or skipped, so read the commit log for the real cadence and the gaps.
+The workflow [`.github/workflows/hourly.yml`](.github/workflows/hourly.yml) appends decisions for BTCUSDT, ETHUSDT and SOLUSDT every hour, verifies the chain, writes `ledger/head.json`, commits, and redeploys the dashboard. Git commit times are an independent clock. GitHub scheduled runs are best effort and can be delayed or skipped, so read the commit log for the real cadence and the gaps.
 
 ## Chainlink CRE
 

@@ -10,6 +10,7 @@ import re
 from . import narrative as narrative_mod
 
 NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
+ID_TOKEN = re.compile(r"\bE\d+\b")  # id do indice escrito no texto, ex.: "(E3)": e referencia, nao numero afirmado
 
 
 def index(packet: dict, feats: dict | None = None) -> dict[str, str]:
@@ -71,7 +72,7 @@ def validate(claims: list[dict], evidence_items: dict[str, str]) -> dict:
         else:
             cited = " ".join(evidence_items[c] for c in cites)
             cited_numbers = {_norm(n) for n in NUMBER.findall(cited)}
-            stray = [n for n in NUMBER.findall(text) if _norm(n) not in cited_numbers]
+            stray = [n for n in NUMBER.findall(ID_TOKEN.sub(" ", text)) if _norm(n) not in cited_numbers]
             if stray:
                 reason = f"number not in cited evidence: {stray[0]}"
         (rejected if reason else accepted).append({**claim, **({"rejected_because": reason} if reason else {})})

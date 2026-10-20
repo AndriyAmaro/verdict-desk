@@ -185,11 +185,12 @@ def argue(side: str, evidence_items: dict[str, str], ask=chat) -> list[dict]:
     system = (
         f"You are the {side} analyst in a market debate. Make {STANCE.get(side, 'your side of the case')}. "
         "Pick the evidence items that best support your side and say what each one implies for the next move. "
-        "Be honest: if the evidence does not support your side, return fewer claims or an empty list. "
+        "Be honest, but go through every item before giving up on your side: return an empty list only if no item can honestly be read in favor of it. "
         'Reply ONLY with a JSON list of objects {"claim": str, "cites": [evidence ids]}. '
         "Every evidence item starts with its id (E1, E2, ...) before the colon. You MUST cite items by those ids, "
         'written as strings exactly as listed: a claim that rests on items E3 and E14 has "cites": ["E3", "E14"]. '
         "A bare number such as 14 is not an id: a claim that does not cite by id is discarded. "
+        "Write the ids only in cites, never inside the claim text. "
         "Rules: cite at least one evidence id per claim; every number in a claim must appear in a cited item, "
         "copied exactly as written (never rounded), so never invent horizons, thresholds or percentages; "
         "at most 4 claims; the two sides pick different facts because each side favors different ones."

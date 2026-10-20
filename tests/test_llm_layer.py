@@ -48,6 +48,17 @@ class LlmLayerTest(unittest.TestCase):
                 self.assertEqual(len(layer[side]["accepted"]), accepted)
                 self.assertEqual([c["rejected_because"] for c in layer[side]["rejected"]], ["unknown evidence id"] * (1 - accepted))
 
+    def test_claims_that_mention_their_ids_in_the_text_are_accepted_and_replay_matches(self):
+        # Resposta real do Mistral nos seq 45 e 46: o id aparece no texto e nos cites.
+        inline = lambda system, user: json.dumps([{"claim": "Bitcoin rally hits record (E4)", "cites": ["E4"]}])
+        d = dossier.append(self.pkt, self.path, ask=inline)
+        for side in ("bull", "bear"):
+            self.assertEqual(len(d["llm"][side]["accepted"]), 1)
+            self.assertEqual(d["llm"][side]["rejected"], [])
+        ledger = dossier.read_ledger(self.path)
+        self.assertEqual(dossier.verify(ledger), [])
+        self.assertTrue(dossier.replay(ledger[0])["matches"])
+
     def test_malformed_citations_are_rejected_and_do_not_stop_the_dossier(self):
         weird = lambda system, user: json.dumps(
             [{"claim": "x", "cites": [["E4"]]}, {"claim": "y", "cites": {"id": "E4"}}, {"claim": "z", "cites": 4}]

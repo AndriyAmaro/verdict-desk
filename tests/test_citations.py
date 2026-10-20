@@ -30,6 +30,17 @@ class CitationsTest(unittest.TestCase):
         claims = [{"claim": "Funding rate is 0.0001", "cites": ["E3"]}]
         self.assertEqual(len(citations.validate(claims, self.items)["accepted"]), 1)
 
+    def test_ids_written_in_the_claim_text_are_references_not_numbers(self):
+        # O modelo escreve "(E3)" no texto: o 3 nao e um numero afirmado e nao pode derrubar a afirmacao.
+        claims = [
+            {"claim": "Funding rate is 0.0001 (E3)", "cites": ["E3"]},
+            {"claim": "Bitcoin rally hits record (E4), and the funding rate (E3) is 0.0001", "cites": ["E4", "E3"]},
+            {"claim": "Funding rate (E3) is 7.5", "cites": ["E3"]},
+        ]
+        result = citations.validate(claims, self.items)
+        self.assertEqual([c["claim"] for c in result["accepted"]], [c["claim"] for c in claims[:2]])
+        self.assertEqual([c["rejected_because"] for c in result["rejected"]], ["number not in cited evidence: 7.5"])  # o resto do teste de numeros segue valendo
+
     def test_bare_numbers_and_nested_values_are_not_citations(self):
         claims = [
             {"claim": "Bitcoin rally hits record", "cites": [4]},  # numero solto, o que o modelo fez no seq 36
@@ -87,7 +98,8 @@ class LlmTest(unittest.TestCase):
         llm.argue("bear", {"E1": "x"}, ask=capture)
         self.assertIn("LONG position now", seen[0])
         self.assertIn("against a long entry", seen[1])
-        self.assertIn("return fewer claims or an empty list", seen[0])
+        self.assertIn("return an empty list only if no item can honestly be read in favor of it", seen[0])
+        self.assertIn("Write the ids only in cites, never inside the claim text", seen[0])
 
     def test_argue_uses_injected_ask(self):
         out = llm.argue("bull", {"E1": "x"}, ask=lambda s, u: '[{"claim":"x","cites":["E1"]}]')

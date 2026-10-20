@@ -8,10 +8,25 @@ import hashlib
 import json
 from pathlib import Path
 
-from . import agents, citations, features, llm
 from .canonical import canonical
 
 GENESIS = "0" * 64
+
+# Lazy module cache — v1 modules are the default, v2 is opt-in via rules_version.
+_MODULES: dict[str, dict] = {}
+
+
+def _mods(rules_version: str = "v1") -> dict:
+    """Return {agents, features, citations, llm} for the requested rules_version."""
+    if rules_version not in _MODULES:
+        if rules_version == "v1":
+            from . import agents, citations, features, llm
+        elif rules_version == "v2":
+            from . import agents_v2 as agents, citations, features_v2 as features, llm
+        else:
+            raise ValueError(f"unknown rules_version: {rules_version!r}")
+        _MODULES[rules_version] = {"agents": agents, "features": features, "citations": citations, "llm": llm}
+    return _MODULES[rules_version]
 
 
 def digest(body: dict) -> str:
@@ -24,29 +39,31 @@ def read_ledger(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def analyst_layer(packet: dict, ask=None, feats: dict | None = None) -> dict | None:
+def analyst_layer(packet: dict, ask=None, feats: dict | None = None, rules_version: str = "v1") -> dict | None:
     """Agentes LLM presos a evidencia. Sem chave (e sem `ask` injetado) devolve None.
 
     A saida validada fica congelada no dossie; o juiz segue deterministico.
     """
-    if ask is None and not llm.available():
+    m = _mods(rules_version)
+    if ask is None and not m["llm"].available():
         return None
-    items = citations.index(packet, feats if feats is not None else features.compute(packet))
-    layer = {"model": llm.MODEL, "evidence_index": items}
+    items = m["citations"].index(packet, feats if feats is not None else m["features"].compute(packet))
+    layer = {"model": m["llm"].MODEL, "evidence_index": items}
     for side in ("bull", "bear"):
         try:
-            claims = llm.argue(side, items, **({"ask": ask} if ask else {}))
+            claims = m["llm"].argue(side, items, **({"ask": ask} if ask else {}))
         except (OSError, ValueError, KeyError) as err:
             layer[side] = {"accepted": [], "rejected": [], "error": str(err)}
             continue
-        layer[side] = citations.validate(claims, items)
+        layer[side] = m["citations"].validate(claims, items)
     return layer
 
 
-def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True) -> dict:
-    feats = features.compute(packet)
-    debate = agents.decide(feats)
-    layer = analyst_layer(packet, ask, feats) if use_llm else None
+def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True, rules_version: str = "v1") -> dict:
+    m = _mods(rules_version)
+    feats = m["features"].compute(packet)
+    debate = m["agents"].decide(feats)
+    layer = analyst_layer(packet, ask, feats, rules_version) if use_llm else None
     body = {
         "seq": seq,
         "prev_hash": prev_hash,
@@ -62,28 +79,32 @@ def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True
     return {**body, "hash": digest(body)}
 
 
-def append(packet: dict, path: Path, ask=None) -> dict:
+def append(packet: dict, path: Path, ask=None, rules_version: str = "v1") -> dict:
     ledger = read_ledger(path)
     prev = ledger[-1]["hash"] if ledger else GENESIS
-    dossier = build(packet, prev, len(ledger) + 1, ask)
+    dossier = build(packet, prev, len(ledger) + 1, ask, rules_version=rules_version)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(dossier, ensure_ascii=False) + "\n")
     return dossier
 
 
-def replay(dossier: dict) -> dict:
+def replay(dossier: dict, rules_version: str = "v1") -> dict:
     """Refaz a decisao so com a evidencia congelada e compara com o registrado."""
-    feats = features.compute(dossier["evidence"])
-    debate = agents.decide(feats)
+    # Auto-detect rules_version from the dossier's verdict when not provided.
+    if rules_version == "auto":
+        rules_version = dossier.get("verdict", {}).get("rules_version", "v1")
+    m = _mods(rules_version)
+    feats = m["features"].compute(dossier["evidence"])
+    debate = m["agents"].decide(feats)
     same = feats == dossier["features"] and debate["verdict"] == dossier["verdict"] and debate["sensitivity"] == dossier.get("sensitivity", debate["sensitivity"])
     result = {"seq": dossier["seq"], "matches": same, "recorded": dossier["verdict"], "replayed": debate["verdict"]}
     layer = dossier.get("llm")
     if layer:
         # A saida do LLM nao se refaz; o replay confere que as citacoes seguem validas na evidencia congelada.
-        items = citations.index(dossier["evidence"], dossier["features"])
+        items = m["citations"].index(dossier["evidence"], dossier["features"])
         recheck = all(
-            citations.validate(layer[side]["accepted"], items)["rejected"] == [] for side in ("bull", "bear") if side in layer
+            m["citations"].validate(layer[side]["accepted"], items)["rejected"] == [] for side in ("bull", "bear") if side in layer
         )
         result["llm_citations_valid"] = recheck and items == layer["evidence_index"]
         result["matches"] = same and result["llm_citations_valid"]

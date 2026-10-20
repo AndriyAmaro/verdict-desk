@@ -37,6 +37,32 @@ def cmd_decide(opts) -> int:
     return 0 if recorded else 1
 
 
+def cmd_decide_v2(opts) -> int:
+    """Run the same decide flow but with agents_v2 + features_v2 (RSI, MACD, Bollinger)."""
+    feeds = dict(narrative.DEFAULT_FEEDS) if opts.default_feeds else {}
+    for spec in opts.feed or []:
+        name, _, url = spec.partition("=")
+        feeds[name] = url
+    block = None
+    if feeds:
+        voices = narrative.collect(feeds, log=lambda m: print(m, file=sys.stderr))
+        ask = (lambda system, user: llm.chat(system, user, timeout=narrative.LLM_TIMEOUT, max_tokens=narrative.LLM_MAX_TOKENS)) if llm.available() else None
+        block = narrative.build(voices, ask, llm.MODEL if ask else "")
+        print(f"narrative ({block['method']}): {len(voices)} headlines from {len({v['name'] for v in voices})} voices, {len(block['convergence'])} convergences")
+    recorded = 0
+    for symbol in opts.symbols:
+        try:
+            packet = evidence.collect(symbol, opts.interval, with_news=not opts.no_news)
+        except (OSError, ValueError, KeyError) as err:
+            print(f"{symbol}: no evidence collected, nothing recorded ({err})", file=sys.stderr)
+            continue
+        if block is not None:
+            packet["narrative"] = block
+        recorded += 1
+        print_record(dossier.append(packet, opts.ledger, rules_version="v2"))
+    return 0 if recorded else 1
+
+
 def print_record(record: dict) -> None:
     v = record["verdict"]
     print(f"#{record['seq']} {record['evidence']['symbol']} {v['action']} edge={v['edge']} hash={record['hash'][:16]}")
@@ -187,6 +213,13 @@ def main() -> int:
     p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
     p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
     p.set_defaults(func=cmd_decide)
+    p = sub.add_parser("decide-v2", help="decide with agents_v2 + features_v2 (RSI, MACD, Bollinger)")
+    p.add_argument("symbols", nargs="+", metavar="SYMBOL")
+    p.add_argument("--interval", default="1h")
+    p.add_argument("--no-news", action="store_true")
+    p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
+    p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
+    p.set_defaults(func=cmd_decide_v2)
     p = sub.add_parser("replay", help="re-run decisions from the frozen evidence")
     p.add_argument("seq", nargs="?", type=int)
     p.set_defaults(func=cmd_replay)

@@ -93,7 +93,8 @@ def cmd_replay(opts) -> int:
         return 1
     mismatches = 0
     for d in targets:
-        result = dossier.replay(d)
+        rv = d.get("verdict", {}).get("rules_version", "v1")
+        result = dossier.replay(d, rules_version=rv)
         mismatches += not result["matches"]
         print(f"#{result['seq']} replay {'MATCHES' if result['matches'] else 'DIFFERS'}: {result['replayed']['action']}")
     return 1 if mismatches else 0

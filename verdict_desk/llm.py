@@ -191,8 +191,18 @@ def argue(side: str, evidence_items: dict[str, str], ask=chat) -> list[dict]:
         'written as strings exactly as listed: a claim that rests on items E3 and E14 has "cites": ["E3", "E14"]. '
         "A bare number such as 14 is not an id: a claim that does not cite by id is discarded. "
         "Write the ids only in cites, never inside the claim text. "
-        "Rules: cite at least one evidence id per claim; every number in a claim must appear in a cited item, "
-        "copied exactly as written (never rounded), so never invent horizons, thresholds or percentages; "
+        "Rules: cite at least one evidence id per claim; every number in a claim must appear "
+        "character-for-character in the cited evidence items — copy the exact string from the "
+        "evidence item, NEVER round or reformat. If the evidence says '3.1596' you must write '3.1596', "
+        "NOT '3.16'. If it says '4.53e-05' you must write '4.53e-05', NOT '0.00453%'. If it says "
+        "'-19.79%' you must write '-19.79%', NOT '-19.8%'. Scientific notation, sign, decimal places, "
+        "trailing zeros — all must be copied verbatim. A claim with a rounded or reformatted number "
+        "will be DISCARDED by the validator. "
+        "Examples — ACCEPTED claim: {\"claim\": \"Volume spiked to 125.3% of the 24h average, confirming breakout\", \"cites\": [\"E3\"]} (where E3 says 'volume ratio: 125.3%'). "
+        "Examples — ACCEPTED claim with two items: {\"claim\": \"Bullish setup\", \"cites\": [\"E3\", \"E14\"]} (E3 and E14 both support it). "
+        "Examples — REJECTED claim: {\"claim\": \"Volume spiked to 125% of average\", \"cites\": [\"E3\"]} (125 != 125.3, rounded). "
+        "Examples — REJECTED claim: {\"claim\": \"Funding is slightly positive at 0.005%\", \"cites\": [\"E7\"]} (0.005 != 4.53e-05, reformatted). "
+        "NEVER invent horizons, thresholds or percentages; "
         "at most 4 claims; the two sides pick different facts because each side favors different ones."
     )
     user = "\n".join(f"{k}: {v}" for k, v in evidence_items.items())

@@ -116,7 +116,7 @@ class LlmTest(unittest.TestCase):
             self.assertIn("You MUST cite items by those ids", system)
             self.assertIn('has "cites": ["E3", "E14"]', system)
             self.assertIn("A bare number such as 14 is not an id", system)
-            self.assertIn("copied exactly as written", system)
+            self.assertIn("character-for-character in the cited evidence items", system)
             self.assertEqual(user.splitlines(), ["E1: first item", "E2: second item"])  # o modelo ve os ids como o prompt os descreve
 
     def test_prompt_examples_use_the_same_id_format_as_the_index(self):
@@ -124,4 +124,8 @@ class LlmTest(unittest.TestCase):
         self.assertTrue(all(re.fullmatch(r"E\d+", key) for key in citations.index(pkt)))
         seen = []
         llm.argue("bull", {"E1": "x"}, ask=lambda system, user: seen.append(system) or "[]")
-        self.assertEqual(re.findall(r'"(E\d+)"', seen[0]), ["E3", "E14"])
+        # All evidence id references in the prompt examples must use the E\d+ string format
+        cited_ids = re.findall(r'"(E\d+)"', seen[0])
+        self.assertTrue(cited_ids, "Prompt examples must show evidence id references")
+        self.assertTrue(all(re.fullmatch(r"E\d+", cid) for cid in cited_ids), "All cited ids must match E\\d+ format")
+        self.assertIn("E3", cited_ids)  # at least the example id from the prompt

@@ -30,15 +30,20 @@ jobs:
         env:
           MISTRAL_API_KEY: ${{ secrets.LLM }}
           NIM_MODEL: ${{ vars.NIM_MODEL || 'mistral-small-latest' }}
-        run: python -m verdict_desk decide BTCUSDT ETHUSDT --default-feeds
+        run: python -m verdict_desk decide BTCUSDT ETHUSDT SOLUSDT --default-feeds
       - name: Verify the chain and write the head
         run: |
           python -m verdict_desk verify
           python -m verdict_desk head --out ledger/head.json
-      - name: Commit the ledger
+      - name: Rebase any remote changes and push
         run: |
           git config user.name "verdict-desk-bot"
           git config user.email "verdict-desk-bot@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git pull --rebase origin "${{ github.ref_name }}" && break
+            echo "rebase attempt $attempt failed, retrying..."
+            sleep 5
+          done
           git add ledger
           git commit -m "ledger: $(date -u +%Y-%m-%dT%H:%MZ)" || { echo "nothing recorded this hour"; exit 0; }
           git push

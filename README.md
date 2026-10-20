@@ -6,6 +6,8 @@ Verdict Desk reads public market evidence, freezes it, lets a bull agent and a b
 
 Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
 
+**Watch it first:** a 2-minute demo with no voice, made from real recorded command output and the real dashboard (nothing is mocked): [`web/demo/verdict-desk-demo.mp4`](web/demo/verdict-desk-demo.mp4). The dashboard site serves the same file at `/demo/verdict-desk-demo.mp4`. Recorded on 2026-10-20 against commit `ff8519a`; the on-screen numbers (46 dossiers, the backtest) are from that day.
+
 ## What the bounty asks, and where to look
 
 | The bounty asks for | Verdict Desk | Look here |

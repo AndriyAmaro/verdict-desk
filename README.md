@@ -22,11 +22,14 @@ Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Cha
 
 1. Open the dashboard (the GitHub Pages site of this repository). It loads `ledger/ledger.jsonl` and shows the banner "Every hash recomputed in this browser matches". It does not trust the server: the hashing runs locally in `web/canonical.js`.
 2. Read the two panels above the table: the **cadence** of the live history (every gap between runs, nothing filled in) and the **simulated portfolio** (recomputed in your browser from the ledger with the same rule as `portfolio.py`). Then click a row. You see the deterministic bull and bear arguments with the exact indicator behind each one, then the LLM analysts' claims with the evidence id each one cites, and the claims the citation validator **rejected**, with the reason.
+
+**Where to see the LLM debate in action:** click dossier **seq 46 or later** (the most recent rows). These are the first dossiers where the Mistral LLM analysts produce accepted claims on both sides. Earlier dossiers (seq 1-4: NVIDIA era, no LLM key; seq 5-45: numeric evidence ids caused 100% rejection; seq 35-45: Mistral running but ids were numbers not strings) are honest history showing how the system evolved. The debate you want to evaluate starts at seq 46.
+
 3. Edit one character of the ledger in a text editor, load it with the file picker, and watch the row turn red (`ALTERED`) and the chain break from there on.
 4. Run it yourself:
 
 ```bash
-python3 -m unittest discover -s tests          # 67 tests, standard library only
+python3 -m unittest discover -s tests          # standard library only (129 tests)
 python3 -m verdict_desk verify                 # hash chain of ledger/ledger.jsonl
 python3 -m verdict_desk replay                 # re-derive every verdict from its frozen evidence
 python3 -m verdict_desk portfolio              # simulated positions marked against later candles

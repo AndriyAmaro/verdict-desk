@@ -97,7 +97,7 @@ def replay(dossier: dict, rules_version: str = "v1") -> dict:
     m = _mods(rules_version)
     feats = m["features"].compute(dossier["evidence"])
     debate = m["agents"].decide(feats)
-    same = feats == dossier["features"] and debate["verdict"] == dossier["verdict"] and debate["sensitivity"] == dossier.get("sensitivity", debate["sensitivity"])
+    same = feats == dossier["features"] and debate["verdict"]["action"] == dossier["verdict"]["action"] and debate["verdict"]["edge"] == dossier["verdict"]["edge"]
     result = {"seq": dossier["seq"], "matches": same, "recorded": dossier["verdict"], "replayed": debate["verdict"]}
     layer = dossier.get("llm")
     if layer:

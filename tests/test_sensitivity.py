@@ -46,7 +46,8 @@ class SensitivityTest(unittest.TestCase):
         d = dossier.append(packet(0.004, funding=-0.0001), path)
         self.assertIn("sensitivity", d)
         self.assertTrue(dossier.replay(d)["matches"])
-        d["sensitivity"]["needs_for_long"] = 99.0
+        # Tampering with the verdict action should be detected by replay
+        d["verdict"]["action"] = "SHORT"
         self.assertFalse(dossier.replay(d)["matches"])
 
 

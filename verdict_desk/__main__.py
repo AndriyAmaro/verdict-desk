@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import backtest, dossier, evidence, journal, llm, narrative, portfolio, research
+from . import backtest, dossier, evidence, journal, learning, llm, narrative, portfolio, research
 
 DEFAULT_LEDGER = Path("ledger/ledger.jsonl")
 
@@ -203,6 +203,23 @@ def cmd_audit_journal(opts) -> int:
     return 0
 
 
+def cmd_learn(opts) -> int:
+    """Analyze past decisions and outcomes to learn adaptive weights."""
+    if opts.reset:
+        learning.LEARNING_FILE = learning.LEARNING_FILE  # ensure Path
+        if learning.LEARNING_FILE.exists():
+            learning.LEARNING_FILE.unlink()
+            print(f"Removed {learning.LEARNING_FILE}")
+        return 0
+    if opts.apply:
+        result = learning.apply_learned_weights()
+        if result:
+            print(f"Learned {len(result.get('adaptive_weights', {}))} weight adjustments")
+        return 0
+    learning.print_learning_report(opts.ledger)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="verdict_desk")
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
@@ -251,6 +268,10 @@ def main() -> int:
     p.add_argument("--out", type=Path, help="summary and per-turn outcomes (no free-text reasoning)")
     p.add_argument("--shadow-ledger", type=Path, help="write the shadow dossiers as a separate hash chain")
     p.set_defaults(func=cmd_audit_journal)
+    p = sub.add_parser("learn", help="analyze past outcomes and show adaptive weight adjustments")
+    p.add_argument("--apply", action="store_true", help="save learned weights for v2 agent")
+    p.add_argument("--reset", action="store_true", help="reset learned weights")
+    p.set_defaults(func=cmd_learn)
     opts = parser.parse_args()
     return opts.func(opts)
 

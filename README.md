@@ -12,6 +12,26 @@ Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Cha
 
 **Watch it first:** a 2-minute demo with no voice, made from real recorded command output and the real dashboard (nothing is mocked): [`web/demo/verdict-desk-demo.mp4`](web/demo/verdict-desk-demo.mp4). The dashboard site publishes the same file at `https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo.mp4` from its next deploy on. Recorded on 2026-10-20 against commit `ff8519a`; the on-screen numbers (46 dossiers, the backtest) are from that day.
 
+## Verify in 60 seconds
+
+Three independent checks, none of them trusting this repository's word:
+
+1. **In your browser (about 20 seconds).** Open the dashboard (the GitHub Pages site of this repository). The banner states what your own browser just recomputed from the ledger text: every SHA-256 hash and every link. Press **Test the chain** and watch one flipped decision get caught.
+2. **On-chain (about 20 seconds).** The head of dossier 80 is written on Sepolia by the `LedgerAnchor` contract through a Chainlink CRE workflow: open the [anchoring transaction](https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d) and compare the hash with the head below, or run the read-only check, which answers `ok: true`:
+
+```bash
+node cre/contracts/scripts/check-anchor.mjs
+```
+
+3. **On your machine (about 20 seconds).** Standard library only, nothing to install:
+
+```bash
+python3 -m verdict_desk verify   # the hash chain of ledger/ledger.jsonl
+python3 -m verdict_desk replay   # every verdict re-derived from its frozen evidence
+```
+
+The five-minute path below walks through what each check proves and where its limit is.
+
 ## What the bounty asks, and where to look
 
 | The bounty asks for | Verdict Desk | Look here |
@@ -30,7 +50,7 @@ Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Cha
 4. Run it yourself:
 
 ```bash
-python3 -m unittest discover -s tests          # standard library only (198 tests)
+python3 -m unittest discover -s tests          # standard library only (208 tests)
 python3 -m verdict_desk verify                 # hash chain of ledger/ledger.jsonl
 python3 -m verdict_desk replay                 # re-derive every verdict from its frozen evidence
 python3 -m verdict_desk portfolio              # simulated positions marked against later candles
@@ -71,6 +91,15 @@ Counted over `ledger/ledger.jsonl` on the chain as of **dossier 80** (head `04e2
 | Claims **rejected** by the citation validator | 36 (bull 7, bear 29); reason: "number not in cited evidence" 36 |
 | Share of claims accepted | 84.7% |
 
+The totals above mix two rule sets, so the split is published next to them. Each dossier names its set in `verdict.rules_version`; the ranges overlap because manual comparison runs were appended by hand while the newer set was already recording.
+
+| Rule set | Dossiers | Verdicts |
+|---|---|---|
+| Rules v1 | 56 (seq 1 to 59) | FLAT 54, SHORT 2 |
+| Rules v2 | 24 (seq 54 to 80) | FLAT 5, LONG 19 |
+
+The simulated portfolio over the same chain: 21 positions opened, 2 closed (#24 ETHUSDT SHORT closed at its target, +200.0; #46 ETHUSDT SHORT closed at its stop, -100.0), 19 still open. Win rate on the closed ones: 50.0%, which at this count says almost nothing; most positions are still open because a position only closes when a later dossier of the same symbol records a candle through its stop or its target. Realized +100.0, unrealized +1005.7666 on the open ones, marked against candles recorded after entry; start capital 10000, max drawdown 0.98%. Simulated only, fees not included; `python3 -m verdict_desk portfolio` recomputes it, and the dashboard shows the same figures live.
+
 The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures.
 
 Earlier dossiers stay exactly as they were recorded, so the history of how the LLM layer came to work is in the ledger itself:
@@ -88,6 +117,7 @@ Reproduce any row:
 python3 -m verdict_desk stats --git                                  # the table above
 python3 -m verdict_desk stats --first-llm-seq 35 --last-llm-seq 45   # an earlier range, e.g. the third row of the history
 python3 -m verdict_desk stats --json                                 # every number, machine readable
+python3 -m verdict_desk portfolio                                    # the simulated portfolio paragraph
 ```
 
 ## Auditing someone else's agent

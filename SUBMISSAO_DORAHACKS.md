@@ -34,7 +34,7 @@ PocketChange limits what an agent can spend. Verdict Desk proves what an agent d
 | **CI/CD** | GitHub Actions: hourly scheduled workflow appends dossiers, verifies the chain, and redeploys |
 | **CRE** | Chainlink CRE SDK (`@chainlink/cre-sdk`), Solidity, MockKeystoneForwarder tests |
 | **Data sources** | Binance spot candles (no key), OKX public funding, GDELT news, RSS/Atom feeds |
-| **Testing** | 198 unit tests via `unittest`; cross-language canonical JSON test vectors; a Python versus JavaScript check of the live-operation counts |
+| **Testing** | 208 unit tests via `unittest`; cross-language canonical JSON test vectors; a Python versus JavaScript check of the live-operation counts |
 
 ---
 
@@ -107,7 +107,7 @@ Every dossier is hash-chained to the previous one via RFC 8785 canonical JSON. T
 - `verdict_desk/dossier.py`: dossier creation, canonicalization, hashing
 - `web/canonical.js`: identical canonical JSON implementation in JavaScript
 - `tests/canonical_vectors.json`: shared cross-language test vectors
-- 198 passing unit tests, all verifiable with `python3 -m unittest discover -s tests`
+- 208 passing unit tests, all verifiable with `python3 -m unittest discover -s tests`
 
 ---
 
@@ -164,7 +164,7 @@ Each backtest run prints the SHA-256 of its candle series so the numbers can be 
    ```bash
    git clone https://github.com/AndriyAmaro/verdict-desk.git
    cd verdict-desk
-   python3 -m unittest discover -s tests     # 198 tests
+   python3 -m unittest discover -s tests     # 208 tests
    python3 -m verdict_desk verify             # hash chain
    python3 -m verdict_desk replay             # re-derive every verdict
    python3 -m verdict_desk portfolio          # simulated positions

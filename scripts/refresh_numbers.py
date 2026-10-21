@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from verdict_desk import dossier, livestats  # noqa: E402
+from verdict_desk import dossier, livestats, portfolio  # noqa: E402
 
 LEDGER = ROOT / "ledger" / "ledger.jsonl"
 README = ROOT / "README.md"
@@ -55,6 +55,17 @@ def live_section(ledger: list[dict]) -> str:
     first, last = c["first"][:16].replace("T", " "), c["last"][:16].replace("T", " ")
     sides = e["sides"]
     reasons = ", ".join(f'"{k}" {v}' for k, v in e["rejection_reasons"].items())
+    era_rows = "\n".join(
+        f"| Rules {version} | {era['dossiers']} (seq {era['first_seq']} to {era['last_seq']}) | {', '.join(f'{a} {n}' for a, n in era['actions'].items())} |"
+        for version, era in s["rule_eras"].items()
+    )
+    pf = portfolio.summarize(ledger)
+    closed = [p for p in pf["positions"] if p["status"] != "OPEN"]
+    closed_text = "; ".join(
+        f"#{p['seq']} {p['symbol']} {p['action']} closed at its {'target' if p['status'] == 'TAKE' else 'stop'}, {p['pnl']:+}"
+        for p in closed
+    ) or "none yet"
+    win_rate = f"{pf['win_rate_pct']}%" if pf["win_rate_pct"] is not None else "n/a"
     # The history before the LLM era is derived too; the asserts stop a silent change of the ledger from reaching the docs.
     none, failed, early = livestats.llm_era(ledger, 1, 4), livestats.llm_era(ledger, 5, 34), livestats.llm_era(ledger, 35, 45)
     failed_calls = failed["sides"]["bull"]["errors"] + failed["sides"]["bear"]["errors"]
@@ -76,6 +87,14 @@ Counted over `ledger/ledger.jsonl` on the chain as of **dossier {h['seq']}** (he
 | Claims **rejected** by the citation validator | {e['rejected']} (bull {sides['bull']['rejected']}, bear {sides['bear']['rejected']}); reason: {reasons} |
 | Share of claims accepted | {e['accepted_pct']}% |
 
+The totals above mix two rule sets, so the split is published next to them. Each dossier names its set in `verdict.rules_version`; the ranges overlap because manual comparison runs were appended by hand while the newer set was already recording.
+
+| Rule set | Dossiers | Verdicts |
+|---|---|---|
+{era_rows}
+
+The simulated portfolio over the same chain: {len(pf['positions'])} positions opened, {pf['closed']} closed ({closed_text}), {pf['open']} still open. Win rate on the closed ones: {win_rate}, which at this count says almost nothing; most positions are still open because a position only closes when a later dossier of the same symbol records a candle through its stop or its target. Realized {pf['realized_pnl']:+}, unrealized {pf['unrealized_pnl']:+} on the open ones, marked against candles recorded after entry; start capital {pf['start_capital']:g}, max drawdown {pf['max_drawdown_pct']}%. Simulated only, fees not included; `python3 -m verdict_desk portfolio` recomputes it, and the dashboard shows the same figures live.
+
 The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures.
 
 Earlier dossiers stay exactly as they were recorded, so the history of how the LLM layer came to work is in the ledger itself:
@@ -93,6 +112,7 @@ Reproduce any row:
 python3 -m verdict_desk stats --git                                  # the table above
 python3 -m verdict_desk stats --first-llm-seq 35 --last-llm-seq 45   # an earlier range, e.g. the third row of the history
 python3 -m verdict_desk stats --json                                 # every number, machine readable
+python3 -m verdict_desk portfolio                                    # the simulated portfolio paragraph
 ```
 
 """

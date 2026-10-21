@@ -35,6 +35,11 @@ a.btn[hidden]{display:none}
 <p class="mut">Every row is a frozen dossier. Decisions are simulated; no real orders are placed. This page recomputes every SHA-256 hash in your browser from the ledger text. It does not trust the server that hosts the file.</p>
 <p class="mut">Ledger: <code id="source"></code> <label>or open a file <input id="file" type="file" accept=".jsonl,.json,.txt"></label></p>
 <div id="banner" class="mut">Loading...</div>
+<section class="stats" id="anchor">
+  <h2>Anchored on-chain: Chainlink CRE on Sepolia</h2>
+  <p>On 2026-10-21 a Chainlink CRE workflow wrote the head of this ledger to the <code>LedgerAnchor</code> contract on Sepolia: dossier <b>80</b>, head hash <code>04e260dc39cdecb967ef23513aebd7aee260d2101e2507c7704c94dfb0532283</code>, with the BTC/USD Data Feed value 84378.12678601 recorded next to it. Contract <a href="https://sepolia.etherscan.io/address/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7">0x50443D51Db71A61E131B147B1d36aF21d48CDdF7</a>; anchoring transaction <a href="https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d">0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d</a>.</p>
+  <p class="mut">Re-check it yourself (read-only, no key needed): <code>node cre/contracts/scripts/check-anchor.mjs</code> verifies the ledger, reads the anchor back from Sepolia and answers <code>ok: true</code>. The chain keeps growing after the anchor, so the banner above may already count more than 80 dossiers; the anchor pins the head as of dossier 80, and the same script can anchor a later head.</p>
+</section>
 <section id="tamper" aria-labelledby="tamper-title">
   <h2 id="tamper-title">Test the chain: break it yourself in 30 seconds</h2>
   <p>The banner above is green because this tab just recomputed every hash from the ledger text. Press <b>Test the chain</b>: it tampers with one dossier in a copy held in this tab and verifies again. Nothing is uploaded, saved or downloaded.</p>

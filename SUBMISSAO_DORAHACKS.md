@@ -8,7 +8,7 @@
 
 ## Short Description (256 chars)
 
-Audit-grade, replayable AI decisions for market agents. Verdict Desk freezes public market evidence, lets a bull and bear agent argue with citations, and records a simulated position with a hash-chained reasoning trail anyone can verify in their browser.
+PocketChange limits what an agent can spend. Verdict Desk proves what an agent decided, in a way that survives the operator. Simulated only, no real order: every decision is a hash-chained dossier anyone can verify and replay.
 
 ---
 
@@ -39,6 +39,8 @@ Audit-grade, replayable AI decisions for market agents. Verdict Desk freezes pub
 ---
 
 ## What Verdict Desk Does
+
+**[PocketChange](https://github.com/Somay-kousis/Pocket-Change) limits what an agent can spend. Verdict Desk proves what an agent decided, in a way that survives the operator.** Everything is simulated: no order is ever placed.
 
 Verdict Desk reads public market evidence, freezes it into an immutable packet, and runs a structured debate: a **bull agent** and a **bear agent** argue over the same frozen facts. Each argument must cite specific evidence items by ID, and a citation validator rejects any claim that does not match the cited data. A **deterministic judge** then sizes a *simulated* position (entry, stop-loss, take-profit) inside declared risk limits.
 
@@ -119,6 +121,8 @@ Verdict Desk includes a Chainlink CRE workflow that:
 The workflow code and the Solidity receiver contract are written and covered by tests (10 SDK mock tests + 6 in-memory EVM tests).
 
 **Current CRE status, stated honestly:** The workflow simulation (`cre workflow simulate`) and a live Sepolia deployment have not been run yet. No on-chain anchor transaction exists. The code is complete, tested, and documented; the remaining steps are execution (account setup, simulation, deployment, recording a transaction), which the team is working on.
+
+The evidence will land in `cre/SIMULATION-OUTPUT.md` and in the README table: date of the run, anchored head, BTC/USD value, contract and transaction. Every field says pending until a real run produces it.
 
 See `cre/README.md` and `cre/DEPLOY_SEPOLIA.md` for full details.
 

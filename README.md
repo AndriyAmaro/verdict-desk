@@ -118,25 +118,25 @@ The workflow [`.github/workflows/hourly.yml`](.github/workflows/hourly.yml) is s
 
 [`cre/`](cre/README.md) holds a workflow that fetches the published ledger head with identical consensus, reads the BTC/USD Data Feed on Sepolia, and writes both to `LedgerAnchor` through a CRE report. The contract accepts reports only from the CRE forwarder and only with a higher sequence number than the last one.
 
-Status, stated plainly: the workflow is covered by 10 tests with the SDK mocks and type-checks; the contract is covered by 6 tests in an in-memory EVM. `cre workflow simulate` and a live Sepolia deployment **have not been run yet**. Nothing here claims an anchored head until a transaction exists.
+Status, stated plainly: the workflow is covered by 10 tests with the SDK mocks and type-checks; the contract is covered by 6 tests in an in-memory EVM. **Both ran on 2026-10-21**: the workflow simulated (dry, then with `--broadcast`), `LedgerAnchor` was deployed to Sepolia, and the head of dossier 80 is anchored in a real transaction. `node cre/contracts/scripts/check-anchor.mjs` answers `ok: true`.
 
-The evidence lands in [`cre/SIMULATION-OUTPUT.md`](cre/SIMULATION-OUTPUT.md) and is copied into this table when a real run produces it. Until then every cell says pending, on purpose.
+The evidence is in [`cre/SIMULATION-OUTPUT.md`](cre/SIMULATION-OUTPUT.md); the summary is copied into this table.
 
 <!-- cre-evidence:start -->
 | Evidence | Value |
 |---|---|
-| Run date (UTC) | pending |
-| Head anchored (seq, hash) | pending |
-| BTC/USD Data Feed value recorded with it | pending |
-| `LedgerAnchor` contract on Sepolia | pending |
-| Anchoring transaction | pending |
+| Run date (UTC) | 2026-10-21 |
+| Head anchored (seq, hash) | 80, `04e260dc39cdecb967ef23513aebd7aee260d2101e2507c7704c94dfb0532283` |
+| BTC/USD Data Feed value recorded with it | 84378.12678601 (answer 8437812678601, 8 decimals) |
+| `LedgerAnchor` contract on Sepolia | [0x50443D51Db71A61E131B147B1d36aF21d48CDdF7](https://sepolia.etherscan.io/address/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7) |
+| Anchoring transaction | [0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d](https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d) |
 <!-- cre-evidence:end -->
 
 Anyone can check the chain against the ledger with `node cre/contracts/scripts/check-anchor.mjs` (read-only, no key needed): it verifies the ledger, reads the anchor from Sepolia and asks the contract `isAnchored(seq, hash)`. Runbook and one-command script: [`cre/DEPLOY_SEPOLIA.md`](cre/DEPLOY_SEPOLIA.md).
 
 ## Limits
 
-- The hash chain proves **integrity after recording**, not **authenticity at collection time**. Independent witnesses narrow the gap: sources and timestamps are in every packet (anyone can refetch the candles), git history timestamps each commit, and the CRE anchor would pin the head on-chain.
+- The hash chain proves **integrity after recording**, not **authenticity at collection time**. Independent witnesses narrow the gap: sources and timestamps are in every packet (anyone can refetch the candles), git history timestamps each commit, and the CRE anchor pins the head on-chain (Sepolia; dossier 80 at the last run).
 - A literal headline can still be wrong or manipulative. The grounding gate proves the headline says it, not that it is true. One voice never creates a convergence.
 - The model-written text is not reproducible on replay by design; it is frozen and re-validated.
 - One exchange mirror, one rule set, simulated fills at the last close with fees. This is a trail of reasoning, not a trading edge.

@@ -9,9 +9,9 @@ This is the runbook for the one thing the CRE bounty asks to see that unit tests
 | Workflow logic: head parsing, Data Feed read, report encoding, failure paths | Verified: 10 tests with the SDK mocks, type-checks (`anchor-workflow` job of the `tests` workflow) |
 | `LedgerAnchor.sol` | Verified: 6 tests in an in-memory EVM |
 | Deploy script against Sepolia, dry run (`--dry-run`: forwarder code check, gas estimate) | Run on 2026-10-20: the deployment costs about 0.0000006 ETH at current Sepolia gas, so any faucet drip is enough |
-| `cre workflow simulate` | **Not run yet.** The simulator needs a CRE login or API key |
-| `LedgerAnchor` on Sepolia | **Not deployed yet.** It needs an address with a little Sepolia ETH |
-| Transaction anchoring the head | **None yet.** Nothing in this repository claims an anchored head until `evidence/` and `deployment.sepolia.json` exist. The evidence lands in [`SIMULATION-OUTPUT.md`](SIMULATION-OUTPUT.md) |
+| `cre workflow simulate` | **Run on 2026-10-21** (dry run and `--broadcast`; outputs in `evidence/`) |
+| `LedgerAnchor` on Sepolia | **Deployed on 2026-10-21**: [0x50443D51Db71A61E131B147B1d36aF21d48CDdF7](https://sepolia.etherscan.io/address/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7) |
+| Transaction anchoring the head | **Exists**: [0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d](https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d) anchored dossier 80 on 2026-10-21. The evidence is in [`SIMULATION-OUTPUT.md`](SIMULATION-OUTPUT.md) |
 
 ## What you need
 

@@ -106,6 +106,43 @@ class LlmEraTest(unittest.TestCase):
         self.assertIsNone(livestats.llm_era([fake(46, "BTCUSDT", "2026-10-17T12:30:00+00:00")])["accepted_pct"])
 
 
+def fake_era(seq, version, action):
+    d = fake(seq, "BTCUSDT", "2026-10-17T09:26:12+00:00", action=action)
+    if version is not None:
+        d["verdict"]["rules_version"] = version
+    return d
+
+
+class RuleErasTest(unittest.TestCase):
+    def test_verdicts_split_by_the_rule_set_that_recorded_them(self):
+        ledger = [
+            fake_era(1, "v1", "FLAT"),
+            fake_era(2, "v1", "SHORT"),
+            fake_era(54, "v2", "LONG"),
+            fake_era(55, "v1", "FLAT"),  # a manual v1 comparison run inside the v2 range
+            fake_era(56, "v2", "LONG"),
+            fake_era(57, "v2", "FLAT"),
+        ]
+        eras = livestats.rule_eras(ledger)
+        self.assertEqual(list(eras), ["v1", "v2"])  # ordered by first dossier, not by name
+        self.assertEqual(eras["v1"], {"dossiers": 3, "first_seq": 1, "last_seq": 55, "actions": {"FLAT": 2, "SHORT": 1}})
+        self.assertEqual(eras["v2"], {"dossiers": 3, "first_seq": 54, "last_seq": 57, "actions": {"FLAT": 1, "LONG": 2}})
+
+    def test_a_dossier_without_a_rules_version_is_counted_not_dropped(self):
+        eras = livestats.rule_eras([fake_era(1, None, "FLAT"), fake_era(2, "v2", "LONG")])
+        self.assertEqual(eras["unversioned"]["dossiers"], 1)
+        self.assertEqual(eras["v2"]["dossiers"], 1)
+
+    def test_empty_ledger_has_no_eras(self):
+        self.assertEqual(livestats.rule_eras([]), {})
+
+    def test_the_report_names_each_era(self):
+        ledger = [fake_era(1, "v1", "FLAT"), fake_era(2, "v2", "LONG")]
+        text = livestats.format_report(livestats.summarize(ledger))
+        self.assertIn("rules v1: 1 dossiers (seq 1 to 1), actions FLAT 1", text)
+        self.assertIn("rules v2: 1 dossiers (seq 2 to 2), actions LONG 1", text)
+
+
 class ReportTest(unittest.TestCase):
     def test_report_prints_the_numbers_it_counted(self):
         text = livestats.format_report(livestats.summarize(sample_ledger()), {"verdict-desk-bot": [1, 45, 46, 47], "Someone": [48, 49]})

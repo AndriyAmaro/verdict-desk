@@ -114,12 +114,34 @@ def llm_era(ledger: list[dict], first_seq: int = FIRST_LLM_SEQ, last_seq: int | 
     }
 
 
+def rule_eras(ledger: list[dict]) -> dict:
+    """Verdicts split by the rule set that recorded them (`verdict.rules_version`).
+
+    The live chain carries more than one rule set (v1 recorded the early dossiers, v2 records
+    the workflow runs since dossier 54, and the two interleave where manual comparison runs
+    were appended). A single LONG/FLAT/SHORT total over the whole chain mixes the two, so the
+    split is published next to it. Eras are ordered by their first dossier.
+    """
+    eras: dict[str, dict] = {}
+    for d in ledger:
+        version = d["verdict"].get("rules_version") or "unversioned"
+        era = eras.setdefault(version, {"dossiers": 0, "first_seq": d["seq"], "last_seq": d["seq"], "actions": {}})
+        era["dossiers"] += 1
+        era["first_seq"] = min(era["first_seq"], d["seq"])
+        era["last_seq"] = max(era["last_seq"], d["seq"])
+        action = d["verdict"]["action"]
+        era["actions"][action] = era["actions"].get(action, 0) + 1
+    for era in eras.values():
+        era["actions"] = dict(sorted(era["actions"].items()))
+    return dict(sorted(eras.items(), key=lambda item: item[1]["first_seq"]))
+
+
 def summarize(ledger: list[dict], first_llm_seq: int = FIRST_LLM_SEQ, last_llm_seq: int | None = None) -> dict:
     head = {"seq": ledger[-1]["seq"], "hash": ledger[-1]["hash"], "symbol": ledger[-1]["evidence"]["symbol"]} if ledger else None
     actions: dict[str, int] = {}
     for d in ledger:
         actions[d["verdict"]["action"]] = actions.get(d["verdict"]["action"], 0) + 1
-    return {"head": head, "actions": dict(sorted(actions.items())), "cadence": cadence(ledger), "llm_era": llm_era(ledger, first_llm_seq, last_llm_seq)}
+    return {"head": head, "actions": dict(sorted(actions.items())), "cadence": cadence(ledger), "llm_era": llm_era(ledger, first_llm_seq, last_llm_seq), "rule_eras": rule_eras(ledger)}
 
 
 def commit_authors(path: Path, ledger: list[dict]) -> dict[str, list[int]] | None:
@@ -165,6 +187,9 @@ def format_report(s: dict, authors: dict[str, list[int]] | None = None) -> str:
         lines.append(f"Head: seq {s['head']['seq']}, hash {s['head']['hash']}")
     per = ", ".join(f"{k} {v}" for k, v in c["per_symbol"].items())
     lines.append(f"Dossiers: {c['total']} ({per}); actions {', '.join(f'{k} {v}' for k, v in s['actions'].items())}")
+    for version, era in s.get("rule_eras", {}).items():
+        era_actions = ", ".join(f"{k} {v}" for k, v in era["actions"].items())
+        lines.append(f"  rules {version}: {era['dossiers']} dossiers (seq {era['first_seq']} to {era['last_seq']}), actions {era_actions}")
     lines.append(f"Window: {c['first']} to {c['last']} = {c['window_hours']} h ({c['window_days']} days)")
     lines.append(f"Clock hours (UTC) with at least one dossier: {c['clock_hours_with_records']} of {c['clock_hours_in_window']} ({c['coverage_pct']}%)")
     lines.append(f"Longest gap between consecutive dossiers of the same symbol: {c['longest_gap_minutes']} min ({c['longest_gap_symbol']}); gaps over {GAP_LIMIT_MINUTES} min: {c['gaps_over_90_minutes']}")

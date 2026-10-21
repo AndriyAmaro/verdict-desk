@@ -23,6 +23,7 @@ Chainlink Data Feed BTC/USD ------EVM read------------^
 | Deploy script against Sepolia | Dry run done (forwarder code check, gas estimate: about 0.0000006 ETH) | `cd contracts && node scripts/deploy.mjs --dry-run` |
 | `cre workflow simulate` | **Not run yet.** The CLI needs a CRE login or API key (API key auth also needs deploy access approval on the account) | [`DEPLOY_SEPOLIA.md`](DEPLOY_SEPOLIA.md) |
 | Live deploy on Sepolia and a real report | **Not done.** Needs a funded throwaway testnet key; nothing is claimed until `evidence/` and `deployment.sepolia.json` exist | [`DEPLOY_SEPOLIA.md`](DEPLOY_SEPOLIA.md), `scripts/anchor-sepolia.sh` |
+| Evidence file with the simulation output, anchored head, feed value, contract and transaction | Structure ready, **every field pending** | [`SIMULATION-OUTPUT.md`](SIMULATION-OUTPUT.md) |
 
 ## Run it
 
@@ -64,6 +65,7 @@ The full runbook, with the status of each step, is [`DEPLOY_SEPOLIA.md`](DEPLOY_
 | `contracts/scripts/` | `deploy.mjs` (deploy from a throwaway key held in the environment, never printed) and `check-anchor.mjs` (read-only: verifies the ledger chain, reads the anchor, asks `isAnchored`) |
 | `scripts/anchor-sepolia.sh` | Deploy, simulate, broadcast and check in order; saves the outputs in `evidence/` |
 | `DEPLOY_SEPOLIA.md` | Runbook and status of each step |
+| `SIMULATION-OUTPUT.md` | Where the evidence lands (pending until a real run fills it) |
 | `project.yaml`, `secrets.yaml` | CRE project settings (no secrets are used) |
 
 ## Credits and licenses

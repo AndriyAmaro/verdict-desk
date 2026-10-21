@@ -11,7 +11,7 @@ This is the runbook for the one thing the CRE bounty asks to see that unit tests
 | Deploy script against Sepolia, dry run (`--dry-run`: forwarder code check, gas estimate) | Run on 2026-10-20: the deployment costs about 0.0000006 ETH at current Sepolia gas, so any faucet drip is enough |
 | `cre workflow simulate` | **Not run yet.** The simulator needs a CRE login or API key |
 | `LedgerAnchor` on Sepolia | **Not deployed yet.** It needs an address with a little Sepolia ETH |
-| Transaction anchoring the head | **None yet.** Nothing in this repository claims an anchored head until `evidence/` and `deployment.sepolia.json` exist |
+| Transaction anchoring the head | **None yet.** Nothing in this repository claims an anchored head until `evidence/` and `deployment.sepolia.json` exist. The evidence lands in [`SIMULATION-OUTPUT.md`](SIMULATION-OUTPUT.md) |
 
 ## What you need
 
@@ -55,7 +55,7 @@ cre workflow simulate ./anchor -T staging-settings --non-interactive --trigger-i
 node contracts/scripts/check-anchor.mjs
 ```
 
-`.env` is ignored by git. `check-anchor.mjs` verifies the whole hash chain of the ledger with the same code the dashboard runs, reads the latest anchored sequence number and head hash from the contract, asks the contract `isAnchored(seq, hash)` for the hash this ledger has at that sequence number, and prints the anchoring transaction.
+`.env` is ignored by git. `check-anchor.mjs --json` prints the same facts as JSON, which is what fills [`SIMULATION-OUTPUT.md`](SIMULATION-OUTPUT.md). `check-anchor.mjs` verifies the whole hash chain of the ledger with the same code the dashboard runs, reads the latest anchored sequence number and head hash from the contract, asks the contract `isAnchored(seq, hash)` for the hash this ledger has at that sequence number, and prints the anchoring transaction.
 
 ## Which forwarder
 

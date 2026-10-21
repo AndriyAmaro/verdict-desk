@@ -39,14 +39,22 @@ jobs:
         run: |
           git config user.name "verdict-desk-bot"
           git config user.email "verdict-desk-bot@users.noreply.github.com"
+          # Commit first: git rebase refuses to run on a dirty tree, so the
+          # old order (pull --rebase before commit) died whenever a human
+          # pushed while the bot was recording (run 39653930760, 2026-10-21:
+          # decide and verify passed, the push step failed, dossiers lost).
+          git add ledger
+          if git diff --cached --quiet; then
+            echo "nothing recorded this hour"
+            exit 0
+          fi
+          git commit -m "ledger: $(date -u +%Y-%m-%dT%H:%MZ)"
           for attempt in 1 2 3; do
-            git pull --rebase origin "${{ github.ref_name }}" && break
-            echo "rebase attempt $attempt failed, retrying..."
+            git pull --rebase origin "${{ github.ref_name }}" && git push && exit 0
+            echo "push attempt $attempt raced, rebasing and retrying..."
             sleep 5
           done
-          git add ledger
-          git commit -m "ledger: $(date -u +%Y-%m-%dT%H:%MZ)" || { echo "nothing recorded this hour"; exit 0; }
-          git push
+          exit 1
 
   pages:
     needs: decide

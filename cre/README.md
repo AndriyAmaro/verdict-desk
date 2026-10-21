@@ -20,8 +20,9 @@ Chainlink Data Feed BTC/USD ------EVM read------------^
 | Head format shared by Python and the workflow | Verified | `python -m verdict_desk head`, parsed by `anchor/logic.ts` |
 | Workflow logic (HTTP head parsing, Data Feed read, report encoding, failure paths) | Verified with the SDK's test mocks | `cd anchor && bun test` (10 tests), `bunx tsc --noEmit` |
 | `LedgerAnchor.sol` | Verified in a real in-memory EVM | `cd contracts/evm && npm install && python -m unittest discover -s test` (6 tests: forwarder-only, append-only, owner check, ERC165, exact custom errors) |
-| `cre workflow simulate` | **Not run yet.** The CLI needs a CRE account (`cre login` or `CRE_API_KEY`) | see below |
-| Live deploy on Sepolia and a real report | **Not done** | needs a funded testnet key and the contract address |
+| Deploy script against Sepolia | Dry run done (forwarder code check, gas estimate: about 0.0000006 ETH) | `cd contracts && node scripts/deploy.mjs --dry-run` |
+| `cre workflow simulate` | **Not run yet.** The CLI needs a CRE login or API key (API key auth also needs deploy access approval on the account) | [`DEPLOY_SEPOLIA.md`](DEPLOY_SEPOLIA.md) |
+| Live deploy on Sepolia and a real report | **Not done.** Needs a funded throwaway testnet key; nothing is claimed until `evidence/` and `deployment.sepolia.json` exist | [`DEPLOY_SEPOLIA.md`](DEPLOY_SEPOLIA.md), `scripts/anchor-sepolia.sh` |
 
 ## Run it
 
@@ -32,9 +33,16 @@ cd ../contracts/evm && npm install && npm run compile && python -m unittest disc
 
 # simulation, needs a CRE account (https://docs.chain.link/cre/account/creating-account)
 export CRE_API_KEY=...            # or: cre login
-cre workflow simulate ./anchor -T staging-settings
-# add --broadcast to send the report for real (needs a funded Sepolia key in .env)
+cre workflow simulate ./anchor -T staging-settings --non-interactive --trigger-index 0
+# add --broadcast to send the report for real (needs a funded Sepolia key as CRE_ETH_PRIVATE_KEY in an ignored .env)
+
+# or everything in order (deploy, simulate, broadcast, check) from a funded throwaway key:
+SEPOLIA_PRIVATE_KEY=0x... bash scripts/anchor-sepolia.sh
+# anyone can check what the contract holds against the public ledger, no key needed:
+node contracts/scripts/check-anchor.mjs
 ```
+
+The full runbook, with the status of each step, is [`DEPLOY_SEPOLIA.md`](DEPLOY_SEPOLIA.md).
 
 `anchor/config.staging.json` already points `headUrl` at the raw `ledger/head.json` of this repository; before a real transaction, set `anchorAddress` to the deployed `LedgerAnchor` (it is the zero address while only simulating). Deploy `LedgerAnchor(forwarder, expectedWorkflowOwner)` with the Sepolia `MockKeystoneForwarder` for simulation or the production CRE forwarder for a deployed workflow; confirm both addresses in the CRE Forwarder Directory first.
 
@@ -53,6 +61,9 @@ cre workflow simulate ./anchor -T staging-settings
 | `contracts/evm/src/abi/*.abi` | ABIs the bindings are generated from (`cre generate-bindings evm --language typescript`) |
 | `contracts/evm/ts/generated/` | Generated bindings (do not edit) |
 | `contracts/evm/test/` | EVM-level contract tests |
+| `contracts/scripts/` | `deploy.mjs` (deploy from a throwaway key held in the environment, never printed) and `check-anchor.mjs` (read-only: verifies the ledger chain, reads the anchor, asks `isAnchored`) |
+| `scripts/anchor-sepolia.sh` | Deploy, simulate, broadcast and check in order; saves the outputs in `evidence/` |
+| `DEPLOY_SEPOLIA.md` | Runbook and status of each step |
 | `project.yaml`, `secrets.yaml` | CRE project settings (no secrets are used) |
 
 ## Credits and licenses

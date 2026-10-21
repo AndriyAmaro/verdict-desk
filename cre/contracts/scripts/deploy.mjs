@@ -68,7 +68,7 @@ const txHash = await wallet.deployContract({ abi, bytecode, args: [getAddress(fo
 console.log(`deploy transaction ${txHash}`)
 const receipt = await client.waitForTransactionReceipt({ hash: txHash, timeout: 180_000 })
 if (receipt.status !== 'success' || !receipt.contractAddress) fail(`deployment failed: ${JSON.stringify({ status: receipt.status, block: String(receipt.blockNumber) })}`)
-const address = receipt.contractAddress
+const address = getAddress(receipt.contractAddress)
 
 const read = (functionName) => client.readContract({ address, abi, functionName })
 const onchainForwarder = await read('forwarder'), onchainOwner = await read('expectedWorkflowOwner'), latestSeq = await read('latestSeq')

@@ -6,10 +6,16 @@
   "use strict";
   var START_CAPITAL = 10000;
   var GAP_LIMIT_MS = 90 * 60 * 1000;
+  var HOUR_MS = 3600000;
+  var FIRST_LLM_SEQ = 46; // first dossier recorded after the analyst prompt and citation validator fixes
 
   function round(x, places) {
     var f = Math.pow(10, places);
     return Math.round((x + Number.EPSILON) * f) / f;
+  }
+
+  function round1(x) {
+    return Math.floor(x * 10 + 0.5) / 10; // half up, same as verdict_desk/livestats.py
   }
 
   function lastCandleTime(d) {
@@ -92,17 +98,63 @@
       }
     });
     all.sort(function (a, b) { return a - b; });
+    var hours = {};
+    all.forEach(function (t) { hours[Math.floor(t / HOUR_MS)] = true; });
+    var withRecords = Object.keys(hours).length;
+    var span = all.length ? Math.floor(all[all.length - 1] / HOUR_MS) - Math.floor(all[0] / HOUR_MS) + 1 : 0;
     return {
       total: ledger.length,
       per_symbol: counts,
       first: all.length ? new Date(all[0]).toISOString() : null,
       last: all.length ? new Date(all[all.length - 1]).toISOString() : null,
+      window_hours: all.length ? round1((all[all.length - 1] - all[0]) / HOUR_MS) : 0,
       longest_gap_minutes: Math.round(longest / 60000),
       longest_gap_symbol: longestSymbol,
-      gaps_over_90_minutes: gapsOver
+      gaps_over_90_minutes: gapsOver,
+      clock_hours_with_records: withRecords,
+      clock_hours_in_window: span,
+      coverage_pct: span ? round1(withRecords / span * 100) : 0
     };
   }
 
-  var api = { START_CAPITAL: START_CAPITAL, portfolio: portfolio, cadence: cadence, resolve: resolve };
+  /* What the citation validator did with the LLM analysts' claims from firstSeq on (same rule as livestats.py). */
+  function llmEra(ledger, firstSeq, lastSeq) {
+    firstSeq = firstSeq || FIRST_LLM_SEQ;
+    lastSeq = lastSeq || null;
+    var era = ledger.filter(function (d) { return d.seq >= firstSeq && (lastSeq === null || d.seq <= lastSeq); });
+    var sides = { bull: { accepted: 0, rejected: 0, errors: 0 }, bear: { accepted: 0, rejected: 0, errors: 0 } };
+    var reasons = {}, without = [], models = {};
+    era.forEach(function (d) {
+      var layer = d.llm;
+      if (!layer || !Object.keys(layer).length) { without.push(d.seq); return; }
+      if (layer.model) models[layer.model] = true;
+      ["bull", "bear"].forEach(function (side) {
+        var part = layer[side] || {};
+        if (part.error) { sides[side].errors++; return; }
+        sides[side].accepted += (part.accepted || []).length;
+        (part.rejected || []).forEach(function (c) {
+          sides[side].rejected++;
+          var reason = String(c.rejected_because || "unknown").split(":")[0];
+          reasons[reason] = (reasons[reason] || 0) + 1;
+        });
+      });
+    });
+    var accepted = sides.bull.accepted + sides.bear.accepted, rejected = sides.bull.rejected + sides.bear.rejected;
+    return {
+      first_seq: firstSeq,
+      last_seq: lastSeq,
+      dossiers: era.length,
+      dossiers_with_analysts: era.length - without.length,
+      dossiers_without_llm: without,
+      models: Object.keys(models).sort(),
+      accepted: accepted,
+      rejected: rejected,
+      accepted_pct: accepted + rejected ? round1(accepted / (accepted + rejected) * 100) : null,
+      sides: sides,
+      rejection_reasons: reasons
+    };
+  }
+
+  var api = { START_CAPITAL: START_CAPITAL, FIRST_LLM_SEQ: FIRST_LLM_SEQ, portfolio: portfolio, cadence: cadence, llmEra: llmEra, resolve: resolve };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.VerdictStats = api;
 })(typeof self !== "undefined" ? self : this);

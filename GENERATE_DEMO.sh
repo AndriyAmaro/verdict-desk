@@ -10,6 +10,11 @@ CAST_FILE="/tmp/verdict-desk-demo.cast"
 
 cd "$REPO"
 
+# The public ledger is appended by the hourly workflow only. The "fresh decision" of the demo goes to a
+# scratch copy: dossiers 54 to 68 of the public chain are demo runs that ended up there by mistake.
+SCRATCH="$(mktemp -d)/ledger.jsonl"
+cp ledger/ledger.jsonl "$SCRATCH"
+
 # Source Mistral key
 source ~/.hermes/.env 2>/dev/null
 export MISTRAL_API_KEY="${HERMES_CUSTOM_API_MISTRAL_AI_API_KEY:-}"
@@ -39,8 +44,8 @@ if ! command -v asciinema &> /dev/null; then
         echo "$ python3 -m verdict_desk verify"
         python3 -m verdict_desk verify
         echo ""
-        echo "$ python3 -m verdict_desk decide-v2 BTCUSDT --no-news"
-        python3 -m verdict_desk decide-v2 BTCUSDT --no-news 2>&1
+        echo "$ python3 -m verdict_desk --ledger scratch-copy.jsonl decide-v2 BTCUSDT --no-news"
+        python3 -m verdict_desk --ledger "$SCRATCH" decide-v2 BTCUSDT --no-news 2>&1
         echo ""
         echo "$ python3 -m verdict_desk replay"
         python3 -m verdict_desk replay 2>&1 | tail -10
@@ -64,6 +69,9 @@ if ! command -v asciinema &> /dev/null; then
     exit 0
 fi
 
+# Test count from a real run, not a constant
+TESTS="$(python3 -m unittest discover -s tests 2>&1 | sed -n 's/^Ran \([0-9]*\) tests.*/\1/p')"
+
 # Record with asciinema
 echo "📹 Recording terminal session..."
 asciinema rec "$CAST_FILE" -c "bash -c '
@@ -74,15 +82,15 @@ export MISTRAL_API_KEY=\"\${HERMES_CUSTOM_API_MISTRAL_AI_API_KEY:-}\"
 echo \"=== Verdict Desk - Audit-Grade AI Decisions ===\"
 echo \"\"
 echo \"\$(git log --oneline -1)\"
-echo \"\$(wc -l < ledger/ledger.jsonl) dossiers | 129 tests | LIVE\"
+echo \"\$(wc -l < ledger/ledger.jsonl) dossiers | $TESTS tests | LIVE\"
 echo \"\"
 
 echo \"1️⃣  Verify hash chain...\"
 python3 -m verdict_desk verify
 echo \"\"
 
-echo \"2️⃣  Fresh v2 decision...\"
-python3 -m verdict_desk decide-v2 BTCUSDT --no-news
+echo \"2️⃣  Fresh v2 decision (recorded in a scratch copy of the ledger)...\"
+python3 -m verdict_desk --ledger $SCRATCH decide-v2 BTCUSDT --no-news
 echo \"\"
 
 echo \"3️⃣  Replay all decisions...\"

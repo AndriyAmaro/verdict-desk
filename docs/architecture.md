@@ -1,8 +1,8 @@
 # Architecture: Verdict Desk
 
-> Status: Draft · Last updated: 2026-10-17 · Scope: BLI Legal Tech Hackathon 2, bounties "Autonomous Agents" (RYO-CHAN) and "Best CRE workflow" (Chainlink)
+> Status: Draft · Last updated: 2026-10-21 · Scope: BLI Legal Tech Hackathon 2, bounties "Autonomous Agents" (RYO-CHAN) and "Best CRE workflow" (Chainlink)
 
-No SRS exists for this project. Drivers below come from the bounty text, the project strategy (`../../ESTRATEGIA.md`) and the constraints in section 2, and are stated in prose. Each section marks what is **Built** (in the repo today: 67 Python tests, 10 anchor workflow tests, 6 contract tests) and what is **Planned** (designed, not yet written). Nothing planned is presented as done.
+No SRS exists for this project. Drivers below come from the bounty text, the project strategy (`../../ESTRATEGIA.md`) and the constraints in section 2, and are stated in prose. Each section marks what is **Built** (in the repo today: 208 Python tests, 10 anchor workflow tests, 6 contract tests) and what is **Planned** (designed, not yet written). Nothing planned is presented as done.
 
 ## 1. Introduction and Goals
 
@@ -26,7 +26,7 @@ The legal angle fits the organizer (Blockchain Legal Institute): a dossier is bu
 | Submission due 2026-10-31 22:01 (DoraHacks time); internal cut-off 2026-10-22 for an end-to-end demo with LLM | Small modular core, reuse of what exists, no new platforms |
 | Budget zero | Public keyless data, free LLM tier only, free hosting (GitHub) |
 | Brazil-based maintainer | Binance futures API is blocked by location; the public spot mirror is used |
-| LLM key (Mistral API) not configured yet in the cloud environment | LLM layer is optional and injectable; the core runs alone |
+| LLM key (Mistral API) is set only in the workflow environment | LLM layer is optional and injectable; the core runs alone. The analysts answer live since dossier 35 (section 11, risk 2) |
 | No X (Twitter) API | Narrative agent reads public RSS feeds instead |
 | Original code, MIT license, third-party code only credited | The automaton's journal is used as a data source only, never as submitted code |
 | Judge-facing text in American English | This document, README, dashboard and video script |
@@ -47,7 +47,7 @@ graph TB
     rss["Public RSS feeds<br/>(external) narrative voices"]
     mistral["Mistral API<br/>(external, optional) LLM analysts"]
     github["GitHub<br/>(external) repo, Actions, Pages"]
-    cre["Chainlink CRE + Data Feed + testnet<br/>(external, planned) anchoring"]
+    cre["Chainlink CRE + Data Feed + testnet<br/>(external) anchoring"]
 
     operator -->|"runs, publishes"| system
     judge -->|"reads, replays, verifies"| system
@@ -89,9 +89,9 @@ graph TB
         cli["CLI + engine<br/>[Python 3, stdlib]<br/>decide, replay, verify,<br/>portfolio, backtest"]
         ledger[("Ledger<br/>JSONL, hash-chained<br/>in git")]
         web["Static dashboard +<br/>browser verifier<br/>[HTML/JS]"]
-        actions["Hourly runner<br/>[GitHub Actions]<br/>planned"]
-        flow["Anchoring workflow<br/>[Chainlink CRE, TypeScript]<br/>planned"]
-        anchor[("Anchor contract<br/>testnet<br/>planned")]
+        actions["Hourly runner<br/>[GitHub Actions]"]
+        flow["Anchoring workflow<br/>[Chainlink CRE, TypeScript]"]
+        anchor[("Anchor contract<br/>Sepolia testnet")]
     end
 
     data["Public data sources<br/>Binance, OKX, GDELT, RSS"]
@@ -111,15 +111,13 @@ graph TB
 
     classDef person fill:#08427b,stroke:#052e56,color:#fff
     classDef container fill:#438dd5,stroke:#2e6295,color:#fff
-    classDef planned fill:#6b8fb8,stroke:#2e6295,color:#fff,stroke-dasharray: 5 5
     classDef external fill:#999,stroke:#666,color:#fff
     class judge person
-    class cli,web,ledger container
-    class actions,flow,anchor planned
+    class cli,web,ledger,actions,flow,anchor container
     class data,mistral external
 ```
 
-Dashed blocks are planned. The engine's modules (package `verdict_desk`):
+The engine's modules (package `verdict_desk`):
 
 | Module | Responsibility | Purity |
 |---|---|---|
@@ -174,13 +172,13 @@ sequenceDiagram
 | Environment | What runs | Status |
 |---|---|---|
 | Local | `python -m verdict_desk ...`, `python -m unittest discover` | Built |
-| Live (public repo) | GitHub Actions cron runs `decide` hourly and commits the ledger; GitHub Pages serves the dashboard; CRE workflow anchors the head hash daily | Planned, blocked on repo creation scope |
+| Live (public repo) | GitHub Actions cron runs `decide-v2` hourly and commits the ledger; GitHub Pages serves the dashboard; the CRE workflow anchored the head on Sepolia on 2026-10-21 (simulate with broadcast; runbook in `cre/DEPLOY_SEPOLIA.md`) | Built and running (repo `AndriyAmaro/verdict-desk`; scheduled runs are best effort, so the cadence has the gaps counted in the README) |
 
 No server, database or container is needed. Hosting cost is zero. The live environment is the same code on a schedule, not a different build.
 
 ## 8. Cross-cutting Concepts
 
-**Security and trust model.** The hash chain proves **integrity after recording**, not **authenticity at collection time**: an operator could in principle fabricate a packet before hashing it. The design narrows that gap with independent witnesses: (1) every packet carries its source URL and timestamp, and historical candles can be re-fetched by anyone and compared; (2) git history, written by an hourly job in a public repo, timestamps each commit outside the operator's clock; (3) the planned CRE anchor writes the head hash to a testnet with an oracle price, which a later edit cannot rewrite. Secrets: the only secret is `MISTRAL_API_KEY`, read from the environment and never written to a dossier or log. There is no key with trading rights anywhere.
+**Security and trust model.** The hash chain proves **integrity after recording**, not **authenticity at collection time**: an operator could in principle fabricate a packet before hashing it. The design narrows that gap with independent witnesses: (1) every packet carries its source URL and timestamp, and historical candles can be re-fetched by anyone and compared; (2) git history, written by an hourly job in a public repo, timestamps each commit outside the operator's clock; (3) the CRE anchor wrote the head hash to Sepolia with an oracle price on 2026-10-21, which a later edit cannot rewrite. Secrets: the only secret is `MISTRAL_API_KEY`, read from the environment and never written to a dossier or log. There is no key with trading rights anywhere.
 
 **Data.** One append-only JSONL file; one line per dossier; canonical JSON (sorted keys, compact separators) hashed with SHA-256; genesis hash is 64 zeros. Each dossier embeds its own evidence (about 72 candles), so lines are self-contained and verifiable in isolation. Migration: the rules carry `rules_version` ("v1"); a new rule set ships as v2 and never rewrites v1 history.
 
@@ -190,7 +188,7 @@ No server, database or container is needed. Hosting cost is zero. The live envir
 
 **Performance.** A run takes seconds, dominated by the 5-second GDELT spacing. Ledger growth is roughly tens of KB per dossier (embedded candles); hourly operation is a few MB per month. Not a concern for the hackathon window.
 
-**Testing.** Strategy: many fast unit tests over pure functions, no network in tests. Framework: Python `unittest` from the standard library (no dependency, in line with ADR-004). LLM paths are tested through an injected `ask` stub. 67 Python tests pass today (plus 10 workflow tests under `cre/anchor` and 6 EVM contract tests), including: narrative grounding gate rejects invented quotes, unknown voices and out-of-vocabulary values; a failed symbol is a visible gap, never a fake decision; citation validator rejections, replay detects an altered claim, hash chain detects edits, backtest does not leak the future, fees apply on both sides. Critical flow for end-to-end checking: `decide` then `verify` then `replay` on a fresh ledger (Planned as a single scripted check run by Actions after each commit). Coverage stance: none (no percentage gate; criterion coverage is tracked by the test names above, since a percentage measures execution, not assertion quality). The browser verifier is tested through Node (`tests/node_verify.js`) on 9 cross-language vectors and a real ledger; the page itself was exercised once in Chromium, not by a CI test.
+**Testing.** Strategy: many fast unit tests over pure functions, no network in tests. Framework: Python `unittest` from the standard library (no dependency, in line with ADR-004). LLM paths are tested through an injected `ask` stub. 208 Python tests pass today (plus 10 workflow tests under `cre/anchor` and 6 EVM contract tests), including: narrative grounding gate rejects invented quotes, unknown voices and out-of-vocabulary values; a failed symbol is a visible gap, never a fake decision; citation validator rejections, replay detects an altered claim, hash chain detects edits, deletion, duplication and a genesis that does not link to the genesis hash, backtest does not leak the future, fees apply on both sides. End-to-end checking: the `tests` workflow (`.github/workflows/tests.yml`) runs the suite and `python -m verdict_desk verify` on the shipped ledger on every push. Coverage stance: none (no percentage gate; criterion coverage is tracked by the test names above, since a percentage measures execution, not assertion quality). The browser verifier is tested through Node (`tests/node_verify.js`) on 9 cross-language vectors and a real ledger; the page itself was exercised once in Chromium, not by a CI test.
 
 ## 9. Architecture Decisions
 
@@ -285,7 +283,7 @@ No server, database or container is needed. Hosting cost is zero. The live envir
 
 ### ADR-008: Chainlink CRE workflow anchors the ledger head and an oracle price
 
-**Status:** Accepted in principle, **Planned** · **Date:** 2026-10-12
+**Status:** Accepted and built · **Date:** 2026-10-12, built and run on 2026-10-21
 **Requirements addressed:** Chainlink bounty (CRE as orchestration layer joining a blockchain to an API, LLM or agent; simulation by the CRE CLI or live deploy); tamper evidence beyond the operator
 
 **Decision.** A CRE workflow (TypeScript SDK) runs on a daily trigger: it fetches the published ledger head hash over HTTP, reads a Data Feed price for the traded asset, and writes the head hash and price to a minimal anchor contract on a testnet. The price doubles as independent cross-check evidence for the dossier.
@@ -294,9 +292,11 @@ No server, database or container is needed. Hosting cost is zero. The live envir
 
 **Consequences.** Needs a testnet wallet and CRE CLI access; every CRE API detail must be verified against the current Chainlink documentation before coding (this document does not assume them). If time runs out, the project ships the deterministic core and drops the anchor, keeping the git-timestamp witness.
 
+**Update 2026-10-21.** Built and run: `LedgerAnchor` is deployed on Sepolia and the head of dossier 80 is anchored in a real transaction; `node cre/contracts/scripts/check-anchor.mjs` answers `ok: true`. Evidence in `cre/SIMULATION-OUTPUT.md`, runbook in `cre/DEPLOY_SEPOLIA.md`.
+
 ### ADR-009: Hourly GitHub Actions run commits the ledger to a public repo
 
-**Status:** Accepted in principle, **Planned (blocked)** · **Date:** 2026-10-12
+**Status:** Accepted and running · **Date:** 2026-10-12, live since 2026-10-17
 **Requirements addressed:** independent timestamps; "live history" credibility
 
 **Decision.** A scheduled workflow runs `decide` and commits the new ledger line. The commit time and public repo history act as a witness the operator does not control.
@@ -304,6 +304,8 @@ No server, database or container is needed. Hosting cost is zero. The live envir
 **Options considered.** *GitHub Actions (chosen)*: free, public, timestamped. *Maintainer's VPS cron*: reliable, but timestamps are self-asserted and the history is private.
 
 **Consequences.** GitHub scheduled runs are best effort and can be delayed or skipped; the dashboard must show real gaps rather than hide them. Two repository facts must change first: the public repo must exist (it needs the owner's go-ahead), and the ledger lives in the tracked `ledger/ledger.jsonl` (`data/` stays ignored for scratch runs).
+
+**Update 2026-10-21.** Both facts changed on 2026-10-17: the public repo `AndriyAmaro/verdict-desk` exists, `ledger/` is tracked, and the workflow has committed live dossiers since (the counted cadence, gaps included, is in the README, section "Live operation").
 
 ## 10. Quality Requirements
 
@@ -332,7 +334,7 @@ No server, database or container is needed. Hosting cost is zero. The live envir
 
 - **Dossier:** one ledger record: frozen evidence, features, bull and bear arguments, verdict, optional LLM layer, and hashes.
 - **Frozen evidence packet:** the collected data a decision used, stored inside the dossier.
-- **Edge:** bull score minus bear score; a position opens when its absolute value reaches the threshold (2.0).
+- **Edge:** bull score minus bear score; a position opens when its absolute value reaches the threshold (2.0 in rules v1, 1.5 in rules v2).
 - **Replay:** recomputation of a decision from its frozen evidence only.
 - **ATR:** average true range, used for stop and target distances.
 - **CRE:** Chainlink Runtime Environment, the workflow layer used for the anchoring flow.

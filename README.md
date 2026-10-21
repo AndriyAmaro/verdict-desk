@@ -20,7 +20,7 @@ Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Cha
 | Record the simulated operation | Entry, size, stop, target and the portfolio marked against later candles | `verdict_desk/agents.py`, `portfolio.py` |
 | Cause and effect | Every argument names the evidence item it rests on; LLM claims must cite item ids and numbers that really appear there | `verdict_desk/citations.py`, dashboard row details |
 | A repeatable reasoning trail | `replay` re-derives the verdict from the frozen packet; `verify` checks the hash chain | `verdict_desk/dossier.py` |
-| Chainlink CRE (second bounty) | A CRE workflow plus a receiver contract that anchor the ledger head and a Data Feed price on Sepolia | `cre/` (status table inside); evidence file `cre/SIMULATION-OUTPUT.md` (pending) |
+| Chainlink CRE (second bounty) | A CRE workflow plus a receiver contract that anchor the ledger head and a Data Feed price on Sepolia | `cre/` (status table inside); evidence file `cre/SIMULATION-OUTPUT.md` (run on 2026-10-21, anchor on Sepolia) |
 
 ## Five-minute judge path
 
@@ -30,7 +30,7 @@ Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Cha
 4. Run it yourself:
 
 ```bash
-python3 -m unittest discover -s tests          # standard library only (198 tests)
+python3 -m unittest discover -s tests          # standard library only (199 tests)
 python3 -m verdict_desk verify                 # hash chain of ledger/ledger.jsonl
 python3 -m verdict_desk replay                 # re-derive every verdict from its frozen evidence
 python3 -m verdict_desk portfolio              # simulated positions marked against later candles
@@ -132,7 +132,7 @@ The evidence is in [`cre/SIMULATION-OUTPUT.md`](cre/SIMULATION-OUTPUT.md); the s
 | Anchoring transaction | [0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d](https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d) |
 <!-- cre-evidence:end -->
 
-Anyone can check the chain against the ledger with `node cre/contracts/scripts/check-anchor.mjs` (read-only, no key needed): it verifies the ledger, reads the anchor from Sepolia and asks the contract `isAnchored(seq, hash)`. Runbook and one-command script: [`cre/DEPLOY_SEPOLIA.md`](cre/DEPLOY_SEPOLIA.md).
+Anyone can check the chain against the ledger with `node cre/contracts/scripts/check-anchor.mjs` (read-only, no key needed; on a fresh clone run `cd cre/contracts && npm install` once first): it verifies the ledger, reads the anchor from Sepolia and asks the contract `isAnchored(seq, hash)`. Runbook and one-command script: [`cre/DEPLOY_SEPOLIA.md`](cre/DEPLOY_SEPOLIA.md).
 
 ## Limits
 

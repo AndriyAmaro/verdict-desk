@@ -39,7 +39,8 @@ cre workflow simulate ./anchor -T staging-settings --non-interactive --trigger-i
 
 # or everything in order (deploy, simulate, broadcast, check) from a funded throwaway key:
 SEPOLIA_PRIVATE_KEY=0x... bash scripts/anchor-sepolia.sh
-# anyone can check what the contract holds against the public ledger, no key needed:
+# anyone can check what the contract holds against the public ledger, no key needed
+# (on a fresh clone: cd contracts && npm install, once, so that viem is there):
 node contracts/scripts/check-anchor.mjs
 ```
 

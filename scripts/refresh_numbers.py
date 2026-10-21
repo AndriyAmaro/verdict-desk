@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""Refreshes every published figure from the ledger, so no number in the docs is typed by hand.
+
+  python3 scripts/refresh_numbers.py             # README "Live operation", the build-page draft, the test count
+  python3 scripts/refresh_numbers.py --check     # change nothing; exit 1 if a document is out of date with the ledger
+
+The figures come from `python3 -m verdict_desk stats --git` (verdict_desk/livestats.py) on the verified chain,
+and the test count from a real run of the suite. Run it again right before submitting: the chain grows hourly.
+"""
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from verdict_desk import dossier, livestats  # noqa: E402
+
+LEDGER = ROOT / "ledger" / "ledger.jsonl"
+README = ROOT / "README.md"
+BUILD_PAGE = ROOT / "SUBMISSAO_DORAHACKS.md"
+
+
+# Only the phrases that state the size of the suite: other "N tests" in the docs (the CRE ones) are different counts.
+TEST_COUNT_PATTERNS = [
+    (README, r"(standard library only \()(?:\d+|TESTS_COUNT)( tests\))"),
+    (BUILD_PAGE, r"(\| \*\*Testing\*\* \| )(?:\d+|TESTS_COUNT)( unit tests)"),
+    (BUILD_PAGE, r"(- )(?:\d+|TESTS_COUNT)( passing unit tests)"),
+    (BUILD_PAGE, r"(# )(?:\d+|TESTS_COUNT)( tests)"),
+]
+
+
+def count_tests() -> int:
+    run = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"], cwd=ROOT, capture_output=True, text=True, env={**os.environ, "MISTRAL_API_KEY": ""})
+    found = re.search(r"Ran (\d+) tests", run.stderr)
+    if run.returncode != 0 or not found:
+        raise SystemExit("the test suite does not pass, so there is no honest test count to publish:\n" + run.stderr[-800:])
+    return int(found.group(1))
+
+
+def live_section(ledger: list[dict]) -> str:
+    s = livestats.summarize(ledger)
+    authors = livestats.commit_authors(LEDGER, ledger)
+    if not authors:
+        raise SystemExit("needs a git checkout of the ledger (git blame) to count who recorded each dossier")
+    bot = authors.get("verdict-desk-bot", [])
+    other = sorted(n for name, seqs in authors.items() if name != "verdict-desk-bot" for n in seqs)
+    c, e, h = s["cadence"], s["llm_era"], s["head"]
+    per = ", ".join(f"{k} {v}" for k, v in c["per_symbol"].items())
+    gap_h, gap_m = divmod(c["longest_gap_minutes"], 60)
+    first, last = c["first"][:16].replace("T", " "), c["last"][:16].replace("T", " ")
+    sides = e["sides"]
+    reasons = ", ".join(f'"{k}" {v}' for k, v in e["rejection_reasons"].items())
+    # The history before the LLM era is derived too; the asserts stop a silent change of the ledger from reaching the docs.
+    none, failed, early = livestats.llm_era(ledger, 1, 4), livestats.llm_era(ledger, 5, 34), livestats.llm_era(ledger, 35, 45)
+    failed_calls = failed["sides"]["bull"]["errors"] + failed["sides"]["bear"]["errors"]
+    assert (len(none["dossiers_without_llm"]), failed_calls, early["accepted"]) == (4, 60, 0), "the recorded history changed: re-read the ledger before publishing"
+    why = early["rejection_reasons"]
+    return f"""<!-- live-numbers: generated from dossier {h['seq']} by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
+Counted over `ledger/ledger.jsonl` on the chain as of **dossier {h['seq']}** (head `{h['hash'][:16]}`, collected {last} UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
+
+| What | Number |
+|---|---|
+| Dossiers in the verified chain | {c['total']} ({per}) |
+| Operating window, first to last dossier | {c['window_hours']} h, {c['window_days']} days ({first} to {last} UTC) |
+| Clock hours (UTC) in that window with at least one dossier | {c['clock_hours_with_records']} of {c['clock_hours_in_window']} ({c['coverage_pct']}%) |
+| Longest gap between consecutive dossiers of the same symbol | {gap_h} h {gap_m} min ({c['longest_gap_symbol']}); {c['gaps_over_90_minutes']} gaps over 90 minutes |
+| Recorded by the workflow bot (scheduled or manually dispatched runs) | {len(bot)} (dossiers {livestats.seq_ranges(bot)}) |
+| Recorded by other commits | {len(other)}{(' (dossiers ' + livestats.seq_ranges(other) + '): runs made outside the workflow while the demo tooling and the v2 rules were being built; the ledger is append-only, so they stay') if other else ''} |
+| LLM era, dossier {e['first_seq']} onward | {e['dossiers']} dossiers, {e['dossiers_with_analysts']} with analyst output{(' (dossiers ' + livestats.seq_ranges(e['dossiers_without_llm']) + ' have no LLM layer)') if e['dossiers_without_llm'] else ''} |
+| Claims **accepted** by the citation validator | {e['accepted']} (bull {sides['bull']['accepted']}, bear {sides['bear']['accepted']}) |
+| Claims **rejected** by the citation validator | {e['rejected']} (bull {sides['bull']['rejected']}, bear {sides['bear']['rejected']}); reason: {reasons} |
+| Share of claims accepted | {e['accepted_pct']}% |
+
+The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures.
+
+Earlier dossiers stay exactly as they were recorded, so the history of how the LLM layer came to work is in the ledger itself:
+
+| Dossiers | What the ledger shows |
+|---|---|
+| 1 to 4 | No LLM layer: no key was set (the dashboard shows these as "off") |
+| 5 to 34 | The first model provider (an NVIDIA-hosted model) answered HTTP 403 on every call: {failed_calls} analyst calls failed, each failure recorded in its dossier |
+| 35 to 45 | Mistral analysts answered, but {early['accepted']} of {early['rejected']} claims passed the validator ({why.get('unknown evidence id', 0)} cited an id that does not exist, {why.get('number not in cited evidence', 0)} used a number that is not in the cited item) |
+| 46 onward | Analysts answer and claims pass the validator, as counted above |
+
+Reproduce any row:
+
+```bash
+python3 -m verdict_desk stats --git                                  # the table above
+python3 -m verdict_desk stats --first-llm-seq 35 --last-llm-seq 45   # an earlier range, e.g. the third row of the history
+python3 -m verdict_desk stats --json                                 # every number, machine readable
+```
+
+"""
+
+
+def build_page_line(ledger: list[dict]) -> str:
+    s = livestats.summarize(ledger)
+    c, e, h = s["cadence"], s["llm_era"], s["head"]
+    return (
+        f"{c['total']} dossiers in `ledger/ledger.jsonl` as of dossier {h['seq']} ({c['last'][:16].replace('T', ' ')} UTC), over a window of {c['window_hours']} h ({c['window_days']} days); "
+        f"from dossier {e['first_seq']} on, the citation validator accepted {e['accepted']} claims and rejected {e['rejected']} ({e['accepted_pct']}% accepted). "
+        f"Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing"
+    )
+
+
+def refreshed(tests: int | None) -> dict[Path, str]:
+    ledger = dossier.read_ledger(LEDGER)
+    problems = dossier.verify(ledger)
+    if problems:
+        raise SystemExit("the ledger does not verify, nothing to publish: " + "; ".join(problems))
+    out = {}
+    text = README.read_text(encoding="utf-8")
+    text, n = re.subn(r"<!-- live-numbers:.*?(?=## Auditing someone else's agent)", lambda _: live_section(ledger), text, flags=re.S)
+    if n != 1:
+        raise SystemExit("README.md has no live-numbers block to refresh")
+    out[README] = text
+    page = BUILD_PAGE.read_text(encoding="utf-8")
+    page, n = re.subn(r"<!-- numbers:start -->\n.*?\n<!-- numbers:end -->", lambda _: f"<!-- numbers:start -->\n- {build_page_line(ledger)}\n<!-- numbers:end -->", page, flags=re.S)
+    if n != 1:
+        raise SystemExit("SUBMISSAO_DORAHACKS.md has no numbers block to refresh")
+    out[BUILD_PAGE] = page
+    if tests is not None:
+        for path, pattern in TEST_COUNT_PATTERNS:
+            out[path], n = re.subn(pattern, lambda m: f"{m.group(1)}{tests}{m.group(2)}", out[path])
+            if n != 1:
+                raise SystemExit(f"{path.name} has no test count matching {pattern!r}")
+    return out
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--check", action="store_true", help="change nothing; exit 1 if a document is out of date with the ledger")
+    parser.add_argument("--skip-tests", action="store_true", help="do not run the suite; leave the test counts as they are")
+    opts = parser.parse_args()
+    tests = None if opts.skip_tests else count_tests()
+    updated = refreshed(tests)
+    stale = [path for path, text in updated.items() if text != path.read_text(encoding="utf-8")]
+    if opts.check:
+        for path in stale:
+            print(f"out of date with the ledger: {path.relative_to(ROOT)}")
+        return 1 if stale else 0
+    for path in stale:
+        path.write_text(updated[path], encoding="utf-8")
+        print(f"updated {path.relative_to(ROOT)}")
+    print("nothing to update" if not stale else "done")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

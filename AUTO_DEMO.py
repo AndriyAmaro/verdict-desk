@@ -11,13 +11,19 @@ Uso: python3 AUTO_DEMO.py
 """
 
 import json
+import re
+import shutil
 import subprocess
 import os
 import sys
+import tempfile
 from datetime import datetime
 
 REPO_DIR = "/tmp/verdict-desk-work"
 OUTPUT_FILE = os.path.join(REPO_DIR, "web", "demo", "auto-demo-output.txt")
+# The public ledger is appended by the hourly workflow only. The "fresh decisions" of the demo are recorded
+# in a scratch copy: dossiers 54 to 68 of the public chain are demo runs that ended up there by mistake.
+SCRATCH_LEDGER = os.path.join(tempfile.mkdtemp(prefix="vd-demo-"), "ledger.jsonl")
 
 def run_cmd(cmd, cwd=None, timeout=30):
     """Run command and return output"""
@@ -39,6 +45,7 @@ def run_cmd(cmd, cwd=None, timeout=30):
 
 def main():
     os.chdir(REPO_DIR)
+    shutil.copy("ledger/ledger.jsonl", SCRATCH_LEDGER)
     results = {}
     
     print("🎬 Verdict Desk Automated Demo Generator")
@@ -52,11 +59,11 @@ def main():
     
     # Scene 1: Fresh decision (v1)
     print("\n🎯 Scene 1: Fresh Decision (v1)")
-    results['decide_btc_v1'] = run_cmd("python3 -m verdict_desk decide BTCUSDT --no-news --default-feeds", timeout=30)
+    results['decide_btc_v1'] = run_cmd(f"python3 -m verdict_desk --ledger {SCRATCH_LEDGER} decide BTCUSDT --no-news --default-feeds", timeout=30)
     
     # Scene 1b: Fresh decision (v2)
     print("\n🎯 Scene 1b: Fresh Decision (v2)")
-    results['decide_btc_v2'] = run_cmd("python3 -m verdict_desk decide-v2 BTCUSDT --no-news", timeout=30)
+    results['decide_btc_v2'] = run_cmd(f"python3 -m verdict_desk --ledger {SCRATCH_LEDGER} decide-v2 BTCUSDT --no-news", timeout=30)
     
     # Scene 2: LLM debate deep-dive
     print("\n💬 Scene 2: LLM Debate (dossier #46)")
@@ -95,7 +102,7 @@ else:
     
     # Scene 6: Tests
     print("\n🧪 Scene 6: Tests")
-    results['tests'] = run_cmd("python3 -m unittest discover -s tests", timeout=30)
+    results['tests'] = run_cmd("python3 -m unittest discover -s tests 2>&1", timeout=120)
     
     # Scene 7: CRE status
     print("\n⛓️ Scene 7: CRE Status")
@@ -104,7 +111,7 @@ else:
     
     # Write results
     with open(OUTPUT_FILE, 'w') as f:
-        f.write("Verdict Desk — Automated Demo Output\n")
+        f.write("Verdict Desk: Automated Demo Output\n")
         f.write(f"Generated: {datetime.now().isoformat()}\n")
         f.write("=" * 60 + "\n\n")
         
@@ -130,8 +137,9 @@ else:
     print(f"✅ Replay: {replay_matches} MATCHES, {replay_differs} DIFFERS")
     
     # Check tests
-    tests_passed = "OK" in results.get('tests', '')
-    print(f"✅ Tests: {'129 PASSED' if tests_passed else 'FAILED'}")
+    tests_passed = results.get('tests', '').rstrip().endswith("OK")
+    ran = re.search(r"Ran (\d+) tests", results.get('tests', ''))
+    print(f"✅ Tests: {(ran.group(1) + ' PASSED') if tests_passed and ran else 'FAILED'}")
     
     # Check LLM
     llm_working = "accepted" in results.get('llm_debate', '').lower()

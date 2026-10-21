@@ -2,15 +2,51 @@
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
-from . import backtest, dossier, evidence, journal, learning, llm, narrative, portfolio, research
+from . import backtest, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research
 
 DEFAULT_LEDGER = Path("ledger/ledger.jsonl")
 
 
+def may_append(ledger_path: Path) -> bool:
+    """Only the hourly workflow appends to the public ledger.
+
+    A demo script, a test run or a local agent that appends there puts its dossiers into the chain that
+    judges read: dossiers 54 to 68 are demo and test runs for exactly that reason, and the append-only
+    ledger cannot take them back. GitHub Actions sets GITHUB_ACTIONS; a person who really means it sets
+    VERDICT_DESK_APPEND_PUBLIC=1. Any other ledger path is free to use.
+    """
+    if ledger_path != DEFAULT_LEDGER or os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("VERDICT_DESK_APPEND_PUBLIC") == "1":
+        return True
+    print(
+        f"Refusing to append to the public ledger ({ledger_path}) outside the hourly workflow.\n"
+        "Use --ledger PATH for a scratch copy (copy ledger/ledger.jsonl there first if the demo needs history),\n"
+        "or set VERDICT_DESK_APPEND_PUBLIC=1 if you really mean to record in the public chain.",
+        file=sys.stderr,
+    )
+    return False
+
+
+def publish_head(ledger_path: Path) -> None:
+    """Keep ledger/head.json in step with the public ledger.
+
+    A run that appends dossiers outside the hourly workflow (a person, a local agent) used to leave a
+    stale head behind: on 2026-10-20 the published head sat at seq 53 while the chain had reached 68.
+    """
+    try:
+        head = dossier.head(dossier.read_ledger(ledger_path))
+    except ValueError as err:
+        print(f"head.json not refreshed: {err}", file=sys.stderr)
+        return
+    (ledger_path.parent / "head.json").write_text(json.dumps(head, separators=(",", ":")) + "\n", encoding="utf-8")
+
+
 def cmd_decide(opts) -> int:
+    if not may_append(opts.ledger):
+        return 2
     feeds = dict(narrative.DEFAULT_FEEDS) if opts.default_feeds else {}
     for spec in opts.feed or []:
         name, _, url = spec.partition("=")
@@ -34,11 +70,15 @@ def cmd_decide(opts) -> int:
             packet["narrative"] = block
         recorded += 1
         print_record(dossier.append(packet, opts.ledger))
+    if recorded and opts.ledger == DEFAULT_LEDGER:
+        publish_head(opts.ledger)
     return 0 if recorded else 1
 
 
 def cmd_decide_v2(opts) -> int:
     """Run the same decide flow but with agents_v2 + features_v2 (RSI, MACD, Bollinger)."""
+    if not may_append(opts.ledger):
+        return 2
     feeds = dict(narrative.DEFAULT_FEEDS) if opts.default_feeds else {}
     for spec in opts.feed or []:
         name, _, url = spec.partition("=")
@@ -60,6 +100,8 @@ def cmd_decide_v2(opts) -> int:
             packet["narrative"] = block
         recorded += 1
         print_record(dossier.append(packet, opts.ledger, rules_version="v2"))
+    if recorded and opts.ledger == DEFAULT_LEDGER:
+        publish_head(opts.ledger)
     return 0 if recorded else 1
 
 
@@ -121,6 +163,23 @@ def cmd_head(opts) -> int:
         opts.out.parent.mkdir(parents=True, exist_ok=True)
         opts.out.write_text(text + "\n", encoding="utf-8")
     print(text)
+    return 0
+
+
+def cmd_stats(opts) -> int:
+    ledger = dossier.read_ledger(opts.ledger)
+    if not ledger:
+        print("The ledger is empty; nothing to count.", file=sys.stderr)
+        return 1
+    problems = dossier.verify(ledger)
+    if problems:
+        print("Refusing to count a broken chain: " + "; ".join(problems), file=sys.stderr)
+        return 1
+    summary = livestats.summarize(ledger, opts.first_llm_seq, opts.last_llm_seq)
+    if opts.json:
+        print(livestats.to_json(summary))
+    else:
+        print(livestats.format_report(summary, livestats.commit_authors(opts.ledger, ledger) if opts.git else None))
     return 0
 
 
@@ -246,6 +305,12 @@ def main() -> int:
     p = sub.add_parser("head", help="print the verified head of the chain as JSON, for the CRE anchor workflow")
     p.add_argument("--out", type=Path, help="also write the JSON to this file (published next to the ledger)")
     p.set_defaults(func=cmd_head)
+    p = sub.add_parser("stats", help="live-operation numbers counted from the verified ledger: dossiers, window, cadence, citation validator results")
+    p.add_argument("--first-llm-seq", type=int, default=livestats.FIRST_LLM_SEQ, help="first dossier of the LLM era (default %(default)s)")
+    p.add_argument("--last-llm-seq", type=int, default=None, help="last dossier of the range to count (default: the head)")
+    p.add_argument("--git", action="store_true", help="also count dossiers per git author of the line that recorded them")
+    p.add_argument("--json", action="store_true", help="print the full summary as JSON")
+    p.set_defaults(func=cmd_stats)
     p = sub.add_parser("portfolio", help="mark simulated positions against later candles")
     p.set_defaults(func=cmd_portfolio)
     p = sub.add_parser("backtest", help="walk-forward test on past candles (separate from the live ledger)")

@@ -13,8 +13,13 @@ set -e
 REPO_DIR="/tmp/verdict-desk-work"
 cd "$REPO_DIR"
 
+# The public ledger is appended by the hourly workflow only. The "fresh decision" of the demo goes to a
+# scratch copy: dossiers 54 to 68 of the public chain are demo runs that ended up there by mistake.
+SCRATCH="$(mktemp -d)/ledger.jsonl"
+cp ledger/ledger.jsonl "$SCRATCH"
+
 echo "=========================================="
-echo "Verdict Desk — Demo Recording Script"
+echo "Verdict Desk: Demo Recording Script"
 echo "=========================================="
 echo ""
 
@@ -32,8 +37,8 @@ sleep 2
 # Scene 1: Fresh decision
 echo "🎯 Scene 1: Fresh Decision"
 echo "----------------------------------------"
-echo "$ python3 -m verdict_desk decide BTCUSDT --no-news --default-feeds"
-python3 -m verdict_desk decide BTCUSDT --no-news --default-feeds
+echo "$ python3 -m verdict_desk --ledger scratch-copy.jsonl decide BTCUSDT --no-news --default-feeds"
+python3 -m verdict_desk --ledger "$SCRATCH" decide BTCUSDT --no-news --default-feeds
 echo ""
 sleep 3
 

@@ -21,10 +21,13 @@ FEE_PCT_PER_SIDE = 0.05
 LABEL = "BACKTEST on past data, not live performance"
 
 
-def fetch_history(symbol: str, interval: str, total: int) -> list[dict]:
-    """Pagina o espelho publico da Binance para tras ate juntar `total` candles."""
+def fetch_history(symbol: str, interval: str, total: int, until_ms: int | None = None) -> list[dict]:
+    """Pagina o espelho publico da Binance para tras ate juntar `total` candles.
+
+    `until_ms` fixa o fim da janela (so entram candles que abriram antes dele), para refazer uma medicao com os mesmos dados.
+    """
     rows: list = []
-    end = None
+    end = until_ms - 1 if until_ms is not None else None
     while len(rows) < total:
         params = {"symbol": symbol.upper(), "interval": interval, "limit": min(1000, total - len(rows))}
         if end is not None:

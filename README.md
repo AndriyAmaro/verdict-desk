@@ -1,10 +1,12 @@
 # Verdict Desk
 
-**Audit-grade, replayable decisions for AI market agents. Simulated only: no order is ever placed.**
+**[PocketChange](https://github.com/Somay-kousis/Pocket-Change) limits what an agent can spend. Verdict Desk proves what an agent decided, in a way that survives the operator.**
+
+Audit-grade, replayable decisions for AI market agents. Simulated only: no order is ever placed.
 
 **Why it exists.** When an autonomous agent acts, the people who answer for it afterwards (an auditor, a compliance officer, a lawyer) need two things: exactly what the agent saw and decided at that moment, and a way to check that record without taking the operator's word for it. Verdict Desk produces that trail. Each decision is frozen as a **dossier**: the evidence the agent saw, with its sources and times, the arguments for and against, and the verdict. Dossiers are hash-chained, so editing a record leaves a mark that anyone can find by recomputing the hashes in their own browser, with no account and no server in the loop. Rewriting every later hash would hide an edit inside the chain but changes its head, so the head is published where the operator cannot quietly rewrite it: in git history today, and in the on-chain anchor that the CRE workflow is built to write (its real status is below). The reasoning can be re-run from the frozen evidence and either gives the same verdict or shows exactly where it differs. The trail shows what was decided and why; it does not show that a decision was right, and this repository makes no claim about customers or deployments. The agent here trades on paper only, so the mechanism can be tested in public.
 
-How it works in one paragraph: Verdict Desk reads public market evidence, freezes it, lets a bull agent and a bear agent argue over the same facts, and lets a deterministic judge size a *simulated* position inside declared risk limits. Every decision becomes a dossier that is hash-chained to the one before it. Open the dashboard, press the red button, and break the chain yourself in 30 seconds.
+How it works in one paragraph: Verdict Desk reads public market evidence, freezes it, lets a bull agent and a bear agent argue over the same facts, and lets a deterministic judge size a *simulated* position inside declared risk limits. Every decision becomes a dossier that is hash-chained to the one before it. Open the dashboard, press **Test the chain**, and break the chain yourself in 30 seconds.
 
 Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
 
@@ -18,17 +20,17 @@ Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Cha
 | Record the simulated operation | Entry, size, stop, target and the portfolio marked against later candles | `verdict_desk/agents.py`, `portfolio.py` |
 | Cause and effect | Every argument names the evidence item it rests on; LLM claims must cite item ids and numbers that really appear there | `verdict_desk/citations.py`, dashboard row details |
 | A repeatable reasoning trail | `replay` re-derives the verdict from the frozen packet; `verify` checks the hash chain | `verdict_desk/dossier.py` |
-| Chainlink CRE (second bounty) | A CRE workflow plus a receiver contract that anchor the ledger head and a Data Feed price on Sepolia | `cre/` (status table inside) |
+| Chainlink CRE (second bounty) | A CRE workflow plus a receiver contract that anchor the ledger head and a Data Feed price on Sepolia | `cre/` (status table inside); evidence file `cre/SIMULATION-OUTPUT.md` (pending) |
 
 ## Five-minute judge path
 
 1. Open the dashboard (the GitHub Pages site of this repository). It loads `ledger/ledger.jsonl` and shows the banner "Every hash recomputed in this browser matches". It does not trust the server: the hashing runs locally in `web/canonical.js`.
-2. **Break it yourself (30 seconds).** Press the red button, "Tamper with dossier #N". It flips one decision in a copy held in your tab: the row turns red, the banner names the dossier, and a three-row table shows the recorded hash next to the one your browser recomputed. "Tamper and re-hash" plays the cleverer attacker: the edited row looks valid again, but the next row no longer links to it (`chain broken`). "Rewrite the whole chain" shows the limit: everything verifies again, but the head hash is different, which is why the head is published outside the operator's reach (git history, other clones, and the on-chain anchor once it exists). You can also edit a decision by hand, or download the tampered copy and run `python3 -m verdict_desk --ledger ledger-tampered.jsonl verify`: the Python verifier reports the same dossier. Nothing is sent anywhere and the server's file is never touched.
+2. **Test the chain (30 seconds, one click, nothing to download).** Press **Test the chain**. It flips one decision in a copy held in your tab: the row turns red, the banner says the chain no longer verifies and names the dossier, and a three-row table shows the recorded hash next to the one your browser recomputed. "Tamper and re-hash" plays the cleverer attacker: the edited row looks valid again, but the next row no longer links to it (`chain broken`). "Rewrite the whole chain" shows the limit: everything verifies again, but the head hash is different, which is why the head is published outside the operator's reach (git history, other clones, and the on-chain anchor once it exists). You can also edit a decision by hand, or download the tampered copy and run `python3 -m verdict_desk --ledger ledger-tampered.jsonl verify`: the Python verifier reports the same dossier. Nothing is sent anywhere and the server's file is never touched.
 3. Read the three panels above the table: the **cadence** of the live history (every gap between runs, nothing filled in), the **LLM debate** counts (claims the citation validator accepted and rejected) and the **simulated portfolio** (recomputed in your browser with the same rule as `portfolio.py`). Then click a row. You see the deterministic bull and bear arguments with the exact indicator behind each one, then the LLM analysts' claims with the evidence id each one cites, and the claims the validator **rejected**, with the reason. The LLM debate works from dossier **46** on; the section "Live operation" below says what the earlier dossiers show.
 4. Run it yourself:
 
 ```bash
-python3 -m unittest discover -s tests          # standard library only (153 tests)
+python3 -m unittest discover -s tests          # standard library only (198 tests)
 python3 -m verdict_desk verify                 # hash chain of ledger/ledger.jsonl
 python3 -m verdict_desk replay                 # re-derive every verdict from its frozen evidence
 python3 -m verdict_desk portfolio              # simulated positions marked against later candles
@@ -53,21 +55,21 @@ public data ──> frozen evidence packet ──> bull agent ┐
 
 ## Live operation, measured from the ledger
 
-<!-- live-numbers: generated from dossier 74 by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
-Counted over `ledger/ledger.jsonl` on the chain as of **dossier 74** (head `8622a18d1894c065`, collected 2026-10-21 01:31 UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
+<!-- live-numbers: generated from dossier 77 by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
+Counted over `ledger/ledger.jsonl` on the chain as of **dossier 77** (head `b8b51e0c0837bd15`, collected 2026-10-21 07:31 UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
 
 | What | Number |
 |---|---|
-| Dossiers in the verified chain | 74 (BTCUSDT 37, ETHUSDT 31, SOLUSDT 6) |
-| Operating window, first to last dossier | 88.1 h (2026-10-17 09:26 to 2026-10-21 01:31 UTC) |
-| Clock hours (UTC) in that window with at least one dossier | 27 of 89 (30.3%) |
-| Longest gap between consecutive dossiers of the same symbol | 6 h 9 min (ETHUSDT); 47 gaps over 90 minutes |
-| Recorded by the workflow bot (scheduled or manually dispatched runs) | 59 (dossiers 1-53, 69-74) |
+| Dossiers in the verified chain | 77 (BTCUSDT 38, ETHUSDT 32, SOLUSDT 7) |
+| Operating window, first to last dossier | 94.1 h, 3.9 days (2026-10-17 09:26 to 2026-10-21 07:31 UTC) |
+| Clock hours (UTC) in that window with at least one dossier | 28 of 95 (29.5%) |
+| Longest gap between consecutive dossiers of the same symbol | 6 h 9 min (ETHUSDT); 50 gaps over 90 minutes |
+| Recorded by the workflow bot (scheduled or manually dispatched runs) | 62 (dossiers 1-53, 69-77) |
 | Recorded by other commits | 15 (dossiers 54-68): runs made outside the workflow while the demo tooling and the v2 rules were being built; the ledger is append-only, so they stay |
-| LLM era, dossier 46 onward | 29 dossiers, 24 with analyst output (dossiers 54-58 have no LLM layer) |
-| Claims **accepted** by the citation validator | 163 (bull 90, bear 73) |
-| Claims **rejected** by the citation validator | 25 (bull 6, bear 19); reason: "number not in cited evidence" 25 |
-| Share of claims accepted | 86.7% |
+| LLM era, dossier 46 onward | 32 dossiers, 27 with analyst output (dossiers 54-58 have no LLM layer) |
+| Claims **accepted** by the citation validator | 180 (bull 101, bear 79) |
+| Claims **rejected** by the citation validator | 32 (bull 7, bear 25); reason: "number not in cited evidence" 32 |
+| Share of claims accepted | 84.9% |
 
 The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures.
 
@@ -106,7 +108,7 @@ Each `backtest` run prints the sha256 of its candle series so the numbers can be
 
 The offline study in [`research/`](research/README.md) searched a tuned set of v1 parameters (choose on the first 60%, judge on the last 40%, 36 candidate settings). It beat v1 out of sample on 3 of 3 symbols but was net positive on only 1 of 3 and never beat buy and hold, so it was not adopted.
 
-**Which rules record the live dossiers.** The backtest above is for the v1 rules, which recorded dossiers 1 to 53 and a few manual comparison runs. The hourly workflow now records with the v2 rules in `verdict_desk/agents_v2.py`: the v1 arguments plus RSI, MACD and Bollinger arguments, and an entry threshold of 1.5 instead of 2.0. Each dossier says which rules recorded it in `verdict.rules_version`, and `replay` re-derives it with those rules. The v2 rules are not the tuned parameters of the study above, and **they are not covered by the backtest table**: it describes v1 only.
+**Which rules record the live dossiers.** The backtest above is for the v1 rules, which recorded dossiers 1 to 53 and a few manual comparison runs. The hourly workflow now records with the v2 rules in `verdict_desk/agents_v2.py`: the v1 arguments plus RSI, MACD and Bollinger arguments, and an entry threshold of 1.5 instead of 2.0. Each dossier says which rules recorded it in `verdict.rules_version`, and `replay` re-derives it with those rules. The v2 rules are not the tuned parameters of the study above, and **they are not covered by the backtest table**: it describes v1 only. How they split between LONG and SHORT, tested against a mirrored market, and what they earned in the same walk-forward protocol, is measured in [`research/V2_DIAGNOSIS.md`](research/V2_DIAGNOSIS.md).
 
 ## Live history
 
@@ -117,6 +119,20 @@ The workflow [`.github/workflows/hourly.yml`](.github/workflows/hourly.yml) is s
 [`cre/`](cre/README.md) holds a workflow that fetches the published ledger head with identical consensus, reads the BTC/USD Data Feed on Sepolia, and writes both to `LedgerAnchor` through a CRE report. The contract accepts reports only from the CRE forwarder and only with a higher sequence number than the last one.
 
 Status, stated plainly: the workflow is covered by 10 tests with the SDK mocks and type-checks; the contract is covered by 6 tests in an in-memory EVM. `cre workflow simulate` and a live Sepolia deployment **have not been run yet**. Nothing here claims an anchored head until a transaction exists.
+
+The evidence lands in [`cre/SIMULATION-OUTPUT.md`](cre/SIMULATION-OUTPUT.md) and is copied into this table when a real run produces it. Until then every cell says pending, on purpose.
+
+<!-- cre-evidence:start -->
+| Evidence | Value |
+|---|---|
+| Run date (UTC) | pending |
+| Head anchored (seq, hash) | pending |
+| BTC/USD Data Feed value recorded with it | pending |
+| `LedgerAnchor` contract on Sepolia | pending |
+| Anchoring transaction | pending |
+<!-- cre-evidence:end -->
+
+Anyone can check the chain against the ledger with `node cre/contracts/scripts/check-anchor.mjs` (read-only, no key needed): it verifies the ledger, reads the anchor from Sepolia and asks the contract `isAnchored(seq, hash)`. Runbook and one-command script: [`cre/DEPLOY_SEPOLIA.md`](cre/DEPLOY_SEPOLIA.md).
 
 ## Limits
 
@@ -154,7 +170,7 @@ The key is read from the environment only and is never written to a dossier or a
 | `ledger/` | The public ledger and its head |
 | `cre/` | Chainlink CRE workflow, receiver contract and tests |
 | `docs/architecture.md` | Architecture, decisions and risks |
-| `research/` | Rules v2 train and test study |
+| `research/` | Rules v2 train and test study, and the diagnosis of the v2 rules that record the live dossiers |
 | `tests/` | Unit tests, cross-language vectors |
 
 ## License and credits

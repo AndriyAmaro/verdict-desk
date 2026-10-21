@@ -34,7 +34,7 @@ Audit-grade, replayable AI decisions for market agents. Verdict Desk freezes pub
 | **CI/CD** | GitHub Actions: hourly scheduled workflow appends dossiers, verifies the chain, and redeploys |
 | **CRE** | Chainlink CRE SDK (`@chainlink/cre-sdk`), Solidity, MockKeystoneForwarder tests |
 | **Data sources** | Binance spot candles (no key), OKX public funding, GDELT news, RSS/Atom feeds |
-| **Testing** | 153 unit tests via `unittest`; cross-language canonical JSON test vectors; a Python versus JavaScript check of the live-operation counts |
+| **Testing** | 198 unit tests via `unittest`; cross-language canonical JSON test vectors; a Python versus JavaScript check of the live-operation counts |
 
 ---
 
@@ -44,7 +44,7 @@ Verdict Desk reads public market evidence, freezes it into an immutable packet, 
 
 Every decision becomes a **dossier**, a self-contained record with all evidence, arguments, citations, verdict, and position details, hash-chained to the previous one via RFC 8785 canonical JSON and SHA-256. The resulting ledger is a public, tamper-evident audit trail that anyone can verify.
 
-The live dashboard loads the ledger and recomputes every hash in the viewer's own browser. Its first screen is a tamper lab: press the red button "Tamper with dossier #N" and the row turns red with `ALTERED` and the banner names it; "Tamper and re-hash" shows the next link breaking; "Rewrite the whole chain" shows the limit (the chain verifies again but the head hash changes, which is why the head is published and anchored). Nothing leaves the viewer's browser, and the downloaded tampered copy is rejected by the Python `verify` in the same way.
+The live dashboard loads the ledger and recomputes every hash in the viewer's own browser. Its first screen is a tamper lab: press "Test the chain" and the row turns red with `ALTERED` and the banner says the chain no longer verifies and names the dossier; "Tamper and re-hash" shows the next link breaking; "Rewrite the whole chain" shows the limit (the chain verifies again but the head hash changes, which is why the head is published and anchored). Nothing leaves the viewer's browser, and the downloaded tampered copy is rejected by the Python `verify` in the same way.
 
 ---
 
@@ -81,7 +81,7 @@ Verdict Desk does exactly this end-to-end. It collects public market data (candl
 
 **Evidence in the repo:**
 <!-- numbers:start -->
-- 74 dossiers in `ledger/ledger.jsonl` as of dossier 74 (2026-10-21 01:31 UTC), over a window of 88.1 h; from dossier 46 on, the citation validator accepted 163 claims and rejected 25 (86.7% accepted). Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing
+- 77 dossiers in `ledger/ledger.jsonl` as of dossier 77 (2026-10-21 07:31 UTC), over a window of 94.1 h (3.9 days); from dossier 46 on, the citation validator accepted 180 claims and rejected 32 (84.9% accepted). Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing
 <!-- numbers:end -->
 - `verdict_desk/evidence.py`, `verdict_desk/narrative.py`: evidence collection and narrative extraction
 - `verdict_desk/agents.py`, `verdict_desk/portfolio.py`: agents and portfolio tracking
@@ -105,7 +105,7 @@ Every dossier is hash-chained to the previous one via RFC 8785 canonical JSON. T
 - `verdict_desk/dossier.py`: dossier creation, canonicalization, hashing
 - `web/canonical.js`: identical canonical JSON implementation in JavaScript
 - `tests/canonical_vectors.json`: shared cross-language test vectors
-- 153 passing unit tests, all verifiable with `python3 -m unittest discover -s tests`
+- 198 passing unit tests, all verifiable with `python3 -m unittest discover -s tests`
 
 ---
 
@@ -138,7 +138,7 @@ Verdict Desk ran a walk-forward backtest (rules v1, latest 4,000 hourly candles 
 
 A tuned set of v1 parameters was also searched (train on first 60%, judge on last 40%, 36 candidate settings). It beat v1 out-of-sample on all 3 symbols but was net positive on only 1 of 3 and never beat buy-and-hold, so it was not adopted.
 
-**Which rules record the live dossiers:** the backtest above is for v1, which recorded dossiers 1 to 53. The hourly workflow now records with the v2 rules in `agents_v2.py` (the v1 arguments plus RSI, MACD and Bollinger arguments, entry threshold 1.5); each dossier says which rules recorded it in `verdict.rules_version`. These v2 rules are not covered by the backtest table.
+**Which rules record the live dossiers:** the backtest above is for v1, which recorded dossiers 1 to 53. The hourly workflow now records with the v2 rules in `agents_v2.py` (the v1 arguments plus RSI, MACD and Bollinger arguments, entry threshold 1.5); each dossier says which rules recorded it in `verdict.rules_version`. These v2 rules are not covered by the backtest table; `research/V2_DIAGNOSIS.md` measures how they split between LONG and SHORT and what they earned in the same walk-forward protocol.
 
 Each backtest run prints the SHA-256 of its candle series so the numbers can be reproduced on the same data.
 
@@ -149,7 +149,7 @@ Each backtest run prints the SHA-256 of its candle series so the numbers can be 
 1. **Open the dashboard** → https://andriyamaro.github.io/verdict-desk/
    It loads the ledger and recomputes every hash in your browser.
 
-2. **Press the red button "Tamper with dossier #N"** → the tamper lab on the first screen: the row turns red in your own browser, and nothing is sent anywhere.
+2. **Press "Test the chain"** → the tamper lab on the first screen: the row turns red in your own browser, and nothing is sent anywhere.
 
 3. **Click on dossier seq 46 or later** → These are the first dossiers where the Mistral LLM agents produce accepted claims on both sides of the debate. Earlier dossiers (seq 1-4: no LLM layer; seq 5-34: HTTP 403 from the first model provider; seq 35-45: 0 of 48 claims passed the validator) are honest history showing how the system evolved.
 
@@ -160,7 +160,7 @@ Each backtest run prints the SHA-256 of its candle series so the numbers can be 
    ```bash
    git clone https://github.com/AndriyAmaro/verdict-desk.git
    cd verdict-desk
-   python3 -m unittest discover -s tests     # 153 tests
+   python3 -m unittest discover -s tests     # 198 tests
    python3 -m verdict_desk verify             # hash chain
    python3 -m verdict_desk replay             # re-derive every verdict
    python3 -m verdict_desk portfolio          # simulated positions

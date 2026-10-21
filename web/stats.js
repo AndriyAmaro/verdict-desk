@@ -108,6 +108,7 @@
       first: all.length ? new Date(all[0]).toISOString() : null,
       last: all.length ? new Date(all[all.length - 1]).toISOString() : null,
       window_hours: all.length ? round1((all[all.length - 1] - all[0]) / HOUR_MS) : 0,
+      window_days: all.length ? round1((all[all.length - 1] - all[0]) / (24 * HOUR_MS)) : 0,
       longest_gap_minutes: Math.round(longest / 60000),
       longest_gap_symbol: longestSymbol,
       gaps_over_90_minutes: gapsOver,

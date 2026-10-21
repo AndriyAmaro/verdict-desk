@@ -36,10 +36,10 @@ a.btn[hidden]{display:none}
 <p class="mut">Ledger: <code id="source"></code> <label>or open a file <input id="file" type="file" accept=".jsonl,.json,.txt"></label></p>
 <div id="banner" class="mut">Loading...</div>
 <section id="tamper" aria-labelledby="tamper-title">
-  <h2 id="tamper-title">Try to break it: 30 seconds, nothing leaves your browser</h2>
-  <p>The banner above is green because this tab just recomputed every hash from the ledger text. Press the red button and watch it turn.</p>
+  <h2 id="tamper-title">Test the chain: break it yourself in 30 seconds</h2>
+  <p>The banner above is green because this tab just recomputed every hash from the ledger text. Press <b>Test the chain</b>: it tampers with one dossier in a copy held in this tab and verifies again. Nothing is uploaded, saved or downloaded.</p>
   <div class="actions">
-    <button id="btn-tamper" class="primary" type="button" disabled>Tamper with dossier <span class="t-seq">...</span></button>
+    <button id="btn-tamper" class="primary" type="button" disabled>Test the chain</button>
     <button id="btn-rehash" type="button" disabled>Tamper and re-hash</button>
     <button id="btn-rewrite" type="button" disabled>Rewrite the whole chain</button>
     <button id="btn-restore" type="button" disabled>Restore the real ledger</button>
@@ -48,7 +48,7 @@ a.btn[hidden]{display:none}
   <div class="scroll"><table id="mini" hidden><thead><tr><th>#</th><th>Symbol</th><th>Action</th><th>Integrity</th><th>Recorded hash</th><th>Recomputed here</th></tr></thead><tbody></tbody></table></div>
   <div id="tamper-note" role="status" aria-live="polite" class="mut">Waiting for the ledger...</div>
   <ul class="what">
-    <li><b>Tamper with dossier <span class="t-seq">...</span></b> flips one decision in a copy held in this tab. The row turns red and the banner names it.</li>
+    <li><b>Test the chain</b> flips one decision in dossier <span class="t-seq">...</span>, in a copy held in this tab. The row turns red and the banner says the chain no longer verifies.</li>
     <li><b>Tamper and re-hash</b> plays the cleverer attacker. The edited row looks valid again, but the next row no longer links to it: <em>chain broken</em>.</li>
     <li><b>Rewrite the whole chain</b> shows the limit. Everything verifies again, but the head hash is different. That is why the head is published outside the operator's reach.</li>
   </ul>
@@ -120,7 +120,7 @@ function renderStats(dossiers, broken) {
   const c = VerdictStats.cadence(dossiers);
   const per = Object.keys(c.per_symbol).sort().map((k) => `${k} ${c.per_symbol[k]}`).join(", ");
   const gap = c.longest_gap_minutes >= 60 ? `${Math.floor(c.longest_gap_minutes / 60)} h ${c.longest_gap_minutes % 60} min` : `${c.longest_gap_minutes} min`;
-  $("cadence").textContent = `${c.total} dossiers (${per}) from ${c.first} to ${c.last}, a window of ${c.window_hours} h. ${c.clock_hours_with_records} of ${c.clock_hours_in_window} clock hours (UTC) in that window have at least one dossier (${c.coverage_pct}%). Longest gap between consecutive dossiers of the same symbol: ${gap}${c.longest_gap_symbol ? " (" + c.longest_gap_symbol + ")" : ""}. Gaps over 90 minutes: ${c.gaps_over_90_minutes}. A scheduled run that GitHub delayed or skipped shows up here; nothing is filled in.`;
+  $("cadence").textContent = `${c.total} dossiers (${per}) from ${c.first} to ${c.last}, a window of ${c.window_hours} h (${c.window_days} days). ${c.clock_hours_with_records} of ${c.clock_hours_in_window} clock hours (UTC) in that window have at least one dossier (${c.coverage_pct}%). Longest gap between consecutive dossiers of the same symbol: ${gap}${c.longest_gap_symbol ? " (" + c.longest_gap_symbol + ")" : ""}. Gaps over 90 minutes: ${c.gaps_over_90_minutes}. A scheduled run that GitHub delayed or skipped shows up here; nothing is filled in.`;
   renderLlm(dossiers);
   if (broken) {
     $("portfolio").textContent = "Not computed: this ledger failed verification, so nothing derived from it can be trusted.";
@@ -223,10 +223,6 @@ function setTamperUi(canTamper, tampered) {
   if (!tampered) { $("dl").hidden = true; $("mini").hidden = true; }
 }
 
-function describeProblems(problems) {
-  return problems.length ? problems.join("; ") : "no problem found, the chain looks intact";
-}
-
 function setDownload(text) {
   if (state.downloadUrl) URL.revokeObjectURL(state.downloadUrl);
   state.downloadUrl = URL.createObjectURL(new Blob([text], { type: "application/x-ndjson" }));
@@ -245,7 +241,7 @@ function renderMini(result, k) {
   $("mini").hidden = false;
 }
 
-async function showTampered(list, k, summary) {
+async function showTampered(list, k, summary, after) {
   const text = dumpLedger(list);
   const result = await VerdictDesk.verifyLedger(text, VerdictDesk.webSha256);
   render(result, "tampered copy in this tab (the server's file is untouched)");
@@ -254,7 +250,7 @@ async function showTampered(list, k, summary) {
   renderMini(result, k);
   const note = $("tamper-note");
   note.className = result.problems.length ? "bad" : "ok";
-  note.textContent = `${summary} Verification result: ${describeProblems(result.problems)}.`;
+  note.textContent = `${summary} ${result.problems.length ? "The chain no longer verifies: " + result.problems.join("; ") + "." : "The chain verifies again: no problem found."}${after ? " " + after : ""}`;
   return result;
 }
 
@@ -273,7 +269,8 @@ async function tamper(level) {
   }
   for (let i = k + 1; i < list.length; i++) { list[i].prev_hash = list[i - 1].hash; await rehash(list[i]); }
   const oldHead = state.real.list[state.real.list.length - 1].hash, newHead = list[list.length - 1].hash;
-  const result = await showTampered(list, k, `${what} Then re-hashed it and every dossier after it (${list.length - k} in total), so the whole chain verifies. The head hash is now ${short(newHead, 16)} instead of ${short(oldHead, 16)} (first 16 characters of each). Only a copy of the head that the operator does not control (git history, other clones, an on-chain anchor) can expose this rewrite.`);
+  const result = await showTampered(list, k, `${what} Then re-hashed it and every dossier after it (${list.length - k} in total). The head hash is now ${short(newHead, 16)} instead of ${short(oldHead, 16)} (first 16 characters of each).`,
+    "Only a copy of the head that the operator does not control (git history, other clones, an on-chain anchor) can expose this rewrite.");
   return result;
 }
 

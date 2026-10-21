@@ -62,6 +62,7 @@ def cadence(ledger: list[dict]) -> dict:
         "first": _iso(every[0]) if every else None,
         "last": _iso(every[-1]) if every else None,
         "window_hours": _round1((every[-1] - every[0]) / HOUR_MS) if every else 0.0,
+        "window_days": _round1((every[-1] - every[0]) / (24 * HOUR_MS)) if every else 0.0,
         "longest_gap_minutes": int(math.floor(longest / 60_000 + 0.5)),
         "longest_gap_symbol": longest_symbol,
         "gaps_over_90_minutes": gaps_over,
@@ -164,7 +165,7 @@ def format_report(s: dict, authors: dict[str, list[int]] | None = None) -> str:
         lines.append(f"Head: seq {s['head']['seq']}, hash {s['head']['hash']}")
     per = ", ".join(f"{k} {v}" for k, v in c["per_symbol"].items())
     lines.append(f"Dossiers: {c['total']} ({per}); actions {', '.join(f'{k} {v}' for k, v in s['actions'].items())}")
-    lines.append(f"Window: {c['first']} to {c['last']} = {c['window_hours']} h")
+    lines.append(f"Window: {c['first']} to {c['last']} = {c['window_hours']} h ({c['window_days']} days)")
     lines.append(f"Clock hours (UTC) with at least one dossier: {c['clock_hours_with_records']} of {c['clock_hours_in_window']} ({c['coverage_pct']}%)")
     lines.append(f"Longest gap between consecutive dossiers of the same symbol: {c['longest_gap_minutes']} min ({c['longest_gap_symbol']}); gaps over {GAP_LIMIT_MINUTES} min: {c['gaps_over_90_minutes']}")
     if authors:

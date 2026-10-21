@@ -66,7 +66,7 @@ Counted over `ledger/ledger.jsonl` on the chain as of **dossier {h['seq']}** (he
 | What | Number |
 |---|---|
 | Dossiers in the verified chain | {c['total']} ({per}) |
-| Operating window, first to last dossier | {c['window_hours']} h ({first} to {last} UTC) |
+| Operating window, first to last dossier | {c['window_hours']} h, {c['window_days']} days ({first} to {last} UTC) |
 | Clock hours (UTC) in that window with at least one dossier | {c['clock_hours_with_records']} of {c['clock_hours_in_window']} ({c['coverage_pct']}%) |
 | Longest gap between consecutive dossiers of the same symbol | {gap_h} h {gap_m} min ({c['longest_gap_symbol']}); {c['gaps_over_90_minutes']} gaps over 90 minutes |
 | Recorded by the workflow bot (scheduled or manually dispatched runs) | {len(bot)} (dossiers {livestats.seq_ranges(bot)}) |
@@ -102,7 +102,7 @@ def build_page_line(ledger: list[dict]) -> str:
     s = livestats.summarize(ledger)
     c, e, h = s["cadence"], s["llm_era"], s["head"]
     return (
-        f"{c['total']} dossiers in `ledger/ledger.jsonl` as of dossier {h['seq']} ({c['last'][:16].replace('T', ' ')} UTC), over a window of {c['window_hours']} h; "
+        f"{c['total']} dossiers in `ledger/ledger.jsonl` as of dossier {h['seq']} ({c['last'][:16].replace('T', ' ')} UTC), over a window of {c['window_hours']} h ({c['window_days']} days); "
         f"from dossier {e['first_seq']} on, the citation validator accepted {e['accepted']} claims and rejected {e['rejected']} ({e['accepted_pct']}% accepted). "
         f"Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing"
     )

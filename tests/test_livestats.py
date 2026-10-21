@@ -65,6 +65,7 @@ class CadenceTest(unittest.TestCase):
         self.assertEqual(c["first"], "2026-10-17T09:26:12.000Z")
         self.assertEqual(c["last"], "2026-10-17T13:45:00.000Z")
         self.assertEqual(c["window_hours"], 4.3)  # 4 h 18 min 48 s
+        self.assertEqual(c["window_days"], 0.2)  # 0.179 days, rounded to one decimal
         # BTC gaps in minutes: 33.8, 150, 50, 25 -> only the 150 min one is over 90
         self.assertEqual(c["longest_gap_minutes"], 150)
         self.assertEqual(c["longest_gap_symbol"], "BTCUSDT")
@@ -74,7 +75,7 @@ class CadenceTest(unittest.TestCase):
 
     def test_empty_ledger_has_no_window(self):
         c = livestats.cadence([])
-        self.assertEqual((c["first"], c["window_hours"], c["coverage_pct"]), (None, 0.0, 0.0))
+        self.assertEqual((c["first"], c["window_hours"], c["window_days"], c["coverage_pct"]), (None, 0.0, 0.0, 0.0))
 
     def test_unparseable_timestamps_are_skipped_not_guessed(self):
         c = livestats.cadence([fake(1, "BTCUSDT", "not a date"), fake(2, "BTCUSDT", "2026-10-17T09:00:00+00:00")])

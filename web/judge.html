@@ -42,7 +42,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <ul>
     <li>Each decision freezes one evidence packet: candles, funding, news, and public voices, with the source and time of every item — <code>verdict_desk/evidence.py</code></li>
     <li>Two LLM analysts (bull and bear) plus a deterministic indicator engine (RSI, MACD, Bollinger) read that same packet — <code>verdict_desk/agents_v2.py</code></li>
-    <li>A narrative agent extracts token, stance, conviction and urgency from up to 20 user-selected voices and requires two distinct voices to agree before it reports a convergence — <code>verdict_desk/narrative.py</code></li>
+    <li>A narrative agent extracts token, stance, conviction and urgency from up to 20 user-selected voices and requires two distinct voices to agree before it reports a convergence — <code>verdict_desk/narrative.py</code>; it also freezes the tokens it <b>rejected</b> and why (one voice only, voices disagreeing, or nobody taking a side)</li>
   </ul>
 </section>
 

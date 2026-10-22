@@ -268,6 +268,37 @@ def converge_extractions(accepted: list[dict]) -> list[dict]:
     return out
 
 
+def rejected_candidates(accepted: list[dict], convergence: list[dict]) -> list[dict]:
+    """Tokens que apareceram e NAO viraram narrativa, com o motivo.
+
+    O spotlight do premio pede que o agente explique os candidatos escolhidos **e os
+    rejeitados**. Convergir e raro; dizer por que um token foi descartado e o que
+    separa uma decisao auditavel de um palpite.
+    """
+    converged = {(c["token"], c["bias"]) for c in convergence}
+    by_token: dict[str, list[dict]] = {}
+    for ex in accepted:
+        for tok in ex["tokens"]:
+            by_token.setdefault(tok, []).append(ex)
+
+    out = []
+    for tok, mentions in sorted(by_token.items()):
+        stances = {m["stance"] for m in mentions if m["stance"] != "neutral"}
+        if any((tok, s) in converged for s in stances):
+            continue  # virou narrativa, nao e rejeitado
+        names = sorted({m["name"] for m in mentions})
+        if not stances:
+            reason = "only neutral mentions: nobody took a side"
+        elif len(stances) > 1:
+            reason = "voices disagree: " + ", ".join(sorted(stances))
+        elif len(names) < MIN_VOICES:
+            reason = f"only one voice said it ({names[0] if names else 'unknown'}); a narrative needs {MIN_VOICES}"
+        else:
+            reason = "not enough to converge"
+        out.append({"token": tok, "voices": names, "stances": sorted(stances), "reason": reason})
+    return out
+
+
 def build(voices: list[dict], ask=None, model: str = "") -> dict:
     """Monta o bloco `narrative` do pacote de evidencia. Sem `ask`, usa palavras-chave."""
     if ask is None:
@@ -286,6 +317,7 @@ def build(voices: list[dict], ask=None, model: str = "") -> dict:
         "rejected": result["rejected"],
         "convergence": converge_extractions(result["accepted"]),
     }
+    block["rejected_candidates"] = rejected_candidates(block["extractions"], block["convergence"])
     if result["chunk_errors"]:
         block["partial"] = True
         block["chunk_errors"] = result["chunk_errors"]

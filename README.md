@@ -35,11 +35,18 @@ The bounty's spotlight describes an agent that monitors user-selected crypto voi
 | Up to 20 user-selected voices | 5 default crypto newsroom and creator feeds, extensible to 20 via `--feed NAME=URL` (RSS/Atom) | 40 headlines per run; 90 of 98 dossiers carry a narrative layer |
 | Tokens, sentiment, conviction, urgency | LLM extraction per headline into a closed vocabulary, each with a literal quote from the headline | 14 extractions accepted and 13 rejected by the grounding gate in the latest dossier |
 | Convergence across distinct voices | A narrative needs at least two different voices on the same token **and** the same stance | **101 convergences** recorded across the live ledger |
+| Explain the candidates it rejected | Every mentioned token that did not become a narrative is kept with its reason: only one voice, voices disagreeing, or neutral mentions only | `narrative.rejected_candidates`, frozen in the dossier |
 | Practice position under transparent rules and risk limits | The convergence becomes a citable evidence item; the deterministic judge sizes a simulated position at 1% risk with an ATR stop and target | `verdict_desk/agents_v2.py`, `portfolio.py` |
 
 Example from the live ledger: BTC bullish, converging across **CoinDesk, Cointelegraph, Decrypt and The Block**, top conviction *high*, top urgency *medium* — and that convergence is one of the items the judge is allowed to cite when it rules.
 
-**One honest gap:** the spotlight names X as the KOL source. This build reads public RSS/Atom feeds, because the X API is paid and the project runs at zero budget. The voice adapter accepts any feed URL, so an X-capable source can be plugged in without touching the extraction, convergence or grounding logic; what this repository does not claim is an X integration that does not exist.
+**One honest gap:** the spotlight names X as the KOL source. This build reads public RSS/Atom feeds, because the X API is paid and the project runs at zero budget. The voice adapter accepts **any** feed URL, so an X or Telegram source works through a public RSS bridge without touching the extraction, convergence or grounding logic — which is covered by a test that parses an X-shaped feed:
+
+```bash
+python3 -m verdict_desk decide-v3 BTCUSDT --feed "kol=https://<your-rss-bridge>/<handle>/rss" --feed "chan=https://<your-rss-bridge>/telegram/<channel>"
+```
+
+What this repository does not claim is a native X API integration that does not exist.
 
 ## Five-minute judge path
 

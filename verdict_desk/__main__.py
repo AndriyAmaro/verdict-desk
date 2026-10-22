@@ -153,6 +153,27 @@ def print_record(record: dict) -> None:
         print("  LLM analysts off (no MISTRAL_API_KEY): deterministic core only")
 
 
+def cmd_scorecard(opts) -> int:
+    """Score the decisions against what the market did next, from the ledger alone."""
+    from . import scorecard
+    ledger = dossier.read_ledger(opts.ledger)
+    if not ledger:
+        print(f"no ledger at {opts.ledger}", file=sys.stderr)
+        return 1
+    result = scorecard.compute(ledger)
+    summary = portfolio.summarize(ledger)
+    if opts.out:
+        Path(opts.out).write_text(scorecard.render(result, summary), encoding="utf-8")
+        print(f"wrote {opts.out}")
+        return 0
+    if opts.markdown:
+        print(scorecard.render_markdown(result))
+        return 0
+    print(scorecard.render_markdown(result))
+    print(f"\nrecords by state: {result['counts']}")
+    return 0
+
+
 def cmd_exhibit(opts) -> int:
     """Render dossiers as printable decision exhibits (stdout, a file, or a directory)."""
     from . import exhibit
@@ -507,6 +528,10 @@ def main() -> int:
     p.add_argument("--seq", type=int, required=True, help="dossier sequence number to export")
     p.add_argument("--out", type=Path, required=True, help="where to write the pack (JSON)")
     p.set_defaults(func=cmd_export)
+    p = sub.add_parser("scorecard", help="score the decisions against later prices, from the ledger alone")
+    p.add_argument("--out", metavar="FILE", help="write the HTML scorecard to FILE")
+    p.add_argument("--markdown", action="store_true", help="print a markdown table instead of the HTML page")
+    p.set_defaults(func=cmd_scorecard)
     p = sub.add_parser("exhibit", help="render a dossier as a printable decision exhibit")
     p.add_argument("seq", nargs="?", type=int, help="dossier seq (default: the latest)")
     p.add_argument("--recent", type=int, metavar="N", help="render the last N dossiers (use with --outdir)")

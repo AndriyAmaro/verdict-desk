@@ -53,6 +53,24 @@ jobs:
             echo "::warning::could not reach the RPC to compare with the on-chain anchor"
           fi
           exit 0
+      - name: Timestamp the head in Bitcoin (OpenTimestamps, no key, no wallet)
+        # The proof is archived PER RECORD, not overwritten: a .ots proves the exact bytes that
+        # were stamped, so replacing it every hour would silently invalidate every earlier proof
+        # (ots verify would fail against the new head). Each hour keeps its own snapshot + proof.
+        # Pending proofs are upgraded on later runs, which is how OTS confirms into a block.
+        run: |
+          pip install --quiet opentimestamps-client
+          mkdir -p ledger/timestamps
+          for proof in ledger/timestamps/*.ots; do
+            [ -e "$proof" ] || continue
+            ots upgrade "$proof" >/dev/null 2>&1 || true
+          done
+          seq=$(python3 -c "import json; print(json.load(open('ledger/head.json'))['seq'])")
+          cp ledger/head.json "ledger/timestamps/$seq.json"
+          ots stamp "ledger/timestamps/$seq.json" || echo "::warning::calendar unreachable this hour; the head is still published and hash-chained"
+          ots verify "ledger/timestamps/$seq.json.ots" 2>&1 | tail -6 || true
+          echo "archived proofs: $(ls ledger/timestamps/*.ots 2>/dev/null | wc -l)"
+
       - name: Rebase any remote changes and push
         run: |
           git config user.name "verdict-desk-bot"

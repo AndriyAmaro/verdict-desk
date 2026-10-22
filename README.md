@@ -48,6 +48,27 @@ python3 -m verdict_desk decide-v3 BTCUSDT --feed "kol=https://<your-rss-bridge>/
 
 What this repository does not claim is a native X API integration that does not exist.
 
+## A third-party clock that needs no wallet
+
+An on-chain anchor requires a funded key, so the hourly cadence pauses whenever the CI secrets are
+absent. This does not: every run stamps the published head with **OpenTimestamps**, submitting the
+digest to independent public calendars that commit it into a Bitcoin block. No key, no funds, no
+account.
+
+```bash
+python3 -c "import json;print(json.load(open('ledger/head.json'))['seq'])"   # e.g. 116
+ots verify ledger/timestamps/116.json.ots      # any machine, no trust in us required
+```
+
+Two details that decide whether this is evidence or decoration:
+
+- **Proofs are archived per record.** A `.ots` proves the exact bytes that were stamped, so
+  overwriting one file each hour would silently invalidate every earlier proof. Each record keeps
+  its own snapshot and proof, and a test checks that every snapshot equals the published hash of
+  that record.
+- **Pending is a state, not a failure.** A fresh proof reads *pending confirmation in Bitcoin
+  blockchain* until a block confirms it; later runs upgrade the earlier proofs.
+
 ## Decision exhibits: the record as a document, not a log line
 
 `python -m verdict_desk exhibit <seq>` renders one dossier as a self-contained, printable document. It exists because a legal reviewer asks a different question than an engineer: *can I rely on this in a dispute?* Each exhibit answers it in seven sections:

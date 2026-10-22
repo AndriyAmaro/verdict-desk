@@ -92,6 +92,7 @@ button{cursor:pointer}button:hover{border-color:var(--accent)}
     const fr = d.evidence?.freshness || {};
     if (fr.newest_candle_age_minutes != null) bits.push(`price age ${fr.newest_candle_age_minutes} min`);
     $("facts").textContent = bits.join(" · ") || "No position: the judge declined to open one.";
+    $("facts").innerHTML += ` <a href="exhibit/exhibit-${d.seq}.html">Open this decision as a printable exhibit →</a>`;
 
     const drops = s.drop_one || [];
     if (!drops.length) { $("sensitivity").innerHTML = `<p class="mut">This dossier predates the sensitivity analysis.</p>`; }

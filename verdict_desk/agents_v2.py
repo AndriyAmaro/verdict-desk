@@ -139,6 +139,28 @@ def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float 
     bull_score = sum(a["weight"] for a in bull_args)
     bear_score = sum(a["weight"] for a in bear_args)
     edge = round(bull_score - bear_score, 4)
+
+    # Fail-closed: evidencia de mercado vencida bloqueia a decisao em vez de
+    # decidir com preco velho. O frescor vem congelado nas features, entao o
+    # replay reproduz o mesmo bloqueio. Dossies antigos nao tem a chave e
+    # seguem decidindo como sempre decidiram.
+    fresh = f.get("freshness")
+    if fresh is not None and not fresh.get("ok", True):
+        return {
+            "rules_version": rules.version,
+            "bull_score": bull_score,
+            "bear_score": bear_score,
+            "edge": edge,
+            "threshold": rules.entry_threshold,
+            "action": "BLOCKED_STALE",
+            "rationale": (
+                f"Refused to decide: {fresh.get('reason') or 'evidence is stale'}. "
+                "The evidence is still frozen in this dossier so the refusal itself is auditable, "
+                "but no simulated position is opened on stale prices."
+            ),
+            "freshness": fresh,
+        }
+
     action = _action(edge, rules)
     verdict = {
         "rules_version": rules.version,

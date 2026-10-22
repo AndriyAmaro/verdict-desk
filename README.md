@@ -24,6 +24,21 @@ Also available: the earlier [2-minute silent recording](web/demo/verdict-desk-de
 | A repeatable reasoning trail | `replay` re-derives the verdict from the frozen packet; `verify` checks the hash chain | `verdict_desk/dossier.py` |
 | Chainlink CRE (second bounty) | A CRE workflow plus a receiver contract that anchor the ledger head and a Data Feed price on Sepolia | `cre/` (status table inside); evidence file `cre/SIMULATION-OUTPUT.md` (complete: simulation, Sepolia deployment and the anchored head of dossier 80) |
 
+### Special Project Spotlight: the narrative agent this build already runs
+
+The bounty's spotlight describes an agent that monitors user-selected crypto voices, extracts the token, sentiment, conviction and urgency from what they say, detects when independent voices converge on the same narrative, and turns that into a practice position under transparent rules and risk limits. That agent exists here and runs on every hourly decision:
+
+| Spotlight requirement | What runs today | Measured evidence |
+|---|---|---|
+| Up to 20 user-selected voices | 5 default crypto newsroom and creator feeds, extensible to 20 via `--feed NAME=URL` (RSS/Atom) | 40 headlines per run; 87 of 95 dossiers carry a narrative layer |
+| Tokens, sentiment, conviction, urgency | LLM extraction per headline into a closed vocabulary, each with a literal quote from the headline | 14 extractions accepted and 13 rejected by the grounding gate in the latest dossier |
+| Convergence across distinct voices | A narrative needs at least two different voices on the same token **and** the same stance | **101 convergences** recorded across the live ledger |
+| Practice position under transparent rules and risk limits | The convergence becomes a citable evidence item; the deterministic judge sizes a simulated position at 1% risk with an ATR stop and target | `verdict_desk/agents_v2.py`, `portfolio.py` |
+
+Example from the live ledger: BTC bullish, converging across **CoinDesk, Cointelegraph, Decrypt and The Block**, top conviction *high*, top urgency *medium* — and that convergence is one of the items the judge is allowed to cite when it rules.
+
+**One honest gap:** the spotlight names X as the KOL source. This build reads public RSS/Atom feeds, because the X API is paid and the project runs at zero budget. The voice adapter accepts any feed URL, so an X-capable source can be plugged in without touching the extraction, convergence or grounding logic; what this repository does not claim is an X integration that does not exist.
+
 ## Five-minute judge path
 
 1. Open the dashboard (the GitHub Pages site of this repository). It loads `ledger/ledger.jsonl` and shows the banner "Every hash recomputed in this browser matches". It does not trust the server: the hashing runs locally in `web/canonical.js`.
@@ -32,11 +47,12 @@ Also available: the earlier [2-minute silent recording](web/demo/verdict-desk-de
 4. Run it yourself:
 
 ```bash
-python3 -m unittest discover -s tests          # standard library only (198 tests)
+python3 -m unittest discover -s tests          # standard library only (213 tests)
 python3 -m verdict_desk verify                 # hash chain of ledger/ledger.jsonl
 python3 -m verdict_desk replay                 # re-derive every verdict from its frozen evidence
 python3 -m verdict_desk portfolio              # simulated positions marked against later candles
 python3 -m verdict_desk stats --git            # the live-operation numbers below, counted from the ledger
+python3 -m verdict_desk export --seq 95 --out pack.json   # self-verifying evidence pack for one dossier
 ```
 
 ## How it works
@@ -49,6 +65,8 @@ public data ──> frozen evidence packet ──> bull agent ┐
 ```
 
 - **Evidence.** Binance public spot mirror (candles), OKX public funding, GDELT news, and public RSS or Atom feeds. No API key is needed for any of them. A source that fails reduces the evidence and is recorded as a gap; it never fakes a decision.
+- **Fail-closed on stale evidence.** Market evidence carries a freshness window (2 hours). The age of the newest candle is computed when the packet is frozen and stored inside it, so the check itself is replayable and never reads the clock later. If the evidence is older than the window the judge returns **`BLOCKED_STALE`** and sizes no position: it refuses to decide on a stale price instead of quietly extrapolating one. The refusal is written into the dossier, so a blocked decision is as auditable as a taken one, and the portfolio only ever opens LONG or SHORT. Dossiers recorded before this gate existed have no freshness key and keep replaying unchanged.
+- **Evidence pack.** `python3 -m verdict_desk export --seq N --out pack.json` writes one dossier as a self-contained file for a third party: the recomputed hash next to the recorded one, the replay result, the neighbouring hashes that pin it in the chain, the plain-language steps to check it without trusting the exporter, and a `pack_digest` over the whole thing. Anything edited anywhere in the pack changes that digest.
 - **Agents.** The bull and bear analysts are LLM agents (Mistral API, free tier) that must cite evidence ids. A validator discards any claim with no citation, an unknown id, or a number that is not in the cited items. The judge that decides action, size, stop and target is deterministic code, so the same frozen packet always yields the same verdict.
 - **Cause and effect.** Each dossier also freezes a sensitivity table: how much more net edge would flip the verdict to LONG or SHORT, and, for each argument, what the verdict would be without it (and whether that single argument decides it). It comes from the same arguments and weights the judge used, so it is deterministic and replayed too.
 - **Narrative agent.** Reads up to 20 public voices. The LLM extracts token, stance, conviction and urgency per headline. Headlines are untrusted input, so each extraction must carry a quote that is a literal part of the headline, a voice id that exists and values from a closed vocabulary; anything else is dropped and logged in the packet. Convergence needs at least two distinct voices on the same token and stance. If the model is down the packet says `keywords` and uses a plain word-list fallback.

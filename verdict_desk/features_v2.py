@@ -86,7 +86,7 @@ def compute(packet: dict) -> dict:
     bb = bollinger(closes)
     rsi_val = rsi(closes)
 
-    return {
+    out = {
         "last_close": last,
         "ema_fast": round(ema(closes, 12), 6),
         "ema_slow": round(ema(closes, 48), 6),
@@ -107,3 +107,9 @@ def compute(packet: dict) -> dict:
         "bb_lower": bb["lower"],
         "bb_pct_b": bb["pct_b"],
     }
+    # Frescor viaja congelado do pacote para dentro das features, entao o replay
+    # reconstroi exatamente o mesmo veredito. Dossies antigos nao tem a chave e
+    # continuam reproduzindo byte a byte (a chave so entra quando existe).
+    if "freshness" in packet:
+        out["freshness"] = packet["freshness"]
+    return out

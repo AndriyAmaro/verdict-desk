@@ -62,6 +62,33 @@ def fetch_news(symbol: str, max_records: int = 8) -> dict:
     return {"source": url, "query": term, "articles": articles}
 
 
+def freshness(packet: dict, window_minutes: int = 120) -> dict:
+    """Frescor da evidencia de mercado: idade do candle mais novo, em minutos.
+
+    Calculado so a partir do proprio pacote (timestamp do candle mais recente e
+    `collected_at`), entao o replay reproduz o mesmo resultado sem consultar o relogio.
+    `ok` falso significa evidencia velha: o juiz deve recusar a decisao em vez de
+    decidir com dado vencido (fail-closed).
+    """
+    candles = packet.get("market", {}).get("candles") or []
+    collected = packet.get("collected_at")
+    if not candles or not collected:
+        return {"window_minutes": window_minutes, "newest_candle_age_minutes": None, "ok": False, "reason": "no candles or collected_at"}
+    try:
+        newest = max(int(c["t"]) for c in candles)
+        now = datetime.fromisoformat(collected)
+        age = (now - datetime.fromtimestamp(newest / 1000, tz=timezone.utc)).total_seconds() / 60
+    except (KeyError, TypeError, ValueError) as err:
+        return {"window_minutes": window_minutes, "newest_candle_age_minutes": None, "ok": False, "reason": f"unreadable timestamps: {err}"}
+    ok = age <= window_minutes
+    return {
+        "window_minutes": window_minutes,
+        "newest_candle_age_minutes": round(age, 2),
+        "ok": ok,
+        "reason": "" if ok else f"newest candle is {age:.0f} min old, window is {window_minutes} min",
+    }
+
+
 def collect(symbol: str, interval: str = "1h", limit: int = 72, with_news: bool = True) -> dict:
     """Coleta um pacote de evidencia congelado para um simbolo."""
     packet = {
@@ -73,4 +100,6 @@ def collect(symbol: str, interval: str = "1h", limit: int = 72, with_news: bool 
     if with_news:
         time.sleep(5)  # o GDELT aceita uma chamada a cada 5 segundos
         packet["news"] = fetch_news(symbol)
+    # Frescor congelado no pacote: o juiz le daqui, entao o replay nao depende do relogio.
+    packet["freshness"] = freshness(packet)
     return packet

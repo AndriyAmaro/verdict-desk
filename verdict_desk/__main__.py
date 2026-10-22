@@ -166,6 +166,76 @@ def cmd_head(opts) -> int:
     return 0
 
 
+EXPORT_INSTRUCTIONS = [
+    "1. Open this file and read `dossier`. Nothing in it is trusted yet.",
+    "2. Remove the `hash` key, canonicalize the rest as UTF-8 JSON with sorted keys and",
+    "   no whitespace (verdict_desk/canonical.py), then SHA-256 it. It must equal",
+    "   `recomputed_hash` below and `dossier.hash`.",
+    "3. Run: python3 -m verdict_desk --ledger <ledger.jsonl> replay --seq <seq>",
+    "   It recomputes the verdict from the frozen evidence alone. It must MATCH.",
+    "4. Compare `neighbors.prev_hash` with the real previous dossier, and this dossier's",
+    "   hash with the next one. Any edit here breaks both links.",
+    "5. `pack_digest` covers everything above (without itself). Change one byte and it",
+    "   changes; that is how you know this pack was not edited in transit.",
+]
+
+
+def export_pack(ledger: list[dict], seq: int) -> dict:
+    """Pacote de evidencia autoverificavel para UM dossie, para entregar a um auditor."""
+    target = next((d for d in ledger if d["seq"] == seq), None)
+    if target is None:
+        raise ValueError(f"seq {seq} not found in the ledger")
+    index = ledger.index(target)
+    replay_result = dossier.replay(target, rules_version=target.get("verdict", {}).get("rules_version", "v1"))
+    body = {k: v for k, v in target.items() if k != "hash"}
+    pack = {
+        "format": "verdict-desk/evidence-pack/v1",
+        "seq": seq,
+        "symbol": target["evidence"]["symbol"],
+        "recorded_hash": target["hash"],
+        "recomputed_hash": dossier.digest(body),
+        "verdict": target["verdict"],
+        "replay": {
+            "matches": replay_result["matches"],
+            "replayed_action": replay_result["replayed"]["action"],
+            "replayed_edge": replay_result["replayed"]["edge"],
+            "llm_citations_valid": replay_result.get("llm_citations_valid"),
+        },
+        "neighbors": {
+            "prev_hash": target["prev_hash"],
+            "next_hash": ledger[index + 1]["hash"] if index + 1 < len(ledger) else None,
+            "is_head": index + 1 == len(ledger),
+        },
+        "chain_position": {"index": index, "ledger_length": len(ledger)},
+        "how_to_verify_this_file_without_trusting_us": EXPORT_INSTRUCTIONS,
+        "dossier": target,
+    }
+    pack["pack_digest"] = dossier.digest(pack)
+    return pack
+
+
+def cmd_export(opts) -> int:
+    ledger = dossier.read_ledger(opts.ledger)
+    try:
+        pack = export_pack(ledger, opts.seq)
+    except ValueError as err:
+        print(err, file=sys.stderr)
+        return 1
+    text = json.dumps(pack, indent=2, sort_keys=True, ensure_ascii=False)
+    if opts.out:
+        opts.out.parent.mkdir(parents=True, exist_ok=True)
+        opts.out.write_text(text + "\n", encoding="utf-8")
+        print(f"wrote {opts.out}  ({len(text):,} bytes)")
+        print(f"pack digest   {pack['pack_digest']}")
+        print(f"recomputed    {pack['recomputed_hash']}  (recorded {pack['recorded_hash']})")
+        print(f"replay        {'MATCHES' if pack['replay']['matches'] else 'DIFFERS'} -> {pack['replay']['replayed_action']}")
+        if pack["neighbors"]["is_head"]:
+            print("this dossier is the current head of the chain")
+    else:
+        print(text)
+    return 0 if pack["replay"]["matches"] and pack["recomputed_hash"] == pack["recorded_hash"] else 1
+
+
 def cmd_stats(opts) -> int:
     ledger = dossier.read_ledger(opts.ledger)
     if not ledger:
@@ -300,6 +370,10 @@ def main() -> int:
     p = sub.add_parser("replay", help="re-run decisions from the frozen evidence")
     p.add_argument("seq", nargs="?", type=int)
     p.set_defaults(func=cmd_replay)
+    p = sub.add_parser("export", help="write a self-verifying evidence pack for one dossier (hand it to an auditor)")
+    p.add_argument("--seq", type=int, required=True, help="dossier sequence number to export")
+    p.add_argument("--out", type=Path, required=True, help="where to write the pack (JSON)")
+    p.set_defaults(func=cmd_export)
     p = sub.add_parser("verify", help="check the hash chain")
     p.set_defaults(func=cmd_verify)
     p = sub.add_parser("head", help="print the verified head of the chain as JSON, for the CRE anchor workflow")

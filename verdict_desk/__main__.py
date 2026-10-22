@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import backtest, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research
+from . import anchor, backtest, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research
 
 DEFAULT_LEDGER = Path("ledger/ledger.jsonl")
 
@@ -151,6 +151,76 @@ def print_record(record: dict) -> None:
             print(f"  [llm {side}] {len(layer[side]['rejected'])} claims rejected by the citation validator")
     else:
         print("  LLM analysts off (no MISTRAL_API_KEY): deterministic core only")
+
+
+def cmd_exhibit(opts) -> int:
+    """Render dossiers as printable decision exhibits (stdout, a file, or a directory)."""
+    from . import exhibit
+    ledger = dossier.read_ledger(opts.ledger)
+    if not ledger:
+        print(f"no ledger at {opts.ledger}", file=sys.stderr)
+        return 1
+
+    if opts.recent:
+        target = ledger[-opts.recent:]
+    elif opts.seq:
+        target = [d for d in ledger if d.get("seq") == opts.seq]
+        if not target:
+            print(f"no dossier with seq {opts.seq}", file=sys.stderr)
+            return 1
+    else:
+        target = [ledger[-1]]
+
+    chain = exhibit.chain_context(ledger, ledger[-1]["seq"])
+    anchor_info = {}
+    if opts.anchor:
+        try:
+            anchored_seq = anchor.read_latest_seq(opts.rpc, opts.address)
+            onchain = anchor.read_anchor(opts.rpc, opts.address, anchored_seq)
+            onchain["seq"] = anchored_seq
+            anchor_info[anchored_seq] = onchain
+            print(f"anchor: record #{anchored_seq} read from {opts.address} on Sepolia", file=sys.stderr)
+            # O dossie ancorado entra sempre: e ele que prova a custodia na cadeia.
+            if opts.recent and anchored_seq not in {d.get("seq") for d in target}:
+                anchored_row = next((d for d in ledger if d.get("seq") == anchored_seq), None)
+                if anchored_row is not None:
+                    target = [anchored_row] + target
+        except (OSError, ValueError, KeyError) as err:
+            print(f"anchor: could not read the chain ({err}); exhibits are produced without it", file=sys.stderr)
+
+    def anchor_for(row):
+        onchain = anchor_info.get(row["seq"])
+        if not onchain:
+            return None
+        # O contrato grava o hash com prefixo 0x e o ledger grava sem: normalizar antes
+        # de comparar. Comparar cru produzia "nao bate" num registro perfeitamente ancorado.
+        published = (row.get("hash") or "").lower().removeprefix("0x")
+        anchored = (onchain.get("head_hash") or "").lower().removeprefix("0x")
+        return {"matches": published == anchored,
+                "anchored_seq": row["seq"], "anchored_at": onchain.get("anchored_at")}
+
+    if opts.outdir:
+        outdir = Path(opts.outdir)
+        outdir.mkdir(parents=True, exist_ok=True)
+        written = []
+        for row in target:
+            page = exhibit.render(row, chain=chain, anchor=anchor_for(row))
+            path = outdir / f"exhibit-{row['seq']}.html"
+            path.write_text(page, encoding="utf-8")
+            written.append((row, path))
+            print(f"wrote {path}")
+        index = exhibit.render_index([(row, f"exhibit-{row['seq']}.html") for row, _ in written])
+        (outdir / "index.html").write_text(index, encoding="utf-8")
+        print(f"wrote {outdir / 'index.html'}")
+        return 0
+
+    page = exhibit.render(target[0], chain=chain, anchor=anchor_for(target[0]))
+    if opts.out:
+        Path(opts.out).write_text(page, encoding="utf-8")
+        print(f"wrote {opts.out}")
+    else:
+        sys.stdout.write(page)
+    return 0
 
 
 def cmd_replay(opts) -> int:
@@ -437,6 +507,15 @@ def main() -> int:
     p.add_argument("--seq", type=int, required=True, help="dossier sequence number to export")
     p.add_argument("--out", type=Path, required=True, help="where to write the pack (JSON)")
     p.set_defaults(func=cmd_export)
+    p = sub.add_parser("exhibit", help="render a dossier as a printable decision exhibit")
+    p.add_argument("seq", nargs="?", type=int, help="dossier seq (default: the latest)")
+    p.add_argument("--recent", type=int, metavar="N", help="render the last N dossiers (use with --outdir)")
+    p.add_argument("--outdir", metavar="DIR", help="write one exhibit per dossier plus an index")
+    p.add_argument("--out", metavar="FILE", help="write a single exhibit to FILE instead of stdout")
+    p.add_argument("--anchor", action="store_true", help="also attach the on-chain anchor status (network read)")
+    p.add_argument("--rpc", default=anchor.DEFAULT_RPC, help="RPC endpoint for --anchor")
+    p.add_argument("--address", default=anchor.DEFAULT_ADDRESS, help="LedgerAnchor address")
+    p.set_defaults(func=cmd_exhibit)
     p = sub.add_parser("monitor", help="compare the ledger against the head anchored on Sepolia (read-only)")
     p.add_argument("--rpc", default="https://ethereum-sepolia-rpc.publicnode.com")
     p.add_argument("--address", default="0x50443D51Db71A61E131B147B1d36aF21d48CDdF7")

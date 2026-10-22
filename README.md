@@ -48,6 +48,22 @@ python3 -m verdict_desk decide-v3 BTCUSDT --feed "kol=https://<your-rss-bridge>/
 
 What this repository does not claim is a native X API integration that does not exist.
 
+## Decision exhibits: the record as a document, not a log line
+
+`python -m verdict_desk exhibit <seq>` renders one dossier as a self-contained, printable document. It exists because a legal reviewer asks a different question than an engineer: *can I rely on this in a dispute?* Each exhibit answers it in seven sections:
+
+| Section | What it establishes |
+|---|---|
+| 1. What the agent saw, and when | Custody: every source, item count and age, with freshness judged per source class |
+| 2. Who argued what | Each claim next to the **evidence text it cites**, and each claim refused with the exact reason (`number not in cited evidence: 1.6`) |
+| 3. Which argument decided it | The record's own sensitivity block: the edge and action that would remain without each argument, with the deciding ones marked |
+| 4. The decision | Action, edge, entry, stop, target, size, declared risk and the system cap |
+| 5. Market voices | Converging narratives and the tokens that never converged, with reasons |
+| 6. Integrity | The hash **recomputed when the exhibit was rendered** against the recorded one, the previous link, the chain position, and the on-chain anchor status |
+| 7. What this exhibit does not prove | Simulated only, no orders, fees excluded, LLM opinions validated for citation and not for merit, secondary sources inherit their errors |
+
+The live site publishes the last five exhibits plus the anchored record, regenerated on every hourly run: [`web/exhibit/`](https://andriyamaro.github.io/verdict-desk/exhibit/index.html).
+
 ## Try the cause-and-effect lab
 
 `web/lab.html` answers, in the browser, the two questions a reviewer actually asks:

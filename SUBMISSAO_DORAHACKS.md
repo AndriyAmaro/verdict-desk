@@ -38,7 +38,7 @@ PocketChange limits what an agent can spend. Verdict Desk proves what an agent d
 | **CI/CD** | GitHub Actions: hourly scheduled workflow appends dossiers, verifies the chain, and redeploys |
 | **CRE** | Chainlink CRE SDK (`@chainlink/cre-sdk`), Solidity, MockKeystoneForwarder tests |
 | **Data sources** | Binance spot candles (no key), OKX public funding, GDELT news, RSS/Atom feeds |
-| **Testing** | 271 unit tests via `unittest`; cross-language canonical JSON test vectors; a Python versus JavaScript check of the live-operation counts |
+| **Testing** | 283 unit tests via `unittest`; cross-language canonical JSON test vectors; a Python versus JavaScript check of the live-operation counts |
 
 ---
 
@@ -93,7 +93,7 @@ Verdict Desk does exactly this end-to-end. It collects public market data (candl
 
 **Evidence in the repo:**
 <!-- numbers:start -->
-- 113 dossiers in `ledger/ledger.jsonl` as of dossier 113 (2026-10-22 21:44 UTC), over a window of 132.3 h (5.5 days); from dossier 46 on, the citation validator accepted 432 claims and rejected 55 (88.7% accepted). Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing
+- 128 dossiers in `ledger/ledger.jsonl` as of dossier 128 (2026-10-22 23:12 UTC), over a window of 133.8 h (5.6 days); from dossier 46 on, the citation validator accepted 535 claims and rejected 64 (89.3% accepted). Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing
 <!-- numbers:end -->
 - `verdict_desk/evidence.py`, `verdict_desk/narrative.py`: evidence collection and narrative extraction
 - `verdict_desk/agents.py`, `verdict_desk/portfolio.py`: agents and portfolio tracking
@@ -117,7 +117,7 @@ Every dossier is hash-chained to the previous one via RFC 8785 canonical JSON. T
 - `verdict_desk/dossier.py`: dossier creation, canonicalization, hashing
 - `web/canonical.js`: identical canonical JSON implementation in JavaScript
 - `tests/canonical_vectors.json`: shared cross-language test vectors
-- 271 passing unit tests, all verifiable with `python3 -m unittest discover -s tests`
+- 283 passing unit tests, all verifiable with `python3 -m unittest discover -s tests`
 
 ---
 
@@ -188,7 +188,7 @@ Each backtest run prints the SHA-256 of its candle series so the numbers can be 
    ```bash
    git clone https://github.com/AndriyAmaro/verdict-desk.git
    cd verdict-desk
-   python3 -m unittest discover -s tests     # 271 tests
+   python3 -m unittest discover -s tests     # 283 tests
    python3 -m verdict_desk verify             # hash chain
    python3 -m verdict_desk replay             # re-derive every verdict
    python3 -m verdict_desk portfolio          # simulated positions

@@ -1,0 +1,79 @@
+name: anchor
+
+# Anchors the current published ledger head on Ethereum Sepolia through the CRE workflow.
+#
+# Why hourly: one anchored transaction proves the mechanism; a cadence of them proves the
+# custody story. A reviewer can take any anchored record, ask the contract for its hash, and
+# compare it with the ledger line published at that time.
+#
+# This job SKIPS, loudly, when the secrets are absent. It never fails the repository because
+# a key was not provided -- a red X for a missing optional key trains people to ignore red Xs.
+
+on:
+  schedule:
+    - cron: "7 * * * *"   # every hour at :07 UTC, after the hourly decide run
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: anchor
+  cancel-in-progress: false
+
+jobs:
+  anchor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for the anchoring secrets
+        id: gate
+        env:
+          SEPOLIA_PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
+          CRE_API_KEY: ${{ secrets.CRE_API_KEY }}
+        run: |
+          if [ -z "${SEPOLIA_PRIVATE_KEY}" ] || [ -z "${CRE_API_KEY}" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Anchor skipped::SEPOLIA_PRIVATE_KEY and CRE_API_KEY are not set, so nothing was anchored this hour. The published ledger stays verifiable without them; only the on-chain cadence is paused."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: oven-sh/setup-bun@v2
+        if: steps.gate.outputs.enabled == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          node-version: "22"
+
+      - name: Install the CRE CLI
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          curl -sSL https://raw.githubusercontent.com/smartcontractkit/cre-cli/main/install.sh | bash
+          echo "$HOME/.cre/bin" >> "$GITHUB_PATH"
+
+      - name: Anchor the current head
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          SEPOLIA_PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
+          CRE_API_KEY: ${{ secrets.CRE_API_KEY }}
+        run: bash cre/scripts/anchor-existing.sh
+
+      - name: Keep the evidence, if anything was produced
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          git config user.name "verdict-desk-bot"
+          git config user.email "verdict-desk-bot@users.noreply.github.com"
+          git add -A cre/evidence
+          if git diff --cached --quiet; then
+            echo "no new evidence"
+          else
+            git commit -m "cre: anchor evidence $(date -u +%Y-%m-%dT%H:%MZ)"
+            git pull --rebase --autostash -q origin "${GITHUB_REF_NAME}"
+            git push -q origin "HEAD:${GITHUB_REF_NAME}"
+          fi

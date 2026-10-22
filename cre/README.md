@@ -71,3 +71,25 @@ The full runbook, with the status of each step, is [`DEPLOY_SEPOLIA.md`](DEPLOY_
 ## Credits and licenses
 
 Project layout and the use of the CRE SDK follow the MIT-licensed `smartcontractkit/cre-templates`; the workflow, contract and tests are original. `@chainlink/cre-sdk` is BUSL-1.1 and is used as a dependency, not vendored. Developed with AI assistance (Claude Code).
+
+
+## Anchoring on a schedule (reusing the deployment)
+
+`cre/scripts/anchor-sepolia.sh` deploys and anchors once — right for the first run, wrong afterwards, because a new address per hour orphans the history. For every run after the first:
+
+```bash
+export SEPOLIA_PRIVATE_KEY=0x...    # throwaway Sepolia key, never committed
+bash cre/scripts/anchor-existing.sh
+```
+
+It broadcasts the report against the contract recorded in `cre/deployment.sepolia.json`. The scheduled job in `.github/workflows/anchor.yml` runs it hourly and **skips with a visible notice** when `SEPOLIA_PRIVATE_KEY` or `CRE_API_KEY` are not configured: the published ledger stays verifiable without them, only the on-chain cadence pauses.
+
+## Evidence kept in this folder
+
+| File | What it proves |
+|---|---|
+| `evidence/simulate-broadcast-output.txt` | a real transaction: seq 80, `0x7caa1f…`, later confirmed on chain at block 11964023 |
+| `evidence/simulate-live-head.txt` | the workflow reading the live published head (seq 113) under consensus and the Data Feed price |
+| `evidence/check-anchor-output.txt` | the contract read back and compared with the public ledger |
+
+`tests/test_cre_evidence.py` re-checks those files against `ledger/ledger.jsonl` on every test run, so the evidence cannot quietly stop being true.

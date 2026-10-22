@@ -94,7 +94,7 @@ A single window is wrong in both directions: it either accepts a stale price (da
 4. Run it yourself:
 
 ```bash
-python3 -m unittest discover -s tests          # standard library only (213 tests)
+python3 -m unittest discover -s tests          # standard library only (271 tests)
 python3 -m verdict_desk verify                 # hash chain of ledger/ledger.jsonl
 python3 -m verdict_desk replay                 # re-derive every verdict from its frozen evidence
 python3 -m verdict_desk portfolio              # simulated positions marked against later candles
@@ -125,21 +125,21 @@ public data ──> frozen evidence packet ──> bull agent ┐
 
 ## Live operation, measured from the ledger
 
-<!-- live-numbers: generated from dossier 80 by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
-Counted over `ledger/ledger.jsonl` on the chain as of **dossier 80** (head `04e260dc39cdecb9`, collected 2026-10-21 13:43 UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
+<!-- live-numbers: generated from dossier 113 by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
+Counted over `ledger/ledger.jsonl` on the chain as of **dossier 113** (head `55af45a17bacc657`, collected 2026-10-22 21:44 UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
 
 | What | Number |
 |---|---|
-| Dossiers in the verified chain | 80 (BTCUSDT 39, ETHUSDT 33, SOLUSDT 8) |
-| Operating window, first to last dossier | 100.3 h, 4.2 days (2026-10-17 09:26 to 2026-10-21 13:43 UTC) |
-| Clock hours (UTC) in that window with at least one dossier | 29 of 101 (28.7%) |
-| Longest gap between consecutive dossiers of the same symbol | 6 h 13 min (BTCUSDT); 53 gaps over 90 minutes |
-| Recorded by the workflow bot (scheduled or manually dispatched runs) | 65 (dossiers 1-53, 69-80) |
+| Dossiers in the verified chain | 113 (BTCUSDT 50, ETHUSDT 44, SOLUSDT 19) |
+| Operating window, first to last dossier | 132.3 h, 5.5 days (2026-10-17 09:26 to 2026-10-22 21:44 UTC) |
+| Clock hours (UTC) in that window with at least one dossier | 36 of 133 (27.1%) |
+| Longest gap between consecutive dossiers of the same symbol | 8 h 34 min (SOLUSDT); 71 gaps over 90 minutes |
+| Recorded by the workflow bot (scheduled or manually dispatched runs) | 98 (dossiers 1-53, 69-113) |
 | Recorded by other commits | 15 (dossiers 54-68): runs made outside the workflow while the demo tooling and the v2 rules were being built; the ledger is append-only, so they stay |
-| LLM era, dossier 46 onward | 35 dossiers, 30 with analyst output (dossiers 54-58 have no LLM layer) |
-| Claims **accepted** by the citation validator | 200 (bull 113, bear 87) |
-| Claims **rejected** by the citation validator | 36 (bull 7, bear 29); reason: "number not in cited evidence" 36 |
-| Share of claims accepted | 84.7% |
+| LLM era, dossier 46 onward | 68 dossiers, 63 with analyst output (dossiers 54-58 have no LLM layer) |
+| Claims **accepted** by the citation validator | 432 (bull 234, bear 198) |
+| Claims **rejected** by the citation validator | 55 (bull 17, bear 38); reason: "number not in cited evidence" 55 |
+| Share of claims accepted | 88.7% |
 
 The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures.
 

@@ -18,6 +18,10 @@ PocketChange limits what an agent can spend. Verdict Desk proves what an agent d
 |---|---|
 | **Repository** | https://github.com/AndriyAmaro/verdict-desk |
 | **Live Demo (GitHub Pages)** | https://andriyamaro.github.io/verdict-desk/ |
+| **Cause and effect lab** | https://andriyamaro.github.io/verdict-desk/lab.html |
+| **Decision exhibits (one document per decision)** | https://andriyamaro.github.io/verdict-desk/exhibit/index.html |
+| **Anchored record #80** | https://andriyamaro.github.io/verdict-desk/exhibit/exhibit-80.html |
+| **Judge path (requirement → artifact)** | https://andriyamaro.github.io/verdict-desk/judge.html |
 | **Demo Video (2 min, no voice)** | https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo.mp4 |
 | **CRE Documentation** | https://github.com/AndriyAmaro/verdict-desk/tree/main/cre |
 
@@ -34,7 +38,7 @@ PocketChange limits what an agent can spend. Verdict Desk proves what an agent d
 | **CI/CD** | GitHub Actions: hourly scheduled workflow appends dossiers, verifies the chain, and redeploys |
 | **CRE** | Chainlink CRE SDK (`@chainlink/cre-sdk`), Solidity, MockKeystoneForwarder tests |
 | **Data sources** | Binance spot candles (no key), OKX public funding, GDELT news, RSS/Atom feeds |
-| **Testing** | 198 unit tests via `unittest`; cross-language canonical JSON test vectors; a Python versus JavaScript check of the live-operation counts |
+| **Testing** | 271 unit tests via `unittest`; cross-language canonical JSON test vectors; a Python versus JavaScript check of the live-operation counts |
 
 ---
 
@@ -67,10 +71,16 @@ Each dossier includes a sensitivity table: how much more net edge would flip the
 ### 5. Tamper-Evident Hash Chain
 Every dossier carries `prev_hash` and its own `hash` over canonical JSON. The same canonicalization runs in Python (ledger writer) and JavaScript (browser verifier), with shared test vectors. `verify` checks the chain: editing a dossier flags that dossier, re-hashing it breaks the link of the next one, and rewriting every later hash leaves the chain consistent but changes the head, which only a copy outside the operator's control (git history, other clones, an on-chain anchor) can expose.
 
-### 6. Auditing Third-Party Agent Journals
+### 6. A Cause-and-Effect Lab Anyone Can Drive
+`web/lab.html` lets a reviewer pick any published dossier and see, argument by argument, the edge and the action that would remain if that argument were removed — the verdict-deciding ones highlighted. A playground below it replays the policy on inputs the reviewer chooses and names the rule that fired: entry band, high-volatility rule, freshness gate, fail-closed. The playground is a mirror of the judge in `web/policy.js`, and a test compares the two over **486 input combinations** so the browser cannot drift from the ledger.
+
+### 7. Decision Exhibits: the record as a document
+`python3 -m verdict_desk exhibit <seq>` renders one decision as a self-contained, printable document: evidence custody per source class, every claim placed beside the evidence text it cites, every refused claim with its exact reason, the deciding argument, the hash recomputed at render time, the chain position, the on-chain anchor status — and a closing section listing **what the record does not prove**. The live site publishes the last five plus the anchored record, regenerated hourly.
+
+### 8. Auditing Third-Party Agent Journals
 `audit-journal` takes the journal of any autonomous agent, cross-checks its recorded candles and prices against public Binance data, and replays each symbol-hour in shadow, reporting what Verdict Desk would have recorded next to what the agent actually did. Free-text reasoning is never copied into the audit output.
 
-### 7. Live, Append-Only History
+### 9. Live, Append-Only History
 GitHub Actions is scheduled every hour: each run appends decisions for BTCUSDT, ETHUSDT, and SOLUSDT, verifies the chain, commits, and redeploys the dashboard. Scheduled runs are best effort, so the cadence has gaps, and they are published (dashboard cadence panel, README "Live operation"). The commit log serves as an independent clock.
 
 ---
@@ -83,7 +93,7 @@ Verdict Desk does exactly this end-to-end. It collects public market data (candl
 
 **Evidence in the repo:**
 <!-- numbers:start -->
-- 80 dossiers in `ledger/ledger.jsonl` as of dossier 80 (2026-10-21 13:43 UTC), over a window of 100.3 h (4.2 days); from dossier 46 on, the citation validator accepted 200 claims and rejected 36 (84.7% accepted). Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing
+- 113 dossiers in `ledger/ledger.jsonl` as of dossier 113 (2026-10-22 21:44 UTC), over a window of 132.3 h (5.5 days); from dossier 46 on, the citation validator accepted 432 claims and rejected 55 (88.7% accepted). Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing
 <!-- numbers:end -->
 - `verdict_desk/evidence.py`, `verdict_desk/narrative.py`: evidence collection and narrative extraction
 - `verdict_desk/agents.py`, `verdict_desk/portfolio.py`: agents and portfolio tracking
@@ -107,7 +117,7 @@ Every dossier is hash-chained to the previous one via RFC 8785 canonical JSON. T
 - `verdict_desk/dossier.py`: dossier creation, canonicalization, hashing
 - `web/canonical.js`: identical canonical JSON implementation in JavaScript
 - `tests/canonical_vectors.json`: shared cross-language test vectors
-- 198 passing unit tests, all verifiable with `python3 -m unittest discover -s tests`
+- 271 passing unit tests, all verifiable with `python3 -m unittest discover -s tests`
 
 ---
 
@@ -118,11 +128,19 @@ Verdict Desk includes a Chainlink CRE workflow that:
 2. Reads the BTC/USD Data Feed price on Sepolia
 3. Writes both to a `LedgerAnchor` contract through a CRE report
 
-The workflow code and the Solidity receiver contract are written and covered by tests (10 SDK mock tests + 6 in-memory EVM tests).
+The workflow code and the Solidity receiver contract are covered by tests (10 SDK mock tests, 6 in-memory EVM tests, plus a TypeScript type-check).
 
-**Current CRE status, stated honestly:** The workflow simulation (`cre workflow simulate`) and a live Sepolia deployment have not been run yet. No on-chain anchor transaction exists. The code is complete, tested, and documented; the remaining steps are execution (account setup, simulation, deployment, recording a transaction), which the team is working on.
+**CRE status, with the artefacts:**
 
-The evidence will land in `cre/SIMULATION-OUTPUT.md` and in the README table: date of the run, anchored head, BTC/USD value, contract and transaction. Every field says pending until a real run produces it.
+| Step | State | Artefact |
+|---|---|---|
+| CRE CLI simulation | **done**, against the live published head | `cre/evidence/simulate-live-head.txt` — fetched `head.json` under `consensusIdenticalAggregation`, read the BTC/USD Data Feed (81,317.07), encoded record **#113** |
+| Contract deployment | **done** on Ethereum Sepolia, source-verified | `LedgerAnchor 0x50443D51Db71A61E131B147B1d36aF21d48CDdF7` |
+| On-chain anchor transaction | **done**: record #80, `0x7caa1f…`, SUCCESS at block **11964023** | `cre/evidence/simulate-broadcast-output.txt` |
+| Monitoring | **runs every hour in CI** and fails the job on a mismatch | `python3 -m verdict_desk monitor` |
+| Hourly re-anchoring | scripted and scheduled; **paused until the CI secrets exist** | `cre/scripts/anchor-existing.sh`, `.github/workflows/anchor.yml` |
+
+The evidence files are re-checked by tests against `ledger/ledger.jsonl` on every run, so a claim written in October cannot quietly stop being true in November.
 
 See `cre/README.md` and `cre/DEPLOY_SEPOLIA.md` for full details.
 
@@ -155,16 +173,22 @@ Each backtest run prints the SHA-256 of its candle series so the numbers can be 
 
 2. **Press "Test the chain"** → the tamper lab on the first screen: the row turns red in your own browser, and nothing is sent anywhere.
 
-3. **Click on dossier seq 46 or later** → These are the first dossiers where the Mistral LLM agents produce accepted claims on both sides of the debate. Earlier dossiers (seq 1-4: no LLM layer; seq 5-34: HTTP 403 from the first model provider; seq 35-45: 0 of 48 claims passed the validator) are honest history showing how the system evolved.
+3. **Open the lab** → https://andriyamaro.github.io/verdict-desk/lab.html
+   Pick a dossier, find the red rows: those are the arguments the verdict depends on. Then move the sliders and see which rule fires.
 
-4. **Watch the 2-minute demo** → https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo.mp4
+4. **Open the exhibit for the anchored record** → https://andriyamaro.github.io/verdict-desk/exhibit/exhibit-80.html
+   The record as a document: what the agent saw, who argued what, which argument decided it, and the line that says it matches the hash written on Sepolia.
+
+5. **Click on dossier seq 46 or later** → These are the first dossiers where the Mistral LLM agents produce accepted claims on both sides of the debate. Earlier dossiers (seq 1-4: no LLM layer; seq 5-34: HTTP 403 from the first model provider; seq 35-45: 0 of 48 claims passed the validator) are honest history showing how the system evolved.
+
+6. **Watch the 2-minute demo** → https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo.mp4
    Recorded from real command output and the real dashboard. Nothing is mocked.
 
-5. **Run it yourself:**
+7. **Run it yourself:**
    ```bash
    git clone https://github.com/AndriyAmaro/verdict-desk.git
    cd verdict-desk
-   python3 -m unittest discover -s tests     # 198 tests
+   python3 -m unittest discover -s tests     # 271 tests
    python3 -m verdict_desk verify             # hash chain
    python3 -m verdict_desk replay             # re-derive every verdict
    python3 -m verdict_desk portfolio          # simulated positions
@@ -175,7 +199,7 @@ Each backtest run prints the SHA-256 of its candle series so the numbers can be 
 
 ## Limits (Disclosed)
 
-- The hash chain proves **integrity after recording**, not **authenticity at collection time**. Independent witnesses (source timestamps, git history, and eventually the CRE anchor) narrow that gap.
+- The hash chain proves **integrity after recording**, not **authenticity at collection time**. Independent witnesses (source timestamps, git history, and the CRE anchor now written on Sepolia) narrow that gap, and re-anchoring pauses until the CI secrets are configured.
 - A literal headline can still be wrong or manipulative. The grounding gate proves the headline says it, not that it is true.
 - One voice never creates a narrative convergence: at least two distinct voices on the same token and stance are required.
 - LLM-generated text is frozen and not re-producible on replay by design; it is stored and re-validated against the evidence.

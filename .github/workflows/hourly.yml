@@ -71,24 +71,45 @@ jobs:
           ots verify "ledger/timestamps/$seq.json.ots" 2>&1 | tail -6 || true
           echo "archived proofs: $(ls ledger/timestamps/*.ots 2>/dev/null | wc -l)"
 
-      - name: Rebase any remote changes and push
+      - name: Publish, and re-record from the freshest head on a push race
+        env:
+          MISTRAL_API_KEY: ${{ secrets.LLM }}
         run: |
+          set -uo pipefail
           git config user.name "verdict-desk-bot"
           git config user.email "verdict-desk-bot@users.noreply.github.com"
-          # Commit first: git rebase refuses to run on a dirty tree, so the
-          # old order (pull --rebase before commit) died whenever a human
-          # pushed while the bot was recording (run 39653930760, 2026-10-21:
-          # decide and verify passed, the push step failed, dossiers lost).
+          # Commit first: git rebase refuses to run on a dirty tree, so the old order
+          # (pull --rebase before commit) died whenever a human pushed while the bot was
+          # recording (run 39653930760, 2026-10-21: dossiers lost).
           git add ledger
           if git diff --cached --quiet; then
             echo "nothing recorded this hour"
             exit 0
           fi
           git commit -m "ledger: $(date -u +%Y-%m-%dT%H:%MZ)"
+
           for attempt in 1 2 3; do
-            git pull --rebase origin "${{ github.ref_name }}" && git push && exit 0
-            echo "push attempt $attempt raced, rebasing and retrying..."
-            sleep 5
+            # A conflict here means two writers both appended a dossier. Rebasing cannot
+            # merge that correctly (a union would duplicate a sequence number), so the only
+            # safe recovery is: drop our commit, reset to what actually got published, and
+            # record again from there. `git rebase --abort` first, because an aborted rebase
+            # leaves "unmerged files" that made the next pull fail instantly (run 39863662557).
+            git rebase --abort 2>/dev/null || true
+            if git pull --rebase origin "${{ github.ref_name }}" && git push; then
+              exit 0
+            fi
+            echo "push attempt $attempt raced; re-recording from the freshest published head..."
+            git rebase --abort 2>/dev/null || true
+            git reset --hard "origin/${{ github.ref_name }}"
+            python -m verdict_desk decide-v3 BTCUSDT ETHUSDT SOLUSDT --default-feeds || true
+            python -m verdict_desk verify
+            python -m verdict_desk head --out ledger/head.json
+            git add ledger
+            if git diff --cached --quiet; then
+              echo "the freshest head already has this hour's decisions"
+              exit 0
+            fi
+            git commit -m "ledger: $(date -u +%Y-%m-%dT%H:%MZ)"
           done
           exit 1
 

@@ -14,7 +14,7 @@ class AnchorLookupTest(unittest.TestCase):
     def test_the_log_search_walks_back_in_small_windows_and_never_throws(self):
         run = subprocess.run([NODE, str(HERE / "node_anchor_lookup.mjs")], capture_output=True, text=True)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-        self.assertIn("all ok (9 checks)", run.stdout)
+        self.assertIn("all ok (11 checks)", run.stdout)
 
 
 if __name__ == "__main__":

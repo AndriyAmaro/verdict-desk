@@ -2,8 +2,10 @@
 // more log history than it keeps. Free Sepolia endpoints answer "pruned history unavailable" to a wide range, so the
 // search walks backwards from the newest block in small windows and stops at the block the contract was deployed in.
 //
-// The function never throws: a node that cannot serve the logs yields `{ tx: null, note }` with the reason, and the
-// caller prints it next to the verdict (the verdict itself comes from state reads, not from this search).
+// A node that cannot serve the logs does not make the function throw: it yields `{ tx: null, note }` with the reason,
+// and the caller prints it next to the verdict (the verdict itself comes from state reads, not from this search).
+// The one exception is a programming error: a `window` that is not a positive bigint is rejected with a RangeError
+// before anything is asked (a zero or negative window would otherwise repeat the same range forever).
 
 export const WINDOW_BLOCKS = 5000n
 export const DEFAULT_LOOKBACK_BLOCKS = 200000n
@@ -14,17 +16,19 @@ export const DEFAULT_LOOKBACK_BLOCKS = 200000n
  * @param {string} options.address contract address
  * @param {object} options.event ABI item of the `Anchored` event
  * @param {bigint} options.seq sequence number to look for (indexed argument `seq`)
- * @param {bigint | null} [options.floorBlock] never search below this block (the deployment block, when known)
- * @param {bigint} [options.window] blocks per request
+ * @param {bigint | number | null} [options.floorBlock] never search below this block (the deployment block, when known)
+ * @param {bigint} [options.window] blocks per request, a positive bigint
  */
 export async function findAnchoringTx({ client, address, event, seq, floorBlock = null, window = WINDOW_BLOCKS }) {
+  if (typeof window !== 'bigint' || window <= 0n) throw new RangeError(`window must be a positive bigint (blocks per request), got ${String(window)}`)
+  const requestedFloor = floorBlock === null ? null : BigInt(floorBlock)
   let latest
   try {
     latest = await client.getBlockNumber()
   } catch (error) {
     return { tx: null, note: `the RPC did not answer the block number request (${reason(error)})` }
   }
-  const floor = floorBlock ?? (latest > DEFAULT_LOOKBACK_BLOCKS ? latest - DEFAULT_LOOKBACK_BLOCKS : 0n)
+  const floor = requestedFloor ?? (latest > DEFAULT_LOOKBACK_BLOCKS ? latest - DEFAULT_LOOKBACK_BLOCKS : 0n)
   let to = latest
   while (to >= floor) {
     const from = to - window + 1n > floor ? to - window + 1n : floor

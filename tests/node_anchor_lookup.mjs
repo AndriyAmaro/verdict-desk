@@ -6,7 +6,7 @@ const address = '0x50443D51Db71A61E131B147B1d36aF21d48CDdF7'
 const event = { type: 'event', name: 'Anchored' }
 
 // A client whose logs come from a table of { block, tx }; it records every getLogs request.
-function client({ latest, logs = [], failAt = null, failBlockNumber = false }) {
+function client({ latest, logs = [], failAt = null, failBlockNumber = false, cap = 1000 }) {
   const requests = []
   return {
     requests,
@@ -16,6 +16,7 @@ function client({ latest, logs = [], failAt = null, failBlockNumber = false }) {
     },
     async getLogs({ address: a, args, fromBlock, toBlock }) {
       requests.push({ address: a, seq: args.seq, fromBlock, toBlock })
+      if (requests.length > cap) throw new Error(`more than ${cap} requests: the search does not terminate`)
       if (failAt !== null && requests.length === failAt) {
         const error = new Error('RPC Request failed.')
         error.details = 'pruned history unavailable'
@@ -100,6 +101,21 @@ await check('several events in one window: the newest transaction wins', async (
   const c = client({ latest: 2000n, logs: [{ block: 1500n, tx: '0xold' }, { block: 1900n, tx: '0xnew' }] })
   const r = await run(c, { floorBlock: 1000n })
   assert.equal(r.tx, '0xnew')
+})
+
+await check('an invalid window is rejected before any request instead of looping or throwing a TypeError', async () => {
+  for (const window of [0n, -5n, 5000, '5000', null]) {
+    const c = client({ latest: 100_000n, cap: 20 })
+    await assert.rejects(() => run(c, { floorBlock: 0n, window }), (error) => error instanceof RangeError && /positive bigint/.test(error.message), `window=${String(window)}`)
+    assert.equal(c.requests.length, 0, `window=${String(window)} must not ask the node anything`)
+  }
+})
+
+await check('a plain number is accepted as the floor block', async () => {
+  const c = client({ latest: 1200n, logs: [{ block: 1100n, tx: '0xnum' }] })
+  const r = await run(c, { floorBlock: 1000 })
+  assert.equal(r.tx, '0xnum')
+  assert.equal(typeof c.requests[0].fromBlock, 'bigint')
 })
 
 console.log(`all ok (${done.length} checks)`)

@@ -34,7 +34,7 @@ PocketChange limits what an agent can spend. Verdict Desk proves what an agent d
 | **CI/CD** | GitHub Actions: hourly scheduled workflow appends dossiers, verifies the chain, and redeploys |
 | **CRE** | Chainlink CRE SDK (`@chainlink/cre-sdk`), Solidity, MockKeystoneForwarder tests |
 | **Data sources** | Binance spot candles (no key), OKX public funding, GDELT news, RSS/Atom feeds |
-| **Testing** | 198 unit tests via `unittest`; cross-language canonical JSON test vectors; a Python versus JavaScript check of the live-operation counts |
+| **Testing** | 199 unit tests via `unittest`; cross-language canonical JSON test vectors; a Python versus JavaScript check of the live-operation counts |
 
 ---
 
@@ -83,7 +83,7 @@ Verdict Desk does exactly this end-to-end. It collects public market data (candl
 
 **Evidence in the repo:**
 <!-- numbers:start -->
-- 80 dossiers in `ledger/ledger.jsonl` as of dossier 80 (2026-10-21 13:43 UTC), over a window of 100.3 h (4.2 days); from dossier 46 on, the citation validator accepted 200 claims and rejected 36 (84.7% accepted). Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing
+- 83 dossiers in `ledger/ledger.jsonl` as of dossier 83 (2026-10-21 22:18 UTC), over a window of 108.9 h (4.5 days); from dossier 46 on, the citation validator accepted 221 claims and rejected 39 (85.0% accepted). Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing
 <!-- numbers:end -->
 - `verdict_desk/evidence.py`, `verdict_desk/narrative.py`: evidence collection and narrative extraction
 - `verdict_desk/agents.py`, `verdict_desk/portfolio.py`: agents and portfolio tracking
@@ -107,7 +107,7 @@ Every dossier is hash-chained to the previous one via RFC 8785 canonical JSON. T
 - `verdict_desk/dossier.py`: dossier creation, canonicalization, hashing
 - `web/canonical.js`: identical canonical JSON implementation in JavaScript
 - `tests/canonical_vectors.json`: shared cross-language test vectors
-- 198 passing unit tests, all verifiable with `python3 -m unittest discover -s tests`
+- 199 passing unit tests, all verifiable with `python3 -m unittest discover -s tests`
 
 ---
 
@@ -118,11 +118,13 @@ Verdict Desk includes a Chainlink CRE workflow that:
 2. Reads the BTC/USD Data Feed price on Sepolia
 3. Writes both to a `LedgerAnchor` contract through a CRE report
 
-The workflow code and the Solidity receiver contract are written and covered by tests (10 SDK mock tests + 6 in-memory EVM tests).
+The workflow code and the Solidity receiver contract are covered by tests (10 SDK mock tests + 6 in-memory EVM tests).
 
-**Current CRE status, stated honestly:** The workflow simulation (`cre workflow simulate`) and a live Sepolia deployment have not been run yet. No on-chain anchor transaction exists. The code is complete, tested, and documented; the remaining steps are execution (account setup, simulation, deployment, recording a transaction), which the team is working on.
+**It ran on 2026-10-21, and the result is on a public chain.** The workflow was simulated with the CRE CLI (v1.38.0), once sending nothing and once with `--broadcast`. `LedgerAnchor` is deployed on Ethereum Sepolia at [0x50443D51Db71A61E131B147B1d36aF21d48CDdF7](https://sepolia.etherscan.io/address/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7), and [this transaction](https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d) anchored the head of dossier 80 (`04e260dc39cdecb967ef23513aebd7aee260d2101e2507c7704c94dfb0532283`) together with the BTC/USD Data Feed value 84378.12678601 (8 decimals). Anyone can check it without a key: `node cre/contracts/scripts/check-anchor.mjs` (after `cd cre/contracts && npm install`, once) verifies the whole ledger chain, reads the anchor from Sepolia and asks the contract `isAnchored(seq, hash)`.
 
-The evidence will land in `cre/SIMULATION-OUTPUT.md` and in the README table: date of the run, anchored head, BTC/USD value, contract and transaction. Every field says pending until a real run produces it.
+**What it is, stated honestly:** the contract was deployed for simulation, so it accepts reports from the `MockKeystoneForwarder`, not from a workflow deployed to the CRE network (that would need its own `LedgerAnchor` with the production forwarder). The anchor proves the pipeline end to end and pins the head of dossier 80 at a time the operator cannot move, the Sepolia block time (2026-10-21 17:53:24 UTC). It is not a production-grade attestation, and it does not show that the evidence was true when it was collected. The first broadcast attempt ran out of gas before the receiver executed; the limit was raised and the second run anchored the head. Both runs are in the evidence.
+
+Full evidence with both command outputs: `cre/SIMULATION-OUTPUT.md` and `cre/evidence/`.
 
 See `cre/README.md` and `cre/DEPLOY_SEPOLIA.md` for full details.
 
@@ -164,11 +166,13 @@ Each backtest run prints the SHA-256 of its candle series so the numbers can be 
    ```bash
    git clone https://github.com/AndriyAmaro/verdict-desk.git
    cd verdict-desk
-   python3 -m unittest discover -s tests     # 198 tests
+   python3 -m unittest discover -s tests     # 199 tests
    python3 -m verdict_desk verify             # hash chain
    python3 -m verdict_desk replay             # re-derive every verdict
    python3 -m verdict_desk portfolio          # simulated positions
    python3 -m verdict_desk stats --git         # live-operation numbers counted from the ledger
+   cd cre/contracts && npm install && cd ../..  # once: viem, the only dependency of the on-chain check
+   node cre/contracts/scripts/check-anchor.mjs  # reads the anchored head from Sepolia and compares it with this ledger
    ```
 
 ---

@@ -116,10 +116,11 @@ The anchored head is the head at the time of the run, not the current one: the l
 ## How a judge checks it
 
 ```bash
-node cre/contracts/scripts/check-anchor.mjs
+cd cre/contracts && npm install     # once, on a fresh clone: viem is the only dependency (about 20 seconds)
+cd ../.. && node cre/contracts/scripts/check-anchor.mjs
 ```
 
-No key is needed. It verifies the whole hash chain of the ledger with the code the dashboard runs, reads the latest anchored sequence number and head hash from Sepolia, asks the contract `isAnchored(seq, hash)` for the hash this ledger has at that sequence number, and prints the anchoring transaction. The exit code is 0 only when the chain is intact and the anchored head is exactly that dossier. (On a free public RPC the event scan at the end can fail with "pruned history unavailable"; the state reads before it are the verdict, and any archive-capable Sepolia RPC passed as `SEPOLIA_RPC_URL` completes it.)
+No key is needed. It verifies the whole hash chain of the ledger with the code the dashboard runs, reads the latest anchored sequence number and head hash from Sepolia, asks the contract `isAnchored(seq, hash)` for the hash this ledger has at that sequence number, and prints the anchoring transaction. The exit code is 0 only when the chain is intact and the anchored head is exactly that dossier. (The search for the transaction asks the RPC for logs in windows of 5,000 blocks, starting at the deployment block, because free public RPCs answer "pruned history unavailable" to a wide range. If one still does, the script says so and gives the verdict anyway; an RPC with full log history passed as `SEPOLIA_RPC_URL` completes it.)
 
 ## What this proves, and what it does not
 

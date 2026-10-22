@@ -83,7 +83,7 @@ Verdict Desk does exactly this end-to-end. It collects public market data (candl
 
 **Evidence in the repo:**
 <!-- numbers:start -->
-- 80 dossiers in `ledger/ledger.jsonl` as of dossier 80 (2026-10-21 13:43 UTC), over a window of 100.3 h (4.2 days); from dossier 46 on, the citation validator accepted 200 claims and rejected 36 (84.7% accepted). Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing
+- 83 dossiers in `ledger/ledger.jsonl` as of dossier 83 (2026-10-21 22:18 UTC), over a window of 108.9 h (4.5 days); from dossier 46 on, the citation validator accepted 221 claims and rejected 39 (85.0% accepted). Counted by `python3 -m verdict_desk stats --git`; the chain keeps growing
 <!-- numbers:end -->
 - `verdict_desk/evidence.py`, `verdict_desk/narrative.py`: evidence collection and narrative extraction
 - `verdict_desk/agents.py`, `verdict_desk/portfolio.py`: agents and portfolio tracking

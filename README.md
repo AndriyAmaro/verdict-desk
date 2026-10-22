@@ -10,6 +10,8 @@ How it works in one paragraph: Verdict Desk reads public market evidence, freeze
 
 Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
 
+**Judge path (start here):** [`web/judge.html`](web/judge.html) — every requirement of both bounties, each one mapped to the file, command or transaction that proves it, with the live numbers recomputed from the ledger in the visitor's browser. Published at `https://andriyamaro.github.io/verdict-desk/judge.html`.
+
 **Watch it first (narrated, 3 min 15 s):** [`web/demo/verdict-desk-demo-narrated.mp4`](web/demo/verdict-desk-demo-narrated.mp4) — eight scenes, every frame from the real published dashboard and real command output: the live ledger, the browser recomputing all 95 hashes (95 at recording time; the ledger is longer now), the one-click tamper demo turning the banner red, a full bull/bear debate with the citation validator at work, the evidence pack export with its digest, the `BLOCKED_STALE` refusal on stale evidence, and the Chainlink CRE anchor with its Sepolia transaction. Published by GitHub Pages at `https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo-narrated.mp4`.
 
 Also available: the earlier [2-minute silent recording](web/demo/verdict-desk-demo.mp4) of raw terminal output. Recorded on 2026-10-20 against commit `ff8519a`; the on-screen numbers in that older file (46 dossiers) are from that day and are kept as history.

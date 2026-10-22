@@ -85,6 +85,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
     <li>The receiver only accepts forwarder reports with a strictly increasing sequence number, so an anchored head can never be overwritten</li>
     <li>The contract is <b>source-verified with an exact match</b> — the explorer serves the code that matches the deployed bytecode: <a href="https://sourcify.dev/#/lookup/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7">Sourcify record</a></li>
     <li>Address <code>0x50443D51Db71A61E131B147B1d36aF21d48CDdF7</code> · <a href="https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d">anchor transaction</a> (SUCCESS, block 11964023)</li>
+    <li><b>And it is monitored, not just written once:</b> <code>python3 -m verdict_desk monitor</code> reads the anchored value back from the contract and compares it with the dossier of that same sequence in the published ledger. It says MATCH, or it names the divergence. The hourly job runs it as a guard: a mismatch fails the run.</li>
   </ul>
 </section>
 

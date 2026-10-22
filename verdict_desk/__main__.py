@@ -236,6 +236,34 @@ def cmd_export(opts) -> int:
     return 0 if pack["replay"]["matches"] and pack["recomputed_hash"] == pack["recorded_hash"] else 1
 
 
+def cmd_monitor(opts) -> int:
+    from . import anchor as anchor_mod
+
+    ledger = dossier.read_ledger(opts.ledger)
+    try:
+        result = anchor_mod.monitor(ledger, rpc_url=opts.rpc, address=opts.address, seq=opts.seq)
+    except Exception as err:  # rede fora do ar nao deve ser confundido com adulteracao
+        print(f"could not read the anchor: {err}", file=sys.stderr)
+        return 2
+    d = result["price_decimals"] if result.get("price_decimals") is not None else 0
+    price = result["price"] / (10 ** d) if result.get("price") is not None else None
+    print(f"anchor on chain : seq {result['anchored_seq']}  {result['anchored_hash']}")
+    if result.get("anchored_at"):
+        import datetime as _dt
+        when = _dt.datetime.fromtimestamp(result["anchored_at"], tz=_dt.timezone.utc).isoformat(timespec="seconds")
+        print(f"                  anchored at {when}" + (f", BTC/USD {price:,.2f}" if price else ""))
+    print(f"published ledger: seq {result['published_seq']}  {result['published_hash']}")
+    if result.get("ledger_head_seq") is not None:
+        print(f"                  ledger has {result.get('ledger_length')} dossiers, head at seq {result['ledger_head_seq']}")
+    if result["matches"]:
+        print("RESULT: MATCH — the anchored dossier still has the hash that was anchored")
+        return 0
+    print("RESULT: MISMATCH — the published history no longer matches what the chain anchored")
+    for p in result["problems"]:
+        print(f"  - {p}")
+    return 1
+
+
 def cmd_stats(opts) -> int:
     ledger = dossier.read_ledger(opts.ledger)
     if not ledger:
@@ -374,6 +402,11 @@ def main() -> int:
     p.add_argument("--seq", type=int, required=True, help="dossier sequence number to export")
     p.add_argument("--out", type=Path, required=True, help="where to write the pack (JSON)")
     p.set_defaults(func=cmd_export)
+    p = sub.add_parser("monitor", help="compare the ledger against the head anchored on Sepolia (read-only)")
+    p.add_argument("--rpc", default="https://ethereum-sepolia-rpc.publicnode.com")
+    p.add_argument("--address", default="0x50443D51Db71A61E131B147B1d36aF21d48CDdF7")
+    p.add_argument("--seq", type=int, help="check a specific anchored sequence instead of the latest")
+    p.set_defaults(func=cmd_monitor)
     p = sub.add_parser("verify", help="check the hash chain")
     p.set_defaults(func=cmd_verify)
     p = sub.add_parser("head", help="print the verified head of the chain as JSON, for the CRE anchor workflow")

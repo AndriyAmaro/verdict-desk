@@ -55,6 +55,7 @@ python3 -m verdict_desk replay                 # re-derive every verdict from it
 python3 -m verdict_desk portfolio              # simulated positions marked against later candles
 python3 -m verdict_desk stats --git            # the live-operation numbers below, counted from the ledger
 python3 -m verdict_desk export --seq 95 --out pack.json   # self-verifying evidence pack for one dossier
+python3 -m verdict_desk monitor                # compare the ledger with the head anchored on Sepolia
 ```
 
 ## How it works
@@ -73,6 +74,7 @@ public data ──> frozen evidence packet ──> bull agent ┐
 - **Cause and effect.** Each dossier also freezes a sensitivity table: how much more net edge would flip the verdict to LONG or SHORT, and, for each argument, what the verdict would be without it (and whether that single argument decides it). It comes from the same arguments and weights the judge used, so it is deterministic and replayed too.
 - **Narrative agent.** Reads up to 20 public voices. The LLM extracts token, stance, conviction and urgency per headline. Headlines are untrusted input, so each extraction must carry a quote that is a literal part of the headline, a voice id that exists and values from a closed vocabulary; anything else is dropped and logged in the packet. Convergence needs at least two distinct voices on the same token and stance. If the model is down the packet says `keywords` and uses a plain word-list fallback.
 - **Ledger.** JSONL, one dossier per line, each with `prev_hash` and its own `hash` over RFC 8785 canonical JSON. The same canonicalization runs in Python and JavaScript, with shared test vectors, which is what lets the browser recompute the exact hash Python wrote.
+- **Anchor monitor.** A CRE workflow anchors the head of the chain on Sepolia. `python3 -m verdict_desk monitor` (read-only, no key) reads the anchored value back from the contract and compares it with the dossier of that same sequence in the published ledger: it prints MATCH, or names the divergence. Rewriting old dossiers breaks this even if every local hash is recomputed, which is the limit the dashboard's "Rewrite the whole chain" button demonstrates. The hourly workflow runs it as a guard: a mismatch fails the run, an unreachable RPC only warns.
 - **Frozen LLM output.** The model's words are stored in the dossier and are not regenerated on replay. Replay re-derives everything deterministic and re-checks that each stored citation is still valid against the frozen evidence.
 
 ## Live operation, measured from the ledger

@@ -35,6 +35,22 @@ jobs:
         run: |
           python -m verdict_desk verify
           python -m verdict_desk head --out ledger/head.json
+      - name: Check the ledger against the head anchored on Sepolia
+        # Read-only comparison: the anchored dossier must still carry the hash the
+        # chain recorded. Exit 1 (history no longer matches) fails the run on purpose;
+        # exit 2 (RPC unreachable) only warns, so an outage does not look like tampering.
+        run: |
+          set +e
+          python -m verdict_desk monitor
+          code=$?
+          if [ "$code" -eq 1 ]; then
+            echo "::error::the published ledger no longer matches the head anchored on Sepolia"
+            exit 1
+          fi
+          if [ "$code" -eq 2 ]; then
+            echo "::warning::could not reach the RPC to compare with the on-chain anchor"
+          fi
+          exit 0
       - name: Rebase any remote changes and push
         run: |
           git config user.name "verdict-desk-bot"

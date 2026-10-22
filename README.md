@@ -48,6 +48,24 @@ python3 -m verdict_desk decide-v3 BTCUSDT --feed "kol=https://<your-rss-bridge>/
 
 What this repository does not claim is a native X API integration that does not exist.
 
+## Verifying a record someone hands you
+
+A dossier that arrives as a file — forwarded, copied out of an email, transcribed — should not
+require trusting the sender or this site. [`web/verify.html`](https://andriyamaro.github.io/verdict-desk/verify.html)
+takes a pasted record and runs three checks in the reader's own browser:
+
+| Check | What it catches |
+|---|---|
+| **Integrity** | the SHA-256 over the record's canonical JSON is recomputed; a single edited character fails it |
+| **Linkage** | the record's `prev_hash` is matched against the previous record in the published ledger, so the file is part of a chain rather than a standalone claim |
+| **Re-derivation** | the stored arguments are pushed back through `web/policy.js`; if today's rules produce a different action, the record no longer explains itself and the page says so |
+
+The re-derivation uses the freshness window that record was made under, not today's, because an old
+record should not fail for a rule that changed after it was written.
+
+`bash scripts/check_pages.sh` renders every page in headless Chromium and asserts on the DOM, since
+a page that renders nothing still returns HTTP 200.
+
 ## A third-party clock that needs no wallet
 
 An on-chain anchor requires a funded key, so the hourly cadence pauses whenever the CI secrets are

@@ -32,12 +32,16 @@
     const bear = Number(input.bear) || 0;
     const atrPct = Number(input.atrPct) || 0;
     const ageMinutes = Number(input.ageMinutes) || 0;
+    // A janela de frescor faz parte da regra vigente quando o registro foi gravado, e cada
+    // registro carrega a sua. Re-derivar com a janela de hoje fara registros antigos parecerem
+    // errados por um motivo que nao e erro deles.
+    const windowMinutes = Number(input.windowMinutes) || MARKET_WINDOW_MINUTES;
 
     const edge = Math.round((bull - bear) * 10000) / 10000;
-    const stale = ageMinutes > MARKET_WINDOW_MINUTES;
+    const stale = ageMinutes > windowMinutes;
     if (stale) {
       return { state: "BLOCKED_STALE", edge, stale: true,
-               rule: `price age ${ageMinutes} min > window ${MARKET_WINDOW_MINUTES} min` };
+               rule: `price age ${ageMinutes} min > window ${windowMinutes} min` };
     }
     if (edge >= THRESHOLD) return { state: "LONG", edge, stale: false, rule: `bull ${bull} - bear ${bear} = ${edge} >= ${THRESHOLD}` };
     if (edge <= -THRESHOLD) return { state: "SHORT", edge, stale: false, rule: `bull ${bull} - bear ${bear} = ${edge} <= -${THRESHOLD}` };

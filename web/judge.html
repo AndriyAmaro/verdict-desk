@@ -63,6 +63,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
     <li>Every argument names the evidence item it rests on, and an LLM claim is discarded unless its numbers really appear in the item it cites</li>
     <li>Each dossier freezes a sensitivity table: what would flip the verdict to LONG or SHORT, and what each single argument is worth</li>
     <li>Stale evidence is refused instead of used: past a 2-hour window the judge returns <code>BLOCKED_STALE</code> and sizes no position, and the refusal is recorded</li>
+    <li>A declined entry is named, not hidden: <code>WATCH_REVERSAL</code> when one single argument would flip the decision (and the rationale says which), <code>REDUCE_EXPOSURE</code> when both sides are strong and volatility is high — entry decisions and sizing are unchanged from the earlier rule set</li>
   </ul>
 </section>
 

@@ -75,8 +75,8 @@ def cmd_decide(opts) -> int:
     return 0 if recorded else 1
 
 
-def cmd_decide_v2(opts) -> int:
-    """Run the same decide flow but with agents_v2 + features_v2 (RSI, MACD, Bollinger)."""
+def _decide_flow(opts, rules_version: str) -> int:
+    """Run the decide flow with the agents/features of the requested rules version."""
     if not may_append(opts.ledger):
         return 2
     feeds = dict(narrative.DEFAULT_FEEDS) if opts.default_feeds else {}
@@ -99,10 +99,18 @@ def cmd_decide_v2(opts) -> int:
         if block is not None:
             packet["narrative"] = block
         recorded += 1
-        print_record(dossier.append(packet, opts.ledger, rules_version="v2"))
+        print_record(dossier.append(packet, opts.ledger, rules_version=rules_version))
     if recorded and opts.ledger == DEFAULT_LEDGER:
         publish_head(opts.ledger)
     return 0 if recorded else 1
+
+
+def cmd_decide_v2(opts) -> int:
+    return _decide_flow(opts, "v2")
+
+
+def cmd_decide_v3(opts) -> int:
+    return _decide_flow(opts, "v3")
 
 
 def print_record(record: dict) -> None:
@@ -395,6 +403,13 @@ def main() -> int:
     p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
     p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
     p.set_defaults(func=cmd_decide_v2)
+    p = sub.add_parser("decide-v3", help="decide with rules v3: same sizing as v2, but a declined entry says why (WATCH_REVERSAL / REDUCE_EXPOSURE)")
+    p.add_argument("symbols", nargs="+", metavar="SYMBOL")
+    p.add_argument("--interval", default="1h")
+    p.add_argument("--no-news", action="store_true")
+    p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
+    p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
+    p.set_defaults(func=cmd_decide_v3)
     p = sub.add_parser("replay", help="re-run decisions from the frozen evidence")
     p.add_argument("seq", nargs="?", type=int)
     p.set_defaults(func=cmd_replay)

@@ -45,9 +45,14 @@ def resolve(dossier: dict, candles: list[dict]) -> dict:
     return {**base, "status": "OPEN", "exit": v["entry"], "pnl": 0.0, "bars": 0}
 
 
+POSITION_ACTIONS = ("LONG", "SHORT")
+
+
 def summarize(ledger: list[dict]) -> dict:
     positions = [
-        resolve(d, _later_candles(ledger, i)) for i, d in enumerate(ledger) if d["verdict"]["action"] != "FLAT"
+        resolve(d, _later_candles(ledger, i))
+        for i, d in enumerate(ledger)
+        if d["verdict"]["action"] in POSITION_ACTIONS
     ]
     closed = [p for p in positions if p["status"] != "OPEN"]
     wins = [p for p in closed if p["pnl"] > 0]
@@ -60,7 +65,7 @@ def summarize(ledger: list[dict]) -> dict:
         max_dd = max(max_dd, (peak - equity) / peak * 100)
     return {
         "decisions": len(ledger),
-        "flat": sum(1 for d in ledger if d["verdict"]["action"] == "FLAT"),
+        "flat": sum(1 for d in ledger if d["verdict"]["action"] not in POSITION_ACTIONS),
         "positions": positions,
         "closed": len(closed),
         "open": len(positions) - len(closed),

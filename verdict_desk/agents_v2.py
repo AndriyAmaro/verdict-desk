@@ -19,9 +19,15 @@ class Rules(NamedTuple):
     stop_atr: float = STOP_ATR
     take_atr: float = TAKE_ATR
     max_risk_pct: float = MAX_RISK_PCT
+    # v3: quando True, um FLAT ganha um nome que diz POR QUE ficou de fora
+    # (WATCH_REVERSAL / REDUCE_EXPOSURE). Desligado por padrao para que os
+    # dossies gravados em v2 continuem reproduzindo exatamente como foram.
+    rich_states: bool = False
+    volatility_pct: float = 1.5
 
 
 V2 = Rules()
+V3 = Rules(version="v3", rich_states=True)
 
 
 def _arg(claim: str, ref: str, value, weight: float) -> dict:
@@ -118,6 +124,47 @@ def _action(edge: float, rules: Rules) -> str:
     return "FLAT"
 
 
+def _rich_flat(edge: float, bull_args: list[dict], bear_args: list[dict], f: dict, rules: Rules) -> tuple[str, str]:
+    """Da nome ao motivo de nao entrar. So roda em v3; v2 continua devolvendo FLAT.
+
+    WATCH_REVERSAL  um unico argumento vale o bastante para virar o veredito.
+    REDUCE_EXPOSURE os dois lados estao fortes e a volatilidade esta alta: manter, menor.
+    FLAT            nada disso: fora do radar mesmo.
+    """
+    threshold = rules.entry_threshold
+    bull_score = sum(a["weight"] for a in bull_args)
+    bear_score = sum(a["weight"] for a in bear_args)
+    last_close = f.get("last_close") or 0
+    atr_pct = (f.get("atr_14") or 0) / last_close * 100 if last_close else 0.0
+
+    # Ordem de leitura deliberada: primeiro a instrucao de risco (os dois lados
+    # fortes com volatilidade alta), depois o alerta de que um unico argumento
+    # decide. Quando os dois valem, "reduzir" e a acao, nao "vigiar".
+    if min(bull_score, bear_score) >= threshold and atr_pct >= rules.volatility_pct:
+        return "REDUCE_EXPOSURE", (
+            f"Neither side clears the band (bull {bull_score} vs bear {bear_score}) while both are strong "
+            f"and volatility is high ({atr_pct:.2f}% ATR): nothing new is opened and existing exposure should shrink."
+        )
+
+    for a in bull_args:
+        if edge - a["weight"] <= -threshold:
+            return "WATCH_REVERSAL", (
+                f"Edge {edge} sits inside the entry band, but the bull argument "
+                f"'{a['claim']}' is worth {a['weight']}: losing it alone would flip the verdict to SHORT."
+            )
+    for a in bear_args:
+        if edge + a["weight"] >= threshold:
+            return "WATCH_REVERSAL", (
+                f"Edge {edge} sits inside the entry band, but the bear argument "
+                f"'{a['claim']}' is worth {a['weight']}: losing it alone would flip the verdict to LONG."
+            )
+
+    return "FLAT", (
+        f"Bull {bull_score} vs bear {bear_score}: edge {edge} does not reach the entry threshold "
+        f"of {threshold} and no single argument is worth enough to flip it."
+    )
+
+
 def sensitivity(bull_args: list[dict], bear_args: list[dict], rules: Rules = V2) -> dict:
     edge = round(sum(a["weight"] for a in bull_args) - sum(a["weight"] for a in bear_args), 4)
     base = _action(edge, rules)
@@ -162,6 +209,14 @@ def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float 
         }
 
     action = _action(edge, rules)
+    if action == "FLAT" and rules.rich_states:
+        action, rationale = _rich_flat(edge, bull_args, bear_args, f, rules)
+    else:
+        rationale = (
+            f"Bull {bull_score} vs bear {bear_score}: edge {edge} "
+            + ("reaches" if action != "FLAT" else "does not reach")
+            + f" the entry threshold of {rules.entry_threshold}."
+        )
     verdict = {
         "rules_version": rules.version,
         "bull_score": bull_score,
@@ -169,13 +224,9 @@ def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float 
         "edge": edge,
         "threshold": rules.entry_threshold,
         "action": action,
-        "rationale": (
-            f"Bull {bull_score} vs bear {bear_score}: edge {edge} "
-            + ("reaches" if action != "FLAT" else "does not reach")
-            + f" the entry threshold of {rules.entry_threshold}."
-        ),
+        "rationale": rationale,
     }
-    if action == "FLAT":
+    if action not in ("LONG", "SHORT"):
         return verdict
     entry = f["last_close"]
     stop_distance = f["atr_14"] * rules.stop_atr

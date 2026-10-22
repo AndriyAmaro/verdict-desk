@@ -73,6 +73,8 @@ a.btn[hidden]{display:none}
   <h2>LLM debate and the citation validator</h2>
   <p id="llmera" class="mut"></p>
   <p id="llmearly" class="mut"></p>
+  <h2>Market voices (narrative agent)</h2>
+  <p id="narrative" class="mut"></p>
   <h2>Simulated portfolio (start capital 10,000, risk 1% per position, fees not included)</h2>
   <p id="portfolio" class="mut"></p>
   <div id="positions"></div>
@@ -159,6 +161,8 @@ function renderLlm(dossiers) {
   const none = e.dossiers_without_llm.length ? `Dossiers with no LLM layer at all: ${e.dossiers_without_llm.join(", ")}.` : "Every dossier in this range has an LLM layer.";
   $("llmera").textContent = `From dossier ${e.first_seq} on (the first with working LLM analysts): ${e.dossiers} dossiers, ${e.dossiers_with_analysts} with analyst output. The citation validator accepted ${e.accepted} claims and rejected ${e.rejected} (${pct} accepted). Bull: ${e.sides.bull.accepted} accepted, ${e.sides.bull.rejected} rejected. Bear: ${e.sides.bear.accepted} accepted, ${e.sides.bear.rejected} rejected. Rejections by reason: ${reasons}. Failed analyst calls: ${failed}. ${none}`;
   const early = e.first_seq > 1 ? VerdictStats.llmEra(dossiers, 1, e.first_seq - 1) : null;
+  const nar = VerdictStats.narrative(dossiers);
+  $("narrative").textContent = `From ${nar.dossiers} dossiers: ${nar.headlines} headlines across ${nar.voices} distinct voices, ${nar.convergences} convergences on ${nar.tokens.length} token${nar.tokens.length === 1 ? "" : "s"} (${nar.tokens.join(", ") || "none yet"}), and ${nar.rejected} mentions recorded as rejected with the reason why no narrative formed.`;
   if (!early || !early.dossiers) { $("llmearly").textContent = ""; return; }
   const earlyFailed = early.sides.bull.errors + early.sides.bear.errors;
   $("llmearly").textContent = `Dossiers 1 to ${e.first_seq - 1} stay exactly as recorded: ${early.dossiers_without_llm.length} had no LLM layer, ${earlyFailed} analyst calls failed, and the analysts that did answer had ${early.accepted} claims accepted and ${early.rejected} rejected.`;

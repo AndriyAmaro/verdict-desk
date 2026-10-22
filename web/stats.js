@@ -156,6 +156,20 @@
     };
   }
 
-  var api = { START_CAPITAL: START_CAPITAL, FIRST_LLM_SEQ: FIRST_LLM_SEQ, portfolio: portfolio, cadence: cadence, llmEra: llmEra, resolve: resolve };
+  function narrative(ledger) {
+    var headlines = 0, voices = {}, convs = 0, tokens = {}, rejected = 0, withNarrative = 0;
+    ledger.forEach(function (d) {
+      var n = d.evidence && d.evidence.narrative;
+      if (!n) return;
+      withNarrative++;
+      (n.voices || []).forEach(function (v) { headlines++; if (v.name) voices[v.name] = true; });
+      (n.convergence || []).forEach(function (c) { convs++; if (c.token) tokens[c.token] = true; });
+      rejected += (n.rejected_candidates || []).length;
+    });
+    return { dossiers: withNarrative, headlines: headlines, voices: Object.keys(voices).length,
+             convergences: convs, tokens: Object.keys(tokens).sort(), rejected: rejected };
+  }
+
+  var api = { START_CAPITAL: START_CAPITAL, FIRST_LLM_SEQ: FIRST_LLM_SEQ, portfolio: portfolio, cadence: cadence, llmEra: llmEra, resolve: resolve, narrative: narrative };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.VerdictStats = api;
 })(typeof self !== "undefined" ? self : this);

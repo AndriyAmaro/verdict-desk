@@ -103,6 +103,15 @@ Two details that decide whether this is evidence or decoration:
 
 The live site publishes the last five exhibits plus the anchored record, regenerated on every hourly run: [`web/exhibit/`](https://andriyamaro.github.io/verdict-desk/exhibit/index.html).
 
+## The chain of custody in one image
+
+![Verdict Desk chain of custody](web/custody.svg)
+
+Six stages, none of which can be skipped: evidence is frozen, debated with citations, validated,
+ruled on deterministically, hash-chained into a dossier, and independently anchored — on Sepolia
+through the CRE workflow and in Bitcoin through OpenTimestamps. The last row of each box states
+what fails closed.
+
 ## Try the cause-and-effect lab
 
 `web/lab.html` answers, in the browser, the two questions a reviewer actually asks:

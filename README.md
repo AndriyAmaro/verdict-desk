@@ -10,7 +10,7 @@ How it works in one paragraph: Verdict Desk reads public market evidence, freeze
 
 Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
 
-**Watch it first (narrated, 3 min 15 s):** [`web/demo/verdict-desk-demo-narrated.mp4`](web/demo/verdict-desk-demo-narrated.mp4) — eight scenes, every frame from the real published dashboard and real command output: the live ledger, the browser recomputing all 95 hashes, the one-click tamper demo turning the banner red, a full bull/bear debate with the citation validator at work, the evidence pack export with its digest, the `BLOCKED_STALE` refusal on stale evidence, and the Chainlink CRE anchor with its Sepolia transaction. Published by GitHub Pages at `https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo-narrated.mp4`.
+**Watch it first (narrated, 3 min 15 s):** [`web/demo/verdict-desk-demo-narrated.mp4`](web/demo/verdict-desk-demo-narrated.mp4) — eight scenes, every frame from the real published dashboard and real command output: the live ledger, the browser recomputing all 95 hashes (95 at recording time; the ledger is longer now), the one-click tamper demo turning the banner red, a full bull/bear debate with the citation validator at work, the evidence pack export with its digest, the `BLOCKED_STALE` refusal on stale evidence, and the Chainlink CRE anchor with its Sepolia transaction. Published by GitHub Pages at `https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo-narrated.mp4`.
 
 Also available: the earlier [2-minute silent recording](web/demo/verdict-desk-demo.mp4) of raw terminal output. Recorded on 2026-10-20 against commit `ff8519a`; the on-screen numbers in that older file (46 dossiers) are from that day and are kept as history.
 
@@ -30,7 +30,7 @@ The bounty's spotlight describes an agent that monitors user-selected crypto voi
 
 | Spotlight requirement | What runs today | Measured evidence |
 |---|---|---|
-| Up to 20 user-selected voices | 5 default crypto newsroom and creator feeds, extensible to 20 via `--feed NAME=URL` (RSS/Atom) | 40 headlines per run; 87 of 95 dossiers carry a narrative layer |
+| Up to 20 user-selected voices | 5 default crypto newsroom and creator feeds, extensible to 20 via `--feed NAME=URL` (RSS/Atom) | 40 headlines per run; 90 of 98 dossiers carry a narrative layer |
 | Tokens, sentiment, conviction, urgency | LLM extraction per headline into a closed vocabulary, each with a literal quote from the headline | 14 extractions accepted and 13 rejected by the grounding gate in the latest dossier |
 | Convergence across distinct voices | A narrative needs at least two different voices on the same token **and** the same stance | **101 convergences** recorded across the live ledger |
 | Practice position under transparent rules and risk limits | The convergence becomes a citable evidence item; the deterministic judge sizes a simulated position at 1% risk with an ATR stop and target | `verdict_desk/agents_v2.py`, `portfolio.py` |

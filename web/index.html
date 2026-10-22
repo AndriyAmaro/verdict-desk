@@ -4,7 +4,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f5fbf'/%3E%3Cpath d='M9 11h14M9 16h9M9 21h11' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <meta name="description" content="A public, tamper-evident ledger of AI agent decisions: frozen evidence, a citation-enforced bull/bear debate, deterministic verdicts, and every hash recomputed in your browser.">
 <meta property="og:title" content="Verdict Desk — simulated decision ledger">
-<meta property="og:description" content="107 dossiers, hash-chained and anchored on Sepolia. Break the chain yourself in 30 seconds.">
+<meta property="og:description" content="A live, hash-chained ledger of AI agent decisions — anchored on Sepolia and in Bitcoin. Break the chain yourself in 30 seconds.">
 <meta property="og:type" content="website">
 <style>
 :root{--bg:#fff;--fg:#1a1a1a;--mut:#666;--line:#ddd;--ok:#0a7a3d;--bad:#b3261e;--card:#f6f6f6;--accent:#1f5fbf}
@@ -35,10 +35,32 @@ a.btn[hidden]{display:none}
 #tamper-note{margin:8px 0;min-height:1.5em}
 #tamper textarea{width:100%;box-sizing:border-box;font:12px/1.4 ui-monospace,monospace;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px}
 #tamper details{margin:10px 0 0}#tamper summary{cursor:pointer;font-weight:600}
+#tamper details{margin:10px 0 0}#tamper summary{cursor:pointer;font-weight:600}
+.hero{margin:6px 0 4px}
+.kicker{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:0}
+.hero h1{font-size:34px;letter-spacing:-.02em;margin:2px 0 6px}
+.tagline{font-size:16px;line-height:1.55;max-width:780px;margin:4px 0 12px;color:var(--fg)}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0 4px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600}
+.stat .v{font-size:22px;font-weight:700;margin:3px 0 0;line-height:1.1}
+.stat .s{font-size:12px;color:var(--mut);margin-top:3px}
+.hero-diagram{margin:14px 0 0}.hero-diagram img{width:100%;height:auto;border:1px solid var(--line);border-radius:12px}
 </style></head><body>
-<h1>Verdict Desk: simulated decision ledger</h1>
-<p style="margin:6px 0 10px"><a class="btn" href="judge.html" style="border-color:var(--accent)"><b>Judge path →</b> every bounty requirement mapped to the artifact that proves it</a> <a class="btn" href="lab.html"><b>Cause and effect lab →</b> drop one argument, watch the verdict change</a> <a class="btn" href="exhibit/index.html"><b>Decision exhibits →</b> one document per decision, printable</a> <a class="btn" href="scorecard.html"><b>Scorecard →</b> how the decisions actually performed</a> <a class="btn" href="verify.html"><b>Verify a record →</b> paste one you were handed</a></p>
-<p class="mut">Every row is a frozen dossier. Decisions are simulated; no real orders are placed. This page recomputes every SHA-256 hash in your browser from the ledger text. It does not trust the server that hosts the file.</p>
+<header class="hero">
+  <p class="kicker">BLI Legal Tech Hackathon 2 · Autonomous Agents</p>
+  <h1>Verdict Desk</h1>
+  <p class="tagline">An AI agent that reads market evidence and decides — then proves what it decided, on what, and why. Every decision is frozen, argued with citations, ruled by deterministic code, and hash-chained onto a public ledger that recomputes itself in your browser.</p>
+  <div class="actions">
+    <a class="btn" href="judge.html" style="border-color:var(--accent);font-weight:700">Judge path →</a>
+    <a class="btn" href="lab.html">Cause and effect lab</a>
+    <a class="btn" href="exhibit/index.html">Decision exhibits</a>
+    <a class="btn" href="scorecard.html">Scorecard</a>
+    <a class="btn" href="verify.html">Verify a record</a>
+  </div>
+  <div class="stats-grid" id="hero-stats"><div class="stat"><div class="k">Loading</div><div class="v">…</div></div></div>
+  <figure class="hero-diagram"><img src="custody.svg" alt="Verdict Desk chain of custody: evidence, debate, validator, judge, dossier, anchored"></figure>
+</header>
 <p class="mut">Ledger: <code id="source"></code> <label>or open a file <input id="file" type="file" accept=".jsonl,.json,.txt"></label></p>
 <div id="banner" class="mut">Loading...</div>
 <section id="tamper" aria-labelledby="tamper-title">
@@ -121,6 +143,22 @@ function render(result, name) {
     : `${result.rows.length} dossiers. Every hash recomputed in this browser matches and every link in the chain is consistent.`;
 }
 
+function renderHero(dossiers, broken, e, nar, p) {
+  const grid = $("hero-stats");
+  if (!grid) return;
+  const card = (k, v, sub) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="s">${sub}</div>` : ""}</div>`;
+  const accepted = e ? e.accepted : 0, rejected = e ? e.rejected : 0;
+  const winRate = (p && p.win_rate_pct !== null && p.win_rate_pct !== undefined) ? p.win_rate_pct + "%" : "—";
+  const dd = p ? p.max_drawdown_pct + "%" : "—";
+  grid.innerHTML =
+    card("Dossiers", dossiers.length, "hash-chained, one per hour") +
+    card("Integrity", broken ? "broken" : "verified", broken ? "a check failed" : "every hash recomputes here") +
+    card("LLM claims", `${accepted} / ${accepted + rejected}`, `${rejected} refused for bad citations`) +
+    card("Narratives", nar.convergences, `${nar.voices} voices · ${nar.tokens.join(", ") || "no token yet"}`) +
+    card("Win rate", winRate, `max drawdown ${dd} · simulated`) +
+    card("Anchored", "Sepolia + Bitcoin", "independent third-party clock");
+}
+
 function renderStats(dossiers, broken) {
   const box = $("stats");
   if (!dossiers.length) { box.hidden = true; return; }
@@ -129,10 +167,11 @@ function renderStats(dossiers, broken) {
   const per = Object.keys(c.per_symbol).sort().map((k) => `${k} ${c.per_symbol[k]}`).join(", ");
   const gap = c.longest_gap_minutes >= 60 ? `${Math.floor(c.longest_gap_minutes / 60)} h ${c.longest_gap_minutes % 60} min` : `${c.longest_gap_minutes} min`;
   $("cadence").textContent = `${c.total} dossiers (${per}) from ${c.first} to ${c.last}, a window of ${c.window_hours} h (${c.window_days} days). ${c.clock_hours_with_records} of ${c.clock_hours_in_window} clock hours (UTC) in that window have at least one dossier (${c.coverage_pct}%). Longest gap between consecutive dossiers of the same symbol: ${gap}${c.longest_gap_symbol ? " (" + c.longest_gap_symbol + ")" : ""}. Gaps over 90 minutes: ${c.gaps_over_90_minutes}. A scheduled run that GitHub delayed or skipped shows up here; nothing is filled in.`;
-  renderLlm(dossiers);
+  const era = renderLlm(dossiers);
   if (broken) {
     $("portfolio").textContent = "Not computed: this ledger failed verification, so nothing derived from it can be trusted.";
     $("positions").replaceChildren();
+    renderHero(dossiers, true, era.e, era.nar, null);
     return;
   }
   const p = VerdictStats.portfolio(dossiers);
@@ -150,6 +189,7 @@ function renderStats(dossiers, broken) {
     table.appendChild(tr);
   }
   holder.appendChild(table);
+  renderHero(dossiers, broken, era.e, era.nar, p);
 }
 
 // Same counts as `python3 -m verdict_desk stats`: the README quotes that command, this panel shows the live ledger.
@@ -163,9 +203,10 @@ function renderLlm(dossiers) {
   const early = e.first_seq > 1 ? VerdictStats.llmEra(dossiers, 1, e.first_seq - 1) : null;
   const nar = VerdictStats.narrative(dossiers);
   $("narrative").textContent = `From ${nar.dossiers} dossiers: ${nar.headlines} headlines across ${nar.voices} distinct voices, ${nar.convergences} convergences on ${nar.tokens.length} token${nar.tokens.length === 1 ? "" : "s"} (${nar.tokens.join(", ") || "none yet"}), and ${nar.rejected} mentions recorded as rejected with the reason why no narrative formed.`;
-  if (!early || !early.dossiers) { $("llmearly").textContent = ""; return; }
+  if (!early || !early.dossiers) { $("llmearly").textContent = ""; return { e, nar }; }
   const earlyFailed = early.sides.bull.errors + early.sides.bear.errors;
   $("llmearly").textContent = `Dossiers 1 to ${e.first_seq - 1} stay exactly as recorded: ${early.dossiers_without_llm.length} had no LLM layer, ${earlyFailed} analyst calls failed, and the analysts that did answer had ${early.accepted} claims accepted and ${early.rejected} rejected.`;
+  return { e, nar };
 }
 
 function list(parent, title, items) {

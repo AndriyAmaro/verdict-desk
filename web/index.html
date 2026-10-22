@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Verdict Desk</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f5fbf'/%3E%3Cpath d='M9 11h14M9 16h9M9 21h11' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta name="description" content="A public, tamper-evident ledger of AI agent decisions: frozen evidence, a citation-enforced bull/bear debate, deterministic verdicts, and every hash recomputed in your browser.">
+<meta property="og:title" content="Verdict Desk — simulated decision ledger">
+<meta property="og:description" content="107 dossiers, hash-chained and anchored on Sepolia. Break the chain yourself in 30 seconds.">
+<meta property="og:type" content="website">
 <style>
 :root{--bg:#fff;--fg:#1a1a1a;--mut:#666;--line:#ddd;--ok:#0a7a3d;--bad:#b3261e;--card:#f6f6f6;--accent:#1f5fbf}
 @media(prefers-color-scheme:dark){:root{--bg:#111;--fg:#eee;--mut:#999;--line:#333;--ok:#4cc38a;--bad:#ff6b5e;--card:#1b1b1b;--accent:#6ea8fe}}
@@ -32,7 +37,7 @@ a.btn[hidden]{display:none}
 #tamper details{margin:10px 0 0}#tamper summary{cursor:pointer;font-weight:600}
 </style></head><body>
 <h1>Verdict Desk: simulated decision ledger</h1>
-<p style="margin:6px 0 10px"><a class="btn" href="judge.html" style="border-color:var(--accent)"><b>Judge path →</b> every bounty requirement mapped to the artifact that proves it</a></p>
+<p style="margin:6px 0 10px"><a class="btn" href="judge.html" style="border-color:var(--accent)"><b>Judge path →</b> every bounty requirement mapped to the artifact that proves it</a> <a class="btn" href="lab.html"><b>Cause and effect lab →</b> drop one argument, watch the verdict change</a></p>
 <p class="mut">Every row is a frozen dossier. Decisions are simulated; no real orders are placed. This page recomputes every SHA-256 hash in your browser from the ledger text. It does not trust the server that hosts the file.</p>
 <p class="mut">Ledger: <code id="source"></code> <label>or open a file <input id="file" type="file" accept=".jsonl,.json,.txt"></label></p>
 <div id="banner" class="mut">Loading...</div>

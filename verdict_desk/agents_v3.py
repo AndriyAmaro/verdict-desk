@@ -14,7 +14,10 @@ reproduzindo com o modulo v2, sem alteracao.
 from . import agents_v2 as _v2
 
 V3 = _v2.V3
+DEFAULT = V3
 Rules = _v2.Rules
+SYSTEM_MAX_RISK_PCT = _v2.SYSTEM_MAX_RISK_PCT
+with_risk_pct = _v2.with_risk_pct
 bull = _v2.bull
 bear = _v2.bear
 judge = _v2.judge

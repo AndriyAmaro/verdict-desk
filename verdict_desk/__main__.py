@@ -75,6 +75,23 @@ def cmd_decide(opts) -> int:
     return 0 if recorded else 1
 
 
+def _rules_from_opts(opts, rules_version: str):
+    """Regras efetivas: o padrao do modulo, ou o limite de risco pedido pelo usuario."""
+    pct = getattr(opts, "risk_pct", None)
+    if pct is None:
+        return None
+    if rules_version == "v1":
+        print("refused: --risk-pct requires rules v2 or v3", file=sys.stderr)
+        raise SystemExit(2)
+    from . import agents_v2, agents_v3
+    mod = agents_v3 if rules_version == "v3" else agents_v2
+    try:
+        return mod.with_risk_pct(mod.DEFAULT, pct)
+    except ValueError as err:
+        print(f"refused: {err}", file=sys.stderr)
+        raise SystemExit(2)
+
+
 def _decide_flow(opts, rules_version: str) -> int:
     """Run the decide flow with the agents/features of the requested rules version."""
     if not may_append(opts.ledger):
@@ -89,6 +106,7 @@ def _decide_flow(opts, rules_version: str) -> int:
         ask = (lambda system, user: llm.chat(system, user, timeout=narrative.LLM_TIMEOUT, max_tokens=narrative.LLM_MAX_TOKENS)) if llm.available() else None
         block = narrative.build(voices, ask, llm.MODEL if ask else "")
         print(f"narrative ({block['method']}): {len(voices)} headlines from {len({v['name'] for v in voices})} voices, {len(block['convergence'])} convergences")
+    rules = _rules_from_opts(opts, rules_version)
     recorded = 0
     for symbol in opts.symbols:
         try:
@@ -99,7 +117,7 @@ def _decide_flow(opts, rules_version: str) -> int:
         if block is not None:
             packet["narrative"] = block
         recorded += 1
-        print_record(dossier.append(packet, opts.ledger, rules_version=rules_version))
+        print_record(dossier.append(packet, opts.ledger, rules_version=rules_version, rules=rules))
     if recorded and opts.ledger == DEFAULT_LEDGER:
         publish_head(opts.ledger)
     return 0 if recorded else 1
@@ -402,6 +420,7 @@ def main() -> int:
     p.add_argument("--no-news", action="store_true")
     p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
     p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
+    p.add_argument("--risk-pct", type=float, metavar="PCT", help="risk per practice position as %% of simulated capital (max 25, default 1)")
     p.set_defaults(func=cmd_decide_v2)
     p = sub.add_parser("decide-v3", help="decide with rules v3: same sizing as v2, but a declined entry says why (WATCH_REVERSAL / REDUCE_EXPOSURE)")
     p.add_argument("symbols", nargs="+", metavar="SYMBOL")
@@ -409,6 +428,7 @@ def main() -> int:
     p.add_argument("--no-news", action="store_true")
     p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
     p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
+    p.add_argument("--risk-pct", type=float, metavar="PCT", help="risk per practice position as %% of simulated capital (max 25, default 1)")
     p.set_defaults(func=cmd_decide_v3)
     p = sub.add_parser("replay", help="re-run decisions from the frozen evidence")
     p.add_argument("seq", nargs="?", type=int)

@@ -9,6 +9,10 @@ from typing import NamedTuple
 RULES_VERSION = "v2"
 ENTRY_THRESHOLD = 1.5  # Reduced from 2.0 to allow more decisions while still requiring real signal
 MAX_RISK_PCT = 1.0
+# Teto do sistema: um usuario pode REDUZIR o risco, nunca elevar acima disto.
+# O limite declarado fica congelado no dossie ao lado do teto, entao quem audita ve
+# exatamente qual regra valeu naquela decisao.
+SYSTEM_MAX_RISK_PCT = 25.0
 STOP_ATR = 1.5
 TAKE_ATR = 3.0
 
@@ -28,6 +32,26 @@ class Rules(NamedTuple):
 
 V2 = Rules()
 V3 = Rules(version="v3", rich_states=True)
+DEFAULT = V2
+
+
+def with_risk_pct(rules: Rules, pct) -> Rules:
+    """Aplica um risco pedido pelo usuario, recusando o que passa do teto do sistema.
+
+    Recusar em voz alta (em vez de cortar em silencio) importa: um usuario que pede 30%
+    precisa saber que a regra gravada foi 25%, nao descobrir depois auditando.
+    """
+    if pct is None:
+        return rules
+    try:
+        value = float(pct)
+    except (TypeError, ValueError):
+        raise ValueError(f"risk pct must be a number, got {pct!r}") from None
+    if not (value > 0):
+        raise ValueError(f"risk pct must be greater than 0, got {value}")
+    if value > SYSTEM_MAX_RISK_PCT:
+        raise ValueError(f"risk pct {value} exceeds the system cap of {SYSTEM_MAX_RISK_PCT}%")
+    return rules._replace(max_risk_pct=value)
 
 
 def _arg(claim: str, ref: str, value, weight: float) -> dict:
@@ -239,6 +263,7 @@ def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float 
             "take_profit": round(entry + direction * f["atr_14"] * rules.take_atr, 6),
             "size": round(risk_cash / stop_distance, 8),
             "risk_pct": rules.max_risk_pct,
+            "system_max_risk_pct": SYSTEM_MAX_RISK_PCT,
             "simulated": True,
         }
     )

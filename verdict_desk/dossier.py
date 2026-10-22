@@ -61,10 +61,28 @@ def analyst_layer(packet: dict, ask=None, feats: dict | None = None, rules_versi
     return layer
 
 
-def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True, rules_version: str = "v1") -> dict:
+def _rules_for(m: dict, dossier_or_rules=None, rules_version: str = "v1"):
+    """Regras efetivas de um dossie: as pedidas pelo usuario, ou o padrao do modulo.
+
+    Um dossie gravado com `--risk-pct 2` so reproduz se o replay reaplicar esse mesmo
+    limite, e o limite esta congelado no proprio veredito justamente para isso.
+    """
+    agent = m["agents"]
+    if not hasattr(agent, "with_risk_pct"):
+        return None
+    base = getattr(agent, "DEFAULT", None)
+    if base is None:
+        return None
+    pct = None
+    if isinstance(dossier_or_rules, dict):
+        pct = dossier_or_rules.get("verdict", {}).get("risk_pct")
+    return agent.with_risk_pct(base, pct)
+
+
+def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True, rules_version: str = "v1", rules=None) -> dict:
     m = _mods(rules_version)
     feats = m["features"].compute(packet)
-    debate = m["agents"].decide(feats)
+    debate = m["agents"].decide(feats, rules) if rules is not None else m["agents"].decide(feats)
     layer = analyst_layer(packet, ask, feats, rules_version) if use_llm else None
     body = {
         "seq": seq,
@@ -81,10 +99,10 @@ def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True
     return {**body, "hash": digest(body)}
 
 
-def append(packet: dict, path: Path, ask=None, rules_version: str = "v1") -> dict:
+def append(packet: dict, path: Path, ask=None, rules_version: str = "v1", rules=None) -> dict:
     ledger = read_ledger(path)
     prev = ledger[-1]["hash"] if ledger else GENESIS
-    dossier = build(packet, prev, len(ledger) + 1, ask, rules_version=rules_version)
+    dossier = build(packet, prev, len(ledger) + 1, ask, rules_version=rules_version, rules=rules)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(dossier, ensure_ascii=False) + "\n")
@@ -98,7 +116,8 @@ def replay(dossier: dict, rules_version: str = "v1") -> dict:
         rules_version = dossier.get("verdict", {}).get("rules_version", "v1")
     m = _mods(rules_version)
     feats = m["features"].compute(dossier["evidence"])
-    debate = m["agents"].decide(feats)
+    rules = _rules_for(m, dossier, rules_version)
+    debate = m["agents"].decide(feats, rules) if rules is not None else m["agents"].decide(feats)
     same = feats == dossier["features"] and debate["verdict"]["action"] == dossier["verdict"]["action"] and debate["verdict"]["edge"] == dossier["verdict"]["edge"]
     result = {"seq": dossier["seq"], "matches": same, "recorded": dossier["verdict"], "replayed": debate["verdict"]}
     layer = dossier.get("llm")

@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Verdict Desk — judge path</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f5fbf'/%3E%3Cpath d='M9 11h14M9 16h9M9 21h11' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
 :root{--bg:#fff;--fg:#1a1a1a;--mut:#666;--line:#ddd;--ok:#0a7a3d;--bad:#b3261e;--card:#f6f6f6;--accent:#1f5fbf}
 @media(prefers-color-scheme:dark){:root{--bg:#111;--fg:#eee;--mut:#999;--line:#333;--ok:#4cc38a;--bad:#ff6b5e;--card:#1b1b1b;--accent:#6ea8fe}}
@@ -21,6 +22,7 @@ a{color:var(--accent)}
 table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left}
 .honest{border-left:4px solid #b3261e}
 </style></head><body>
+<p class="mut" style="margin:8px 0 14px"><a href="index.html">Dashboard</a> · <a href="judge.html"><b>Judge path</b></a> · <a href="lab.html">Cause and effect lab</a></p>
 
 <h1>Verdict Desk — what a judge can check in five minutes</h1>
 <p class="lead">Every claim below links to the artifact that proves it. Nothing here asks you to trust this page: the numbers are recomputed from <code>ledger/ledger.jsonl</code> in your browser, and the hashes are checked the same way.</p>
@@ -43,6 +45,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
     <li>Each decision freezes one evidence packet: candles, funding, news, and public voices, with the source and time of every item — <code>verdict_desk/evidence.py</code></li>
     <li>Two LLM analysts (bull and bear) plus a deterministic indicator engine (RSI, MACD, Bollinger) read that same packet — <code>verdict_desk/agents_v2.py</code></li>
     <li>A narrative agent extracts token, stance, conviction and urgency from up to 20 user-selected voices and requires two distinct voices to agree before it reports a convergence — <code>verdict_desk/narrative.py</code>; it also freezes the tokens it <b>rejected</b> and why (one voice only, voices disagreeing, or nobody taking a side)</li>
+    <li>Behaviour you can test instead of trust: <a href="lab.html">the cause-and-effect lab</a> shows which single argument decides a recorded verdict, and replays the policy on inputs you choose — checked against the Python judge on 486 input combinations</li>
   </ul>
 </section>
 

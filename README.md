@@ -48,6 +48,28 @@ python3 -m verdict_desk decide-v3 BTCUSDT --feed "kol=https://<your-rss-bridge>/
 
 What this repository does not claim is a native X API integration that does not exist.
 
+## Try the cause-and-effect lab
+
+`web/lab.html` answers, in the browser, the two questions a reviewer actually asks:
+
+1. **Which single argument decided this verdict?** Pick any dossier from the published ledger and the page shows, per argument, the edge and the action that would remain if that argument were removed — with the verdict-deciding ones highlighted. This is the dossier's own recorded `sensitivity` block, not a re-run.
+2. **What rule would fire for inputs I choose?** Move the sliders and the state is named with the exact rule that produced it: entry band, high-volatility rule, the freshness gate, and fail-closed behaviour on stale price.
+
+The playground is a mirror of the judge in `web/policy.js`. A mirror that is never compared is a second implementation waiting to lie, so `tests/test_policy_parity.py` runs it over 486 input combinations and fails when any state differs from what `verdict_desk/agents_v2.py` returns for the same numbers.
+
+## Risk limits are the user's, inside a ceiling the system owns
+
+`--risk-pct` sets the risk per practice position (default 1%). The system refuses anything above **25%** instead of silently clamping it, and every dossier freezes both numbers — so an auditor sees the limit that was declared next to the cap that governed it, and a replay reapplies the same limit rather than the default.
+
+```bash
+python3 -m verdict_desk decide-v3 BTCUSDT --risk-pct 2
+python3 -m verdict_desk decide-v3 BTCUSDT --risk-pct 30   # refused: exceeds the system cap of 25%
+```
+
+## Freshness is judged per source class, not as one number
+
+A single window is wrong in both directions: it either accepts a stale price (dangerous) or discards a good headline (silly). Price is checked against a **75-minute** window and **blocks** the decision; news and market voices are checked against a **26-hour** window and only **warn**, because yesterday's headline is still auditable while yesterday's price is not. The result is frozen into every dossier under `evidence.freshness.classes`.
+
 ## Five-minute judge path
 
 1. Open the dashboard (the GitHub Pages site of this repository). It loads `ledger/ledger.jsonl` and shows the banner "Every hash recomputed in this browser matches". It does not trust the server: the hashing runs locally in `web/canonical.js`.

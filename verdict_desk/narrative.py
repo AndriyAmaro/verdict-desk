@@ -73,10 +73,37 @@ def parse_feed(xml_text: str, name: str, limit: int = PER_FEED) -> list[dict]:
     return out
 
 
+def parse_telegram(html: str, channel: str, limit: int = PER_FEED) -> list[dict]:
+    """Le o preview publico de um canal Telegram (https://t.me/s/<canal>) — sem chave.
+
+    O HTML publico expoe cada mensagem como um bloco `.tgme_widget_message_text` com um
+    `<time datetime=...>`. Extrai texto e data; o link aponta para o proprio preview do canal.
+    A voz e o canal, entao dois canais contam como duas vozes distintas na convergencia. Se o
+    Telegram mudar o HTML, devolve vazio e a coleta registra a lacuna — nunca inventa.
+    """
+    texts = re.findall(r'tgme_widget_message_text[^>]*>(.*?)</div>', html, re.S)
+    dates = re.findall(r'datetime="([^"]+)"', html)
+    out = []
+    for i, raw in enumerate(texts[:limit]):
+        text = re.sub(r"<[^>]+>", " ", raw)
+        text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+            continue
+        item = {"name": channel, "title": text[:280], "link": f"https://t.me/s/{channel}"}
+        if i < len(dates):
+            item["published"] = dates[i]
+        out.append(item)
+    return out
+
+
 def fetch_feed(url: str, name: str, timeout: int = 20) -> list[dict]:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=timeout) as response:
-        return parse_feed(response.read().decode("utf-8", "replace"), name)
+        body = response.read().decode("utf-8", "replace")
+    if "t.me/s/" in url:
+        channel = url.rstrip("/").rsplit("/", 1)[-1]
+        return parse_telegram(body, channel or name)
+    return parse_feed(body, name)
 
 
 def collect(feeds: dict[str, str], log=None) -> list[dict]:

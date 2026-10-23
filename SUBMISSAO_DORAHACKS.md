@@ -22,7 +22,7 @@ Verdict Desk turns an AI agent's decision into evidence a lawyer can file: froze
 | **Decision exhibits (one document per decision)** | https://andriyamaro.github.io/verdict-desk/exhibit/index.html |
 | **Anchored record #80** | https://andriyamaro.github.io/verdict-desk/exhibit/exhibit-80.html |
 | **Judge path (requirement → artifact)** | https://andriyamaro.github.io/verdict-desk/judge.html |
-| **Demo Video (2 min, no voice)** | https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo.mp4 |
+| **Demo Video (77 s, narrated)** | https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo-v4.mp4 |
 | **CRE Documentation** | https://github.com/AndriyAmaro/verdict-desk/tree/main/cre |
 
 ---

@@ -24,12 +24,5 @@ judge = _v2.judge
 sensitivity = _v2.sensitivity
 
 
-def decide(f: dict, rules: Rules = V3) -> dict:
-    bull_args = bull(f)
-    bear_args = bear(f)
-    return {
-        "bull": bull_args,
-        "bear": bear_args,
-        "verdict": judge(f, bull_args, bear_args, rules=rules),
-        "sensitivity": sensitivity(bull_args, bear_args, rules),
-    }
+def decide(f: dict, rules: Rules = V3, narrative: dict | None = None, symbol: str | None = None) -> dict:
+    return _v2.decide(f, rules, narrative, symbol)

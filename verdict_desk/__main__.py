@@ -83,8 +83,8 @@ def _rules_from_opts(opts, rules_version: str):
     if rules_version == "v1":
         print("refused: --risk-pct requires rules v2 or v3", file=sys.stderr)
         raise SystemExit(2)
-    from . import agents_v2, agents_v3
-    mod = agents_v3 if rules_version == "v3" else agents_v2
+    from . import agents_v2, agents_v3, agents_v4
+    mod = agents_v4 if rules_version == "v4" else (agents_v3 if rules_version == "v3" else agents_v2)
     try:
         return mod.with_risk_pct(mod.DEFAULT, pct)
     except ValueError as err:
@@ -125,6 +125,10 @@ def _decide_flow(opts, rules_version: str) -> int:
 
 def cmd_decide_v2(opts) -> int:
     return _decide_flow(opts, "v2")
+
+
+def cmd_decide_v4(opts) -> int:
+    return _decide_flow(opts, "v4")
 
 
 def cmd_decide_v3(opts) -> int:
@@ -521,6 +525,14 @@ def main() -> int:
     p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
     p.add_argument("--risk-pct", type=float, metavar="PCT", help="risk per practice position as %% of simulated capital (max 25, default 1)")
     p.set_defaults(func=cmd_decide_v3)
+    p = sub.add_parser("decide-v4", help="decide with rules v4: v3 + a multi-KOL convergence becomes a deterministic signal")
+    p.add_argument("symbols", nargs="+", metavar="SYMBOL")
+    p.add_argument("--interval", default="1h")
+    p.add_argument("--no-news", action="store_true")
+    p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
+    p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
+    p.add_argument("--risk-pct", type=float, metavar="PCT", help="risk per practice position as %% of simulated capital (max 25, default 1)")
+    p.set_defaults(func=cmd_decide_v4)
     p = sub.add_parser("replay", help="re-run decisions from the frozen evidence")
     p.add_argument("seq", nargs="?", type=int)
     p.set_defaults(func=cmd_replay)

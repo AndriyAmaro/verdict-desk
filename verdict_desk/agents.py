@@ -132,7 +132,7 @@ def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float 
     return verdict
 
 
-def decide(f: dict, rules: Rules = V1) -> dict:
+def decide(f: dict, rules: Rules = V1, narrative: dict | None = None, symbol: str | None = None) -> dict:
     bull_args = bull(f)
     bear_args = bear(f)
     return {

@@ -105,6 +105,14 @@ Two details that decide whether this is evidence or decoration:
 
 The live site publishes the last five exhibits plus the anchored record, regenerated on every hourly run: [`web/exhibit/`](https://andriyamaro.github.io/verdict-desk/exhibit/index.html). The anchored record also ships as a signed PDF certificate with a VERIFIED seal: [`exhibit-80.pdf`](https://andriyamaro.github.io/verdict-desk/exhibit/exhibit-80.pdf).
 
+## Rules v4: the multi-KOL convergence creates the position
+
+The spotlight asks the agent to "create a practice position using transparent signal rules". Since
+rules v4, a narrative convergence matching the symbol becomes a **deterministic** argument whose
+weight is a stated formula — 0.5 per distinct voice (max 4) plus 0.5 when top conviction is high —
+so the multi-KOL layer drives the position by a rule the replay reproduces, not by the LLM's
+opinion. Earlier versions (v1/v2/v3) are unchanged and keep replaying under their own version.
+
 ## The chain of custody in one image
 
 ![Verdict Desk chain of custody](web/custody.svg)

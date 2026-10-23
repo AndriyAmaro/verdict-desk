@@ -28,11 +28,49 @@ class Rules(NamedTuple):
     # dossies gravados em v2 continuem reproduzindo exatamente como foram.
     rich_states: bool = False
     volatility_pct: float = 1.5
+    # v4: quando True, uma convergencia da narrativa multi-KOL vira argumento
+    # deterministico (regra transparente de peso), fechando o destaque do premio:
+    # "criar uma posicao pratica usando regras de sinalizacao transparentes".
+    narrative_signal: bool = False
 
 
 V2 = Rules()
 V3 = Rules(version="v3", rich_states=True)
+V4 = Rules(version="v4", rich_states=True, narrative_signal=True)
 DEFAULT = V2
+
+
+def convergence_args(narrative, symbol) -> tuple[list[dict], list[dict]]:
+    """Convergencia multi-KOL -> argumento deterministico, com peso transparente.
+
+    Regra (documentada, replay reproduz): cada convergencia que casa com o simbolo vira um
+    argumento do lado correspondente (bullish -> bull, bearish -> bear). Peso = 0.5 por voz
+    distinta (maximo 4) + 0.5 se a conviccao de topo for 'high'. Duas vozes sem conviccao alta
+    valem 1.0; quatro vozes com conviccao alta valem 2.5. Nada de LLM decide aqui.
+    """
+    if not narrative or not symbol:
+        return [], []
+    base = symbol.upper()
+    for suffix in ("USDT", "USDC", "BUSD", "USDE", "USD", "DAI"):
+        if base.endswith(suffix):
+            base = base[: -len(suffix)]
+            break
+    bull_args, bear_args = [], []
+    for c in narrative.get("convergence") or []:
+        if (c.get("token") or "").upper() != base:
+            continue
+        voices = list(c.get("voices") or [])
+        n = len(voices)
+        weight = min(n, 4) * 0.5
+        if c.get("max_conviction") == "high":
+            weight += 0.5
+        weight = round(weight, 2)
+        claim = (f"{n} market voices converge {c.get('bias')} on {c.get('token')} "
+                 f"(top conviction {c.get('max_conviction')}, urgency {c.get('max_urgency')})")
+        arg = {"claim": claim, "evidence_ref": f"narrative.convergence.{c.get('token')}",
+               "value": voices, "weight": weight}
+        (bull_args if c.get("bias") == "bullish" else bear_args).append(arg)
+    return bull_args, bear_args
 
 
 def with_risk_pct(rules: Rules, pct) -> Rules:
@@ -294,9 +332,13 @@ def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float 
     return verdict
 
 
-def decide(f: dict, rules: Rules = V2) -> dict:
+def decide(f: dict, rules: Rules = V2, narrative: dict | None = None, symbol: str | None = None) -> dict:
     bull_args = bull(f)
     bear_args = bear(f)
+    if rules.narrative_signal:
+        cb, cs = convergence_args(narrative, symbol)
+        bull_args.extend(cb)
+        bear_args.extend(cs)
     return {
         "bull": bull_args,
         "bear": bear_args,

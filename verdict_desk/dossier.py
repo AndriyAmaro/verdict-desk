@@ -25,6 +25,8 @@ def _mods(rules_version: str = "v1") -> dict:
             from . import agents_v2 as agents, citations, features_v2 as features, llm
         elif rules_version == "v3":
             from . import agents_v3 as agents, citations, features_v2 as features, llm
+        elif rules_version == "v4":
+            from . import agents_v4 as agents, citations, features_v2 as features, llm
         else:
             raise ValueError(f"unknown rules_version: {rules_version!r}")
         _MODULES[rules_version] = {"agents": agents, "features": features, "citations": citations, "llm": llm}
@@ -82,7 +84,10 @@ def _rules_for(m: dict, dossier_or_rules=None, rules_version: str = "v1"):
 def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True, rules_version: str = "v1", rules=None) -> dict:
     m = _mods(rules_version)
     feats = m["features"].compute(packet)
-    debate = m["agents"].decide(feats, rules) if rules is not None else m["agents"].decide(feats)
+    narrative = packet.get("narrative")
+    symbol = packet.get("symbol")
+    debate = (m["agents"].decide(feats, rules, narrative, symbol) if rules is not None
+              else m["agents"].decide(feats, narrative=narrative, symbol=symbol))
     layer = analyst_layer(packet, ask, feats, rules_version) if use_llm else None
     body = {
         "seq": seq,
@@ -117,7 +122,10 @@ def replay(dossier: dict, rules_version: str = "v1") -> dict:
     m = _mods(rules_version)
     feats = m["features"].compute(dossier["evidence"])
     rules = _rules_for(m, dossier, rules_version)
-    debate = m["agents"].decide(feats, rules) if rules is not None else m["agents"].decide(feats)
+    narrative = dossier["evidence"].get("narrative")
+    symbol = dossier["evidence"].get("symbol")
+    debate = (m["agents"].decide(feats, rules, narrative, symbol) if rules is not None
+              else m["agents"].decide(feats, narrative=narrative, symbol=symbol))
     same = feats == dossier["features"] and debate["verdict"]["action"] == dossier["verdict"]["action"] and debate["verdict"]["edge"] == dossier["verdict"]["edge"]
     result = {"seq": dossier["seq"], "matches": same, "recorded": dossier["verdict"], "replayed": debate["verdict"]}
     layer = dossier.get("llm")

@@ -103,7 +103,7 @@ Two details that decide whether this is evidence or decoration:
 | 6. Integrity | The hash **recomputed when the exhibit was rendered** against the recorded one, the previous link, the chain position, and the on-chain anchor status |
 | 7. What this exhibit does not prove | Simulated only, no orders, fees excluded, LLM opinions validated for citation and not for merit, secondary sources inherit their errors |
 
-The live site publishes the last five exhibits plus the anchored record, regenerated on every hourly run: [`web/exhibit/`](https://andriyamaro.github.io/verdict-desk/exhibit/index.html).
+The live site publishes the last five exhibits plus the anchored record, regenerated on every hourly run: [`web/exhibit/`](https://andriyamaro.github.io/verdict-desk/exhibit/index.html). The anchored record also ships as a signed PDF certificate with a VERIFIED seal: [`exhibit-80.pdf`](https://andriyamaro.github.io/verdict-desk/exhibit/exhibit-80.pdf).
 
 ## The chain of custody in one image
 

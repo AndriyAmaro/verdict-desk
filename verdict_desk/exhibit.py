@@ -179,6 +179,25 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None)
         rows.append("<table class=\"kv\"><tbody>"
                     + "".join(f"<tr><th>{_e(k)}</th><td>{_e(v)}</td></tr>" for k, v in facts)
                     + "</tbody></table>")
+    policy = verdict.get("policy")
+    if policy:
+        labels = {
+            "entry_threshold": "Entry threshold (edge)",
+            "stop_atr": "Stop distance (ATR x)",
+            "take_atr": "Target distance (ATR x)",
+            "max_risk_pct": "Risk per position",
+            "system_max_risk_pct": "System risk cap",
+            "rich_states": "Named declined states",
+            "volatility_pct": "High-volatility threshold (ATR %)",
+            "market_window_minutes": "Price freshness window",
+            "slow_window_minutes": "News/voice freshness window",
+        }
+        rows.append("<p class=\"small\"><b>Rules frozen in this record</b> — the exact numbers that produced this verdict, "
+                    "inside the hashed body, so changing a rule later would change the hash and the anchor would no longer match.</p>")
+        rows.append("<table class=\"kv\"><tbody>"
+                    + "".join(f"<tr><th>{_e(labels.get(k, k))}</th><td>{_e(v)}{' min' if 'window' in k else ''}</td></tr>"
+                              for k, v in policy.items())
+                    + "</tbody></table>")
 
     # --- 5. narrative, if any ----------------------------------------------------
     if narrative.get("convergence") or narrative.get("rejected_candidates"):

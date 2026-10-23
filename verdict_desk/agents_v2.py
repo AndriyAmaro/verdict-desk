@@ -206,6 +206,28 @@ def sensitivity(bull_args: list[dict], bear_args: list[dict], rules: Rules = V2)
     }
 
 
+def policy(rules: Rules) -> dict:
+    """As regras exatas que produziram este veredito, congeladas no proprio dossie.
+
+    O concorrente forte publica um policy_hash on-chain; nos congelamos o TUPLE legivel das
+    regras dentro do veredito. Como o veredito entra no hash do dossie, qualquer mudanca de
+    regra muda o hash — e a ancora (Sepolia + Bitcoin) denuncia a troca. E por ser legivel,
+    quem audita nao precisa confiar em um hash opaco: le os numeros.
+    """
+    from . import evidence
+    return {
+        "entry_threshold": rules.entry_threshold,
+        "stop_atr": rules.stop_atr,
+        "take_atr": rules.take_atr,
+        "max_risk_pct": rules.max_risk_pct,
+        "system_max_risk_pct": SYSTEM_MAX_RISK_PCT,
+        "rich_states": rules.rich_states,
+        "volatility_pct": rules.volatility_pct,
+        "market_window_minutes": evidence.MARKET_WINDOW_MINUTES,
+        "slow_window_minutes": evidence.SLOW_WINDOW_MINUTES,
+    }
+
+
 def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float = 10_000.0, rules: Rules = V2) -> dict:
     bull_score = sum(a["weight"] for a in bull_args)
     bear_score = sum(a["weight"] for a in bear_args)
@@ -219,6 +241,7 @@ def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float 
     if fresh is not None and not fresh.get("ok", True):
         return {
             "rules_version": rules.version,
+            "policy": policy(rules),
             "bull_score": bull_score,
             "bear_score": bear_score,
             "edge": edge,
@@ -243,6 +266,7 @@ def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float 
         )
     verdict = {
         "rules_version": rules.version,
+        "policy": policy(rules),
         "bull_score": bull_score,
         "bear_score": bear_score,
         "edge": edge,

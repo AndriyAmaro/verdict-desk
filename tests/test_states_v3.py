@@ -58,6 +58,21 @@ class StatesTest(unittest.TestCase):
     def test_v3_marks_its_version(self):
         self.assertEqual(self.judge([3.0], [0.0], agents_v2.V3)["rules_version"], "v3")
 
+    def test_every_verdict_freezes_the_exact_rules(self):
+        v = self.judge([3.0], [0.0], agents_v2.V3)
+        pol = v["policy"]
+        self.assertEqual(pol["entry_threshold"], 1.5)
+        self.assertEqual(pol["stop_atr"], 1.5)
+        self.assertEqual(pol["take_atr"], 3.0)
+        self.assertEqual(pol["system_max_risk_pct"], 25.0)
+        self.assertEqual(pol["market_window_minutes"], 75)
+
+    def test_the_frozen_rules_reflect_a_user_risk_limit(self):
+        wide = agents_v2.with_risk_pct(agents_v2.V3, 5)
+        v = self.judge([3.0], [0.0], wide)
+        self.assertEqual(v["policy"]["max_risk_pct"], 5.0)
+        self.assertEqual(v["risk_pct"], 5.0)
+
     def test_agent_module_defaults_to_v3(self):
         f = {
             "last_close": 100.0, "atr_14": 1.0, "ema_fast": 101.0, "ema_slow": 99.0,

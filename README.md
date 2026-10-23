@@ -1,6 +1,6 @@
 # Verdict Desk
 
-**[PocketChange](https://github.com/Somay-kousis/Pocket-Change) limits what an agent can spend. Verdict Desk proves what an agent decided, in a way that survives the operator.**
+**An autonomous agent makes a market decision. Verdict Desk turns it into evidence a lawyer can file.**
 
 Audit-grade, replayable decisions for AI market agents. Simulated only: no order is ever placed.
 

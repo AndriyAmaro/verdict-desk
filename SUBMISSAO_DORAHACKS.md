@@ -8,7 +8,7 @@
 
 ## Short Description (256 chars)
 
-PocketChange limits what an agent can spend. Verdict Desk proves what an agent decided, in a way that survives the operator. Simulated only, no real order: every decision is a hash-chained dossier anyone can verify and replay.
+Verdict Desk turns an AI agent's decision into evidence a lawyer can file: frozen inputs, a cited bull/bear debate, a deterministic verdict, and a hash-chained record anchored on-chain. Simulated only, never a real order.
 
 ---
 
@@ -42,9 +42,20 @@ PocketChange limits what an agent can spend. Verdict Desk proves what an agent d
 
 ---
 
+## About / vision (paste into the DoraHacks "About" field)
+
+Every autonomous agent now makes consequential decisions and leaves no trail a court can rely on. Verdict Desk fixes that.
+
+Each decision is frozen as evidence — the market data the agent saw, with source and time — then argued: a bull agent and a bear agent debate the same facts, and every claim must cite the exact evidence item it rests on (a validator refuses any claim whose cited item does not contain its number). A deterministic judge then records the practice trade: action, size, stop and target inside a declared risk limit.
+
+The result is a dossier, hash-chained to the previous one and anchored independently — on Ethereum Sepolia through a Chainlink CRE workflow, and in Bitcoin through OpenTimestamps. Anyone can recompute every hash in their own browser, drop a single argument to watch the verdict flip, or render any decision as a printable exhibit: evidence custody, the claims beside what they cite, the deciding argument, and an explicit statement of what the record does not prove.
+
+A decision becomes a piece of evidence, not a log line. Simulated only — no real order is ever placed.
+
+---
 ## What Verdict Desk Does
 
-**[PocketChange](https://github.com/Somay-kousis/Pocket-Change) limits what an agent can spend. Verdict Desk proves what an agent decided, in a way that survives the operator.** Everything is simulated: no order is ever placed.
+**An autonomous agent makes a market decision. Verdict Desk turns it into evidence a lawyer can file.** Everything is simulated: no order is ever placed.
 
 Verdict Desk reads public market evidence, freezes it into an immutable packet, and runs a structured debate: a **bull agent** and a **bear agent** argue over the same frozen facts. Each argument must cite specific evidence items by ID, and a citation validator rejects any claim that does not match the cited data. A **deterministic judge** then sizes a *simulated* position (entry, stop-loss, take-profit) inside declared risk limits.
 

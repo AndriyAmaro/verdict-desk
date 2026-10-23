@@ -10,6 +10,8 @@ How it works in one paragraph: Verdict Desk reads public market evidence, freeze
 
 Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
 
+**Market voices (the multi-KOL spotlight):** [`web/narrative.html`](web/narrative.html) — the featured direction: who converged, on what, and every token that never did, with the reason. Published at `https://andriyamaro.github.io/verdict-desk/narrative.html`.
+
 **Judge path (start here):** [`web/judge.html`](web/judge.html) — every requirement of both bounties, each one mapped to the file, command or transaction that proves it, with the live numbers recomputed from the ledger in the visitor's browser. Published at `https://andriyamaro.github.io/verdict-desk/judge.html`.
 
 **Watch it first (narrated, 77 s):** [`web/demo/verdict-desk-demo-v4.mp4`](web/demo/verdict-desk-demo-v4.mp4) — eight scenes, every frame a real rendered page driven by Playwright: the live hero, the one-click tamper demo turning the banner red, the cause-and-effect lab with its deciding argument, the anchored exhibit, the verify page, and the scorecard with its losing rows. Published at `https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo-v4.mp4`.

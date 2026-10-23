@@ -74,6 +74,8 @@ check verify.html "Verify a record you were handed" "verify page renders"
 check verify.html "sample=1" "verify page can prefill from the ledger"
 check scorecard.html "What this table does not tell you" "scorecard prints its caveats"
 check exhibit/index.html "Decision exhibits" "exhibit index renders"
+check narrative.html "the multi-KOL narrative agent" "market voices page renders"
+check narrative.html "Convergences, in order" "market voices lists convergences"
 
 # The verify page must actually verify when driven: ?sample=1 loads two real records.
 file=$(dom "verify.html?sample=1")

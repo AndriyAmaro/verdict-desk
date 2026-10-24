@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Refreshes every published figure from the ledger, so no number in the docs is typed by hand.
 
-  python3 scripts/refresh_numbers.py             # README "Live operation", the build-page draft, the test count
+  python3 scripts/refresh_numbers.py             # README "Live operation", the build-page draft, the judge page commit line, the test count
   python3 scripts/refresh_numbers.py --check     # change nothing; exit 1 if a document is out of date with the ledger
 
 The figures come from `python3 -m verdict_desk stats --git` (verdict_desk/livestats.py) on the verified chain,
@@ -23,6 +23,7 @@ from verdict_desk import dossier, livestats  # noqa: E402
 LEDGER = ROOT / "ledger" / "ledger.jsonl"
 README = ROOT / "README.md"
 BUILD_PAGE = ROOT / "SUBMISSAO_DORAHACKS.md"
+JUDGE_PAGE = ROOT / "web" / "judge.html"
 MSG = ROOT / "MSG_ORGANIZADORES.md"
 
 
@@ -142,6 +143,18 @@ def refreshed(tests: int | None) -> dict[Path, str]:
     if n != 1:
         raise SystemExit("SUBMISSAO_DORAHACKS.md has no numbers block to refresh")
     out[BUILD_PAGE] = page
+    judge = JUDGE_PAGE.read_text(encoding="utf-8")
+    now = livestats.summarize(ledger)
+    acts = now["actions"]
+    sized = acts.get("LONG", 0) + acts.get("SHORT", 0)
+    parts = [str(now["head"]["seq"]), str(sized), str(len(ledger) - sized), str(acts.get("FLAT", 0)), str(acts.get("WATCH_REVERSAL", 0))]
+    judge, n = re.subn(
+        r"(It commits instead of hiding behind a HOLD: as of dossier )\d+(, )\d+( of them carry a sized LONG or SHORT; the other )\d+( are labelled FLAT \()\d+(\) or WATCH_REVERSAL \()\d+(\))",
+        lambda m: m.group(1) + parts[0] + m.group(2) + parts[1] + m.group(3) + parts[2] + m.group(4) + parts[3] + m.group(5) + parts[4] + m.group(6),
+        judge)
+    if n != 1:
+        raise SystemExit("web/judge.html has no commits-instead-of-HOLD line to refresh")
+    out[JUDGE_PAGE] = judge
     if tests is not None:
         for path, pattern in TEST_COUNT_PATTERNS:
             out.setdefault(path, path.read_text(encoding="utf-8"))

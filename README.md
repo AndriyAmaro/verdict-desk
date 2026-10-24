@@ -34,7 +34,7 @@ The bounty's spotlight describes an agent that monitors user-selected crypto voi
 
 | Spotlight requirement | What runs today | Measured evidence |
 |---|---|---|
-| Up to 20 user-selected voices | 5 default crypto newsroom and creator feeds, extensible to 20 via `--feed NAME=URL` (RSS/Atom) | 40 headlines per run; 165 of 173 dossiers carry a narrative layer |
+| Up to 20 user-selected voices | 5 default crypto newsroom and creator feeds, extensible to 20 via `--feed NAME=URL` (RSS/Atom) | 40 headlines per run; 168 of 176 dossiers carry a narrative layer |
 | Tokens, sentiment, conviction, urgency | LLM extraction per headline into a closed vocabulary, each with a literal quote from the headline | 14 extractions accepted and 13 rejected by the grounding gate in the latest dossier |
 | Convergence across distinct voices | A narrative needs at least two different voices on the same token **and** the same stance | **101 convergences** recorded across the live ledger |
 | Explain the candidates it rejected | Every mentioned token that did not become a narrative is kept with its reason: only one voice, voices disagreeing, or neutral mentions only | `narrative.rejected_candidates`, frozen in the dossier |
@@ -183,21 +183,21 @@ public data ──> frozen evidence packet ──> bull agent ┐
 
 ## Live operation, measured from the ledger
 
-<!-- live-numbers: generated from dossier 173 by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
-Counted over `ledger/ledger.jsonl` on the chain as of **dossier 173** (head `06ddbf622b765eba`, collected 2026-10-24 05:45 UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
+<!-- live-numbers: generated from dossier 176 by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
+Counted over `ledger/ledger.jsonl` on the chain as of **dossier 176** (head `0f6f2bcb01e55839`, collected 2026-10-24 10:51 UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
 
 | What | Number |
 |---|---|
-| Dossiers in the verified chain | 173 (BTCUSDT 70, ETHUSDT 64, SOLUSDT 39) |
-| Operating window, first to last dossier | 164.3 h, 6.8 days (2026-10-17 09:26 to 2026-10-24 05:45 UTC) |
-| Clock hours (UTC) in that window with at least one dossier | 47 of 165 (28.5%) |
-| Longest gap between consecutive dossiers of the same symbol | 8 h 34 min (SOLUSDT); 86 gaps over 90 minutes |
-| Recorded by the workflow bot (scheduled or manually dispatched runs) | 158 (dossiers 1-53, 69-173) |
+| Dossiers in the verified chain | 176 (BTCUSDT 71, ETHUSDT 65, SOLUSDT 40) |
+| Operating window, first to last dossier | 169.4 h, 7.1 days (2026-10-17 09:26 to 2026-10-24 10:51 UTC) |
+| Clock hours (UTC) in that window with at least one dossier | 48 of 170 (28.2%) |
+| Longest gap between consecutive dossiers of the same symbol | 8 h 34 min (SOLUSDT); 89 gaps over 90 minutes |
+| Recorded by the workflow bot (scheduled or manually dispatched runs) | 161 (dossiers 1-53, 69-176) |
 | Recorded by other commits | 15 (dossiers 54-68): runs made outside the workflow while the demo tooling and the v2 rules were being built; the ledger is append-only, so they stay |
-| LLM era, dossier 46 onward | 128 dossiers, 123 with analyst output (dossiers 54-58 have no LLM layer) |
-| Claims **accepted** by the citation validator | 845 (bull 436, bear 409) |
-| Claims **rejected** by the citation validator | 109 (bull 54, bear 55); reason: "no citation" 1, "number not in cited evidence" 108 |
-| Share of claims accepted | 88.6% |
+| LLM era, dossier 46 onward | 131 dossiers, 126 with analyst output (dossiers 54-58 have no LLM layer) |
+| Claims **accepted** by the citation validator | 865 (bull 446, bear 419) |
+| Claims **rejected** by the citation validator | 113 (bull 56, bear 57); reason: "no citation" 1, "number not in cited evidence" 112 |
+| Share of claims accepted | 88.4% |
 
 The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures.
 

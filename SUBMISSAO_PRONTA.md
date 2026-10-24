@@ -1,7 +1,6 @@
-# SUBMISSÃO — VERDICT DESK — copie e cole
+# SUBMISSÃO — VERDICT DESK — SUPERSEDED
 
-**Números atualizados em 2026-10-22 20:23 UTC** (regerar com `python3 -m verdict_desk stats`)
-**Dossiês: 98 · Janela: 130,9 h · Testes: 213 · Replay: 98/98 MATCHES · Validador: 333 aceitas / 46 rejeitadas (87,9%)**
+> **Superseded by `SUBMISSAO_DORAHACKS.md`** (the canonical, auto-refreshed submission). The figures below are a historical snapshot and are NOT current — see README.md or run `python3 -m verdict_desk stats --git` for the live numbers.
 
 ---
 

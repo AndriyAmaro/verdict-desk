@@ -23,6 +23,7 @@ from verdict_desk import dossier, livestats  # noqa: E402
 LEDGER = ROOT / "ledger" / "ledger.jsonl"
 README = ROOT / "README.md"
 BUILD_PAGE = ROOT / "SUBMISSAO_DORAHACKS.md"
+MSG = ROOT / "MSG_ORGANIZADORES.md"
 
 
 # Only the phrases that state the size of the suite: other "N tests" in the docs (the CRE ones) are different counts.
@@ -31,6 +32,7 @@ TEST_COUNT_PATTERNS = [
     (BUILD_PAGE, r"(\| \*\*Testing\*\* \| )(?:\d+|TESTS_COUNT)( unit tests)"),
     (BUILD_PAGE, r"(- )(?:\d+|TESTS_COUNT)( passing unit tests)"),
     (BUILD_PAGE, r"(# )(?:\d+|TESTS_COUNT)( tests)"),
+    (MSG, r"(- \*\*)(?:\d+|TESTS_COUNT)( tests\*\*)"),
 ]
 
 
@@ -118,6 +120,11 @@ def refreshed(tests: int | None) -> dict[Path, str]:
     text, n = re.subn(r"<!-- live-numbers:.*?(?=## Auditing someone else's agent)", lambda _: live_section(ledger), text, flags=re.S)
     if n != 1:
         raise SystemExit("README.md has no live-numbers block to refresh")
+    narrative = sum(1 for d in ledger if (d.get("evidence") or {}).get("narrative"))
+    text, n = re.subn(r"(\d+) of (\d+) dossiers carry a narrative layer",
+                      f"{narrative} of {len(ledger)} dossiers carry a narrative layer", text)
+    if n != 1:
+        raise SystemExit("README.md has no narrative-coverage line to refresh")
     out[README] = text
     page = BUILD_PAGE.read_text(encoding="utf-8")
     page, n = re.subn(r"<!-- numbers:start -->\n.*?\n<!-- numbers:end -->", lambda _: f"<!-- numbers:start -->\n- {build_page_line(ledger)}\n<!-- numbers:end -->", page, flags=re.S)
@@ -126,6 +133,7 @@ def refreshed(tests: int | None) -> dict[Path, str]:
     out[BUILD_PAGE] = page
     if tests is not None:
         for path, pattern in TEST_COUNT_PATTERNS:
+            out.setdefault(path, path.read_text(encoding="utf-8"))
             out[path], n = re.subn(pattern, lambda m: f"{m.group(1)}{tests}{m.group(2)}", out[path])
             if n != 1:
                 raise SystemExit(f"{path.name} has no test count matching {pattern!r}")

@@ -151,9 +151,11 @@ function renderHero(dossiers, broken, e, nar, p) {
   const accepted = e ? e.accepted : 0, rejected = e ? e.rejected : 0;
   const winRate = (p && p.win_rate_pct !== null && p.win_rate_pct !== undefined) ? p.win_rate_pct + "%" : "—";
   const dd = p ? p.max_drawdown_pct + "%" : "—";
+  const committed = dossiers.filter((d) => d.verdict.action === "LONG" || d.verdict.action === "SHORT").length;
   grid.innerHTML =
     card("Dossiers", dossiers.length, "hash-chained, one per hour") +
     card("Integrity", broken ? "broken" : "verified", broken ? "a check failed" : "every hash recomputes here") +
+    card("Commits", committed + " / " + dossiers.length, "sized LONG or SHORT; the rest name what would flip them") +
     card("LLM claims", `${accepted} / ${accepted + rejected}`, `${rejected} refused for bad citations`) +
     card("Narratives", nar.convergences, `${nar.voices} voices · ${nar.tokens.join(", ") || "no token yet"}`) +
     card("Win rate", winRate, `max drawdown ${dd} · simulated`) +

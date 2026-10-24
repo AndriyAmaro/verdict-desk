@@ -7,17 +7,17 @@
     "tests": 2
   },
   "debate-desk": {
-    "commits": 314,
-    "last_commit": "2026-10-23 23:22:11 -0700",
+    "commits": 331,
+    "last_commit": "2026-10-24 02:24:31 -0700",
     "ledger": {
       "BUY": 15,
-      "HOLD": 246,
-      "SELL": 15,
-      "records": 276
+      "HOLD": 256,
+      "SELL": 16,
+      "records": 287
     },
-    "loc": 8579,
+    "loc": 10325,
     "name": "debate-desk",
-    "tests": 1,
-    "transcripts": 64
+    "tests": 2,
+    "transcripts": 70
   }
 }

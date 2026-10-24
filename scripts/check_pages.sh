@@ -68,6 +68,7 @@ check() { # check <page> <needle> <label>
 
 check index.html "recomputed in this browser" "dashboard recomputes hashes"
 check index.html "printable exhibit" "dashboard links each decision to its exhibit"
+check index.html "sized LONG or SHORT" "dashboard shows how many dossiers commit"
 check lab.html "policy.js" "lab loads the shared policy"
 check lab.html "printable exhibit" "lab links the selected decision to its exhibit"
 check verify.html "Verify a record you were handed" "verify page renders"

@@ -25,6 +25,7 @@ README = ROOT / "README.md"
 BUILD_PAGE = ROOT / "SUBMISSAO_DORAHACKS.md"
 JUDGE_PAGE = ROOT / "web" / "judge.html"
 MSG = ROOT / "MSG_ORGANIZADORES.md"
+DESCRICAO_PAGE = ROOT / "DESCRICAO_PAGINA.md"
 
 
 # Only the phrases that state the size of the suite: other "N tests" in the docs (the CRE ones) are different counts.
@@ -35,6 +36,7 @@ TEST_COUNT_PATTERNS = [
     (BUILD_PAGE, r"(# )(?:\d+|TESTS_COUNT)( tests)"),
     (MSG, r"(- \*\*)(?:\d+|TESTS_COUNT)( tests\*\*)"),
     (JUDGE_PAGE, r"(The scale behind the page: )(?:[0-9]+|TESTS_COUNT)( tests)"),
+    (DESCRICAO_PAGE, r"(Testing: )(?:\d+|TESTS_COUNT)( unit tests)"),
 ]
 
 
@@ -180,6 +182,20 @@ def refreshed(tests: int | None) -> dict[Path, str]:
     if n != 1:
         raise SystemExit("web/judge.html has no commits-instead-of-HOLD line to refresh")
     out[JUDGE_PAGE] = judge
+    page_d = DESCRICAO_PAGE.read_text(encoding="utf-8")
+    conv = sum(len((d.get("evidence") or {}).get("narrative", {}).get("convergence") or []) for d in ledger)
+    llm = now["llm_era"]
+    repl = {
+        r"(\d+) convergences recorded so far, across (\d+) of (\d+) dossiers": f"{conv} convergences recorded so far, across {narrative} of {len(ledger)} dossiers",
+        r"(\d+) accepted, (\d+) refused with reasons kept": f"{llm['accepted']} accepted, {llm['rejected']} refused with reasons kept",
+        r"(\d+) dossiers and counting": f"{len(ledger)} dossiers and counting",
+        r"(\d+) published verdicts": f"{len(ledger)} published verdicts",
+    }
+    for pat, repl_text in repl.items():
+        page_d, n = re.subn(pat, repl_text, page_d)
+        if n != 1:
+            raise SystemExit(f"DESCRICAO_PAGINA.md has no line matching {pat!r}")
+    out[DESCRICAO_PAGE] = page_d
     if tests is not None:
         for path, pattern in TEST_COUNT_PATTERNS:
             out.setdefault(path, path.read_text(encoding="utf-8"))

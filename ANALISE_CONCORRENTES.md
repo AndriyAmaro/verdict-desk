@@ -1,5 +1,8 @@
 # Análise de Concorrentes — BLI Legal Tech Hackathon 2 (DoraHacks)
 
+> ⚠️ **SUPERSEDED — snapshot interno de 2026-10-20, NÃO é a leitura atual do campo.**
+> Os números abaixo (53 dossiers, 129 testes) e as alegações de "único" estão desatualizados: os rivais atuais (Debate Desk, Bull v. Bear) desde então adicionaram âncora on-chain própria e a tag de spotlight multi-KOL. **A fonte de verdade atual é `scripts/enemy_watch.py` + `research/enemy-watch.json`** (roda a cada 3h no robô). Não use este arquivo para posicionamento público.
+
 > **Data:** 2026-10-20
 > **Referência:** Verdict Desk (nosso) — 53 dossiers, 129 testes, LLM Mistral, CRE workflow, dashboard visual, video demo, hash chain verificável, sensitivity analysis, audit-journal.
 > **Deadline:** 31 out 2026 · **Prize pool:** ~$50K · **100+ projetos submetidos** (segundo BLI.Tools, out/2026)

@@ -105,6 +105,8 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <ul>
     <li><b>Real:</b> the market data, the decisions, the hash chain, the browser verification, the replay, the LLM debate with its validator, and the Sepolia anchor.</li>
     <li><b>Simulated:</b> the money. No funds move, ever. This is a reasoning and audit trail, not a trading edge — the published backtests of these rules do not profit after fees, and the repository says so.</li>
+    <li><b>Why simulated is the stronger answer, not a cop-out:</b> the bounty asks for the practice trades an agent <i>would</i> make. A simulated decision is the legally-defensible reading — with no funds moved, nobody is ever liable for an autonomous agent's mistake, and a build that swaps real tokens (even on a testnet) has to answer for every trade it opens. The same third-party time custody is provided here without moving funds: the head is anchored on Sepolia through the CRE workflow and timestamped in Bitcoin, hourly, with no key.</li>
+    <li><b>And the verdict itself is deterministic, not an LLM's call:</b> the action (LONG/SHORT/FLAT, or a named refusal) is computed from the arguments' weights by code, so it reproduces exactly on replay. The LLM only writes the arguments — and every one is citation-validated. A build whose LLM judge proposes the action and whose code only gates the size is one step further from a repeatable trail.</li>
     <li><b>Known limits:</b> one exchange mirror for candles, one rule set, fills at the last close with fees, and a model that writes prose which is frozen and re-validated rather than regenerated.</li>
   </ul>
 </section>

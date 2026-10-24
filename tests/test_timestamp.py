@@ -11,6 +11,7 @@ anywhere. So proofs are archived per record, and the tests below pin that down.
 """
 
 import json
+import re
 import shutil
 import subprocess
 import unittest
@@ -54,12 +55,35 @@ class TimestampTest(unittest.TestCase):
 
     @unittest.skipUnless(OTS, "the ots client is not installed")
     def test_the_ots_client_accepts_the_proofs(self):
-        """Pending or confirmed both count: either way a calendar holds the digest."""
-        proof = self.proofs()[-1]
-        out = subprocess.run([OTS, "verify", str(proof)], capture_output=True, text=True, timeout=120)
-        text = out.stdout + out.stderr
-        self.assertIn("Bitcoin blockchain", text,
-                      f"the client did not recognise the proof:\n{text[:400]}")
+        """Offline, node-free, and stricter than "Bitcoin blockchain".
+
+        Plain `ots verify` needs a bitcoind to confirm the header and the calendars over the
+        network, so on a bare host (or a rate-limited one) it exits 1 without ever printing the
+        block — the check used to fail for the host's reasons, not the proof's. Disabling both
+        (--no-bitcoin, --no-default-whitelist) keeps what actually matters and is instant: the
+        client reads the proof and names the Bitcoin block whose merkle root commits our digest.
+        A pending proof must still say so out loud; anything else is a proof we cannot date.
+        """
+        BLOCK = re.compile(r"Bitcoin block (\d+) has merkleroot ([0-9a-f]{64})")
+        confirmed = []
+        for proof in self.proofs():
+            run = subprocess.run(
+                [OTS, "--no-bitcoin", "--no-default-whitelist", "verify", str(proof)],
+                capture_output=True, text=True, timeout=60)
+            text = run.stdout + run.stderr
+            self.assertNotIn("Error", text, f"the client errored on {proof.name}:\n{text[:400]}")
+            blocks = BLOCK.findall(text)
+            if blocks:
+                confirmed.append((proof.name, blocks))
+            else:
+                self.assertIn("Pending confirmation in Bitcoin blockchain", text,
+                              f"the client neither confirmed nor dated {proof.name}:\n{text[:400]}")
+        self.assertTrue(confirmed, "no archived proof is committed to a Bitcoin block yet")
+        for name, blocks in confirmed:
+            for height, _root in blocks:
+                self.assertGreater(int(height), 800_000, f"{name} names an implausible block height")
+
+
 
 
 if __name__ == "__main__":

@@ -37,10 +37,21 @@ TEST_COUNT_PATTERNS = [
 
 
 def count_tests() -> int:
+    """The size of the suite, from a real run — but not a run that can deadlock on itself.
+
+    test_published_figures_match_the_ledger calls this script with --check, so if that one failure
+    also blocked the count, a single new ledger record would freeze every published figure for good.
+    It is tolerated here and only here: the run that tolerates it is the run that repairs it, and
+    the suite re-checks the repaired docs afterwards. Any other failing test still stops us.
+    """
     run = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"], cwd=ROOT, capture_output=True, text=True, env={**os.environ, "MISTRAL_API_KEY": ""})
     found = re.search(r"Ran (\d+) tests", run.stderr)
-    if run.returncode != 0 or not found:
-        raise SystemExit("the test suite does not pass, so there is no honest test count to publish:\n" + run.stderr[-800:])
+    if not found:
+        raise SystemExit("the test suite did not run, so there is no honest test count to publish:\n" + run.stderr[-800:])
+    if run.returncode != 0:
+        failing = re.findall(r"^(?:FAIL|ERROR): (\w+)", run.stderr, re.M)
+        if failing != ["test_published_figures_match_the_ledger"]:
+            raise SystemExit("the test suite does not pass, so there is no honest test count to publish:\n" + run.stderr[-800:])
     return int(found.group(1))
 
 

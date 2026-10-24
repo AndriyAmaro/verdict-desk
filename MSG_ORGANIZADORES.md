@@ -15,7 +15,7 @@ The build is complete and actively maintained. Everything below is live and veri
 - **A cause-and-effect lab** where removing a single argument shows the verdict flip — https://andriyamaro.github.io/verdict-desk/lab.html
 - **A printable audit exhibit for every decision** (evidence custody, claims beside the evidence they cite, the deciding argument, the recomputed hash) — https://andriyamaro.github.io/verdict-desk/exhibit/index.html
 - **On-chain**: the ledger head is anchored on Ethereum Sepolia (LedgerAnchor `0x50443D51Db71A61E131B147B1d36aF21d48CDdF7`, anchor tx at block 11964023) and timestamped in Bitcoin via OpenTimestamps, hourly, no key
-- **299 tests**, replay reproduces 100% of published verdicts
+- **300 tests**, replay reproduces 100% of published verdicts
 
 Repository: https://github.com/AndriyAmaro/verdict-desk
 

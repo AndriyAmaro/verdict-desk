@@ -34,6 +34,7 @@ TEST_COUNT_PATTERNS = [
     (BUILD_PAGE, r"(- )(?:\d+|TESTS_COUNT)( passing unit tests)"),
     (BUILD_PAGE, r"(# )(?:\d+|TESTS_COUNT)( tests)"),
     (MSG, r"(- \*\*)(?:\d+|TESTS_COUNT)( tests\*\*)"),
+    (JUDGE_PAGE, r"(The scale behind the page: )(?:[0-9]+|TESTS_COUNT)( tests)"),
 ]
 
 

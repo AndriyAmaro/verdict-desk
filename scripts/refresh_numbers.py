@@ -38,6 +38,27 @@ TEST_COUNT_PATTERNS = [
 ]
 
 
+# A page that names a dashboard card ("the <b>Positions</b> card") must name one that is actually drawn.
+CARD_LABEL = re.compile(r'card\("([^"]+)"')
+CARD_REFERENCE = re.compile(r"<b>([^<]+)</b> card")
+
+
+def card_reference_problems() -> list[str]:
+    """Every card a page names must be a card the dashboard draws.
+
+    The dashboard card for sized dossiers was once labelled 'Commits'; after it was renamed to
+    'Positions', the judge page still said 'the Commits card' and nothing failed — a dead link that
+    only a reader would notice. This makes it a build failure instead.
+    """
+    labels = set(CARD_LABEL.findall((ROOT / "web" / "index.html").read_text(encoding="utf-8")))
+    problems = []
+    for page in sorted((ROOT / "web").glob("*.html")):
+        for name in CARD_REFERENCE.findall(page.read_text(encoding="utf-8")):
+            if name not in labels:
+                problems.append(f"{page.relative_to(ROOT)} names the '{name}' card, which index.html does not draw (it draws {sorted(labels)})")
+    return problems
+
+
 def count_tests() -> int:
     """The size of the suite, from a real run — but not a run that can deadlock on itself.
 
@@ -128,6 +149,9 @@ def refreshed(tests: int | None) -> dict[Path, str]:
     problems = dossier.verify(ledger)
     if problems:
         raise SystemExit("the ledger does not verify, nothing to publish: " + "; ".join(problems))
+    card_problems = card_reference_problems()
+    if card_problems:
+        raise SystemExit("a page names a card the dashboard does not draw: " + "; ".join(card_problems))
     out = {}
     text = README.read_text(encoding="utf-8")
     text, n = re.subn(r"<!-- live-numbers:.*?(?=## Auditing someone else's agent)", lambda _: live_section(ledger), text, flags=re.S)

@@ -155,7 +155,7 @@ function renderHero(dossiers, broken, e, nar, p) {
   grid.innerHTML =
     card("Dossiers", dossiers.length, "hash-chained, one per hour") +
     card("Integrity", broken ? "broken" : "verified", broken ? "a check failed" : "every hash recomputes here") +
-    card("Commits", committed + " / " + dossiers.length, "sized LONG or SHORT; the rest name what would flip them") +
+    card("Positions", committed + " / " + dossiers.length, "sized LONG or SHORT; the rest name what would flip them") +
     card("LLM claims", `${accepted} / ${accepted + rejected}`, `${rejected} refused for bad citations`) +
     card("Narratives", nar.convergences, `${nar.voices} voices · ${nar.tokens.join(", ") || "no token yet"}`) +
     card("Win rate", winRate, `max drawdown ${dd} · simulated`) +

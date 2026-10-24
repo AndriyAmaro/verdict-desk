@@ -10,6 +10,7 @@ each hourly run overwrote one proof file, every earlier proof would stop verifyi
 anywhere. So proofs are archived per record, and the tests below pin that down.
 """
 
+import hashlib
 import json
 import re
 import shutil
@@ -59,29 +60,60 @@ class TimestampTest(unittest.TestCase):
 
         Plain `ots verify` needs a bitcoind to confirm the header and the calendars over the
         network, so on a bare host (or a rate-limited one) it exits 1 without ever printing the
-        block — the check used to fail for the host's reasons, not the proof's. Disabling both
+        block - the check used to fail for the host's reasons, not the proof's. Disabling both
         (--no-bitcoin, --no-default-whitelist) keeps what actually matters and is instant: the
         client reads the proof and names the Bitcoin block whose merkle root commits our digest.
-        A pending proof must still say so out loud; anything else is a proof we cannot date.
+
+        The trap in the other direction, and it bit every hour a fresh proof landed: a proof
+        stamped minutes ago is only *pending* - its attestations are calendar promises that
+        upgrade to a Bitcoin attestation hours later - and --no-default-whitelist is exactly
+        what discards those calendar attestations, so `verify` prints nothing and a proof that
+        is simply young reads as a proof that is broken. So the commitment is checked twice,
+        both offline: `ots info` must name the sha256 of the snapshot we archived (the proof is
+        about these bytes and no others), and that digest must be either named in a Bitcoin
+        block or handed to one of the public calendars by uri. A proof that is neither is a
+        proof we cannot date, and that still fails. Pending is allowed only while young: an old
+        record still waiting means the upgrade step stopped, which is a real outage.
         """
         BLOCK = re.compile(r"Bitcoin block (\d+) has merkleroot ([0-9a-f]{64})")
-        confirmed = []
+        DIGEST = re.compile(r"File sha256 hash: ([0-9a-f]{64})")
+        PENDING = re.compile(r"PendingAttestation\('(https?://[^']+)'\)")
+        CALENDARS = ("eternitywall.com", "opentimestamps.org", "catallaxy.com")
+        latest = max(ledger())
+        confirmed, pending = [], []
         for proof in self.proofs():
+            snapshot = proof.with_suffix("")
+            info = subprocess.run([OTS, "info", str(proof)], capture_output=True, text=True, timeout=60)
+            itext = info.stdout + info.stderr
+            digests = DIGEST.findall(itext)
+            self.assertEqual(digests, [hashlib.sha256(snapshot.read_bytes()).hexdigest()],
+                             f"{proof.name} does not commit to the bytes of {snapshot.name}:\n{itext[:400]}")
             run = subprocess.run(
                 [OTS, "--no-bitcoin", "--no-default-whitelist", "verify", str(proof)],
                 capture_output=True, text=True, timeout=60)
             text = run.stdout + run.stderr
             self.assertNotIn("Error", text, f"the client errored on {proof.name}:\n{text[:400]}")
+            # measured 2026-10-24: a proof verified against the wrong bytes prints
+            # "File does not match original!" and still exits 0, so the client alone
+            # would bless a proof of some other file. The digest check above is the guard.
+            self.assertNotIn("does not match original", text,
+                             f"{proof.name} does not cover {snapshot.name}:\n{text[:400]}")
             blocks = BLOCK.findall(text)
             if blocks:
                 confirmed.append((proof.name, blocks))
-            else:
-                self.assertIn("Pending confirmation in Bitcoin blockchain", text,
-                              f"the client neither confirmed nor dated {proof.name}:\n{text[:400]}")
+                continue
+            calendars = [u for u in PENDING.findall(itext) if any(c in u for c in CALENDARS)]
+            self.assertTrue(calendars,
+                            f"the client neither confirmed nor dated {proof.name}:\n{text[:300]}\n{itext[:300]}")
+            pending.append((proof.name, int(proof.name.split(".")[0])))
         self.assertTrue(confirmed, "no archived proof is committed to a Bitcoin block yet")
         for name, blocks in confirmed:
             for height, _root in blocks:
                 self.assertGreater(int(height), 800_000, f"{name} names an implausible block height")
+        for name, seq in pending:
+            self.assertLessEqual(latest - seq, 12,
+                                 f"{name} is {latest - seq} records old and still pending; "
+                                 "the OpenTimestamps upgrade step has stopped")
 
 
 

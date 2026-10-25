@@ -15,6 +15,7 @@ Nothing to install and nothing to take on trust: each page below downloads the r
 | [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) | Reads the Bitcoin proof of the ledger head, asks two block explorers for the block, reads the Sepolia anchor, and shows how many attacks on our own verifier got through. |
 | [Evidence for a lawyer](https://andriyamaro.github.io/verdict-desk/evidence.html) | What each layer establishes and what it does not, and a foundation declaration drafted from a real dossier. |
 | [Cause and effect lab](https://andriyamaro.github.io/verdict-desk/lab.html) | Remove one argument from a real decision and watch the verdict flip. |
+| [Learn it by breaking it](https://andriyamaro.github.io/verdict-desk/learn.html) | Seven short exercises, each one a way to try to fool the system and what it should teach you. |
 | [Judge path](https://andriyamaro.github.io/verdict-desk/judge.html) | Every requirement of both bounties, each mapped to the file, command or transaction that proves it. |
 
 From a terminal: `python3 -m unittest discover -s tests` (the suite), `python3 -m verdict_desk verify` (the chain), `replay` (every verdict re-derived from its frozen evidence), `trust-check` (every frozen voice table recomputed from the dossiers before it) and `battery` (attack a copy of the ledger and count what the verifier misses).

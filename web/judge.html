@@ -50,7 +50,9 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <ul>
     <li>Each decision freezes one evidence packet: candles, funding, news, and public voices, with the source and time of every item — <code>verdict_desk/evidence.py</code></li>
     <li>Two LLM analysts (bull and bear) plus a deterministic indicator engine (RSI, MACD, Bollinger) read that same packet — <code>verdict_desk/agents_v2.py</code></li>
-    <li>A narrative agent extracts token, stance, conviction and urgency from up to 20 user-selected voices and requires two distinct voices to agree before it reports a convergence — <code>verdict_desk/narrative.py</code>; it also freezes the tokens it <b>rejected</b> and why (one voice only, voices disagreeing, or nobody taking a side)</li>
+    <li>A narrative agent extracts token, stance, conviction and urgency from up to 20 <b>user-selected voices</b> (a file you edit: <code>config/voices.json</code>, whose hash is frozen in every dossier together with the voices that returned nothing that hour; today 5 newsrooms and 8 public Telegram channels) and requires two distinct voices to agree before it reports a convergence — <code>verdict_desk/narrative.py</code>; it also freezes the tokens it <b>rejected</b> and why (one voice only, voices disagreeing, or nobody taking a side)</li>
+    <li><b>"Trusted voices converge" is measured, not asserted:</b> each voice's calls are scored against the market's move, set against the hit rate luck alone would give, and weighted by the skill that is left, <b>recomputed in your browser</b> from the raw ledger and with no lookahead (every dossier freezes the table it used, and <code>trust-check</code> recomputes it from the dossiers before it) — <a href="narrative.html">Market voices</a>, <code>verdict_desk/trust.py</code></li>
+    <li><b>Your limit, your position:</b> on the same page, tick the voices that agree, set your own risk limit and watch the practice position it produces (the formulas are the Python judge's, compared over hundreds of random inputs; a limit above the 25% ceiling is refused)</li>
     <li>The <a href="scorecard.html">scorecard</a> scores every position against what the market did next, with the sample sizes and the caveats printed next to the numbers — the one page that asks whether the decisions were good, not whether the record is intact</li>
     <li>Every decision can be rendered as a <a href="exhibit/index.html">printable audit exhibit</a> — a Certificate of Filing with a VERIFIED seal, and the anchored record also ships as a <a href="exhibit/exhibit-80.pdf">signed PDF</a>: evidence custody, each claim beside the evidence text it cites, the deciding argument, the recomputed hash, the on-chain anchor, and an explicit statement of what the record does <b>not</b> prove</li>
     <li>Behaviour you can test instead of trust: <a href="lab.html">the cause-and-effect lab</a> shows which single argument decides a recorded verdict, and replays the policy on inputs you choose — checked against the Python judge on 486 input combinations</li>
@@ -106,6 +108,15 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   </ul>
 </section>
 
+<h2>Beyond the brief: why this record is hard to fake</h2>
+<section class="crit">
+  <ul>
+    <li><a href="witnesses.html"><b>Witnesses</b></a>: every hour the head of the chain is stamped in Bitcoin. Your browser reads the proof, recomputes the digest, replays the hash steps and asks <b>two independent block explorers</b> for the block's merkle root; it also reads the Sepolia anchor and checks the ledger against every stamped head. A ledger cut short, or rewritten and re-hashed, disagrees with a head that was already stamped.</li>
+    <li><b>We attack our own verifier</b> and publish the count: <code>python3 -m verdict_desk battery</code> edits a value six ways (down to a Cyrillic look-alike letter), deletes, swaps, duplicates, forges a head, cuts the tail and rewrites history, and runs the project's own <code>verify</code>. <span id="battery-live" class="mut">Loading the latest result…</span></li>
+    <li><a href="evidence.html"><b>Evidence for a lawyer</b></a>: layer by layer, what the record establishes and what it does not (including that our time stamp is <i>not</i> an eIDAS qualified one), and a foundation declaration drafted from a real dossier after re-checking the chain in your browser.</li>
+  </ul>
+</section>
+
 <h2>What is real and what is simulated</h2>
 <section class="crit honest">
   <ul>
@@ -127,6 +138,11 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
 </table>
 
 <script src="canonical.js"></script>
+<script>
+fetch('battery.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('none'); return r.json(); }).then(function (b) {
+  document.getElementById('battery-live').innerHTML = 'Latest run: <b>' + b.total_trials + '</b> attacks on ' + b.dossiers + ' dossiers, <b>' + b.total_missed + '</b> got through (the two the hash chain cannot see alone are caught by the stamped heads).';
+}).catch(function () { var el = document.getElementById('battery-live'); if (el) el.textContent = 'Run it to see the count.'; });
+</script>
 <script>
 (async function () {
   var el = document.getElementById('live');

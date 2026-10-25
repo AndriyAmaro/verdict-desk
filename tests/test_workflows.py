@@ -69,3 +69,30 @@ class WorkflowCallsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CadenceGateTest(unittest.TestCase):
+    """GitHub drops scheduled runs, so the hourly workflow is triggered several times an hour and a gate
+    job stops the extra ones. Both halves have to hold: triggers without the gate would duplicate
+    decisions, a gate without the triggers would change nothing."""
+
+    FLOW = (ROOT / ".github" / "workflows" / "hourly.yml").read_text(encoding="utf-8")
+
+    def test_it_is_triggered_at_least_three_times_an_hour(self):
+        cron = re.search(r'cron:\s*"([^"]+)"', self.FLOW).group(1)
+        minutes = cron.split()[0].split(",")
+        self.assertGreaterEqual(len(minutes), 3, cron)
+
+    def test_the_decision_job_waits_for_the_gate_and_the_pages_job_follows_the_decision(self):
+        self.assertIn("needs: gate", self.FLOW)
+        self.assertIn("needs.gate.outputs.run == 'true'", self.FLOW)
+        self.assertIn("needs.gate.result != 'success'", self.FLOW)  # fail open: a broken gate must not stop recording
+        self.assertIn("needs: decide", self.FLOW)
+
+    def test_a_manual_run_always_records(self):
+        gate = self.FLOW[self.FLOW.index("gate:"):self.FLOW.index("  decide:")]
+        self.assertIn("workflow_dispatch", gate)
+        self.assertIn('echo "run=true"', gate)
+
+    def test_the_gate_uses_a_real_command_with_the_limit_the_comment_promises(self):
+        self.assertIn("verdict_desk due --min-minutes 50", self.FLOW)

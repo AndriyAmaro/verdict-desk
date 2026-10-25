@@ -4,10 +4,11 @@ import argparse
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from . import voices as voices_config
-from . import anchor, backtest, battery, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research, trust
+from . import anchor, backtest, battery, cadence, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research, trust
 
 DEFAULT_LEDGER = Path("ledger/ledger.jsonl")
 
@@ -465,6 +466,14 @@ def cmd_monitor(opts) -> int:
     return 1
 
 
+def cmd_due(opts) -> int:
+    """Print `run=true` or `run=false` for a workflow to append to its outputs; never fails the job."""
+    now = datetime.now(timezone.utc)
+    ledger = dossier.read_ledger(opts.ledger) if Path(opts.ledger).exists() else []
+    print(f"run={'true' if cadence.due(ledger, now, opts.min_minutes) else 'false'}")
+    return 0
+
+
 def cmd_stats(opts) -> int:
     ledger = dossier.read_ledger(opts.ledger)
     if not ledger:
@@ -672,6 +681,9 @@ def main() -> int:
     p = sub.add_parser("head", help="print the verified head of the chain as JSON, for the CRE anchor workflow")
     p.add_argument("--out", type=Path, help="also write the JSON to this file (published next to the ledger)")
     p.set_defaults(func=cmd_head)
+    p = sub.add_parser("due", help="print run=true when the last decision is old enough for a new one (the workflow is triggered several times an hour)")
+    p.add_argument("--min-minutes", type=float, default=50, metavar="N", help="minimum minutes since the newest dossier (default 50)")
+    p.set_defaults(func=cmd_due)
     p = sub.add_parser("stats", help="live-operation numbers counted from the verified ledger: dossiers, window, cadence, citation validator results")
     p.add_argument("--first-llm-seq", type=int, default=livestats.FIRST_LLM_SEQ, help="first dossier of the LLM era (default %(default)s)")
     p.add_argument("--last-llm-seq", type=int, default=None, help="last dossier of the range to count (default: the head)")

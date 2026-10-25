@@ -27,6 +27,8 @@ def _mods(rules_version: str = "v1") -> dict:
             from . import agents_v3 as agents, citations, features_v2 as features, llm
         elif rules_version == "v4":
             from . import agents_v4 as agents, citations, features_v2 as features, llm
+        elif rules_version == "v5":
+            from . import agents_v5 as agents, citations, features_v2 as features, llm
         else:
             raise ValueError(f"unknown rules_version: {rules_version!r}")
         _MODULES[rules_version] = {"agents": agents, "features": features, "citations": citations, "llm": llm}

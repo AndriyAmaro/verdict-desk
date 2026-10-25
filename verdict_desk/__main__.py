@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from . import voices as voices_config
-from . import anchor, backtest, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research
+from . import anchor, backtest, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research, trust
 
 DEFAULT_LEDGER = Path("ledger/ledger.jsonl")
 
@@ -84,8 +84,8 @@ def _rules_from_opts(opts, rules_version: str):
     if rules_version == "v1":
         print("refused: --risk-pct requires rules v2 or v3", file=sys.stderr)
         raise SystemExit(2)
-    from . import agents_v2, agents_v3, agents_v4
-    mod = agents_v4 if rules_version == "v4" else (agents_v3 if rules_version == "v3" else agents_v2)
+    from . import agents_v2, agents_v3, agents_v4, agents_v5
+    mod = {"v5": agents_v5, "v4": agents_v4, "v3": agents_v3}.get(rules_version, agents_v2)
     try:
         return mod.with_risk_pct(mod.DEFAULT, pct)
     except ValueError as err:
@@ -118,6 +118,9 @@ def _decide_flow(opts, rules_version: str) -> int:
         block = narrative.build(voices, ask, llm.MODEL if ask else "")
         if config is not None:
             block["config"] = {**config["record"], "gaps": gaps}
+        if rules_version == "v5":
+            # A nota de cada voz sai do ledger ANTERIOR a este ciclo e e congelada no dossier.
+            block["trust"] = trust.record_for(dossier.read_ledger(opts.ledger), {v["name"] for v in voices})
         print(f"narrative ({block['method']}): {len(voices)} headlines from {len({v['name'] for v in voices})} voices, {len(block['convergence'])} convergences"
               + (f", {len(gaps)} voices without a message ({', '.join(sorted(gaps))})" if gaps else ""))
     rules = _rules_from_opts(opts, rules_version)
@@ -143,6 +146,35 @@ def cmd_decide_v2(opts) -> int:
 
 def cmd_decide_v4(opts) -> int:
     return _decide_flow(opts, "v4")
+
+
+def cmd_decide_v5(opts) -> int:
+    return _decide_flow(opts, "v5")
+
+
+def cmd_trust(opts) -> int:
+    """Per-voice track record, measured from the ledger alone."""
+    result = trust.compute(dossier.read_ledger(opts.ledger))
+    if opts.out:
+        Path(opts.out).write_text(json.dumps(result, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"wrote {opts.out}")
+        return 0
+    print(f"voice track record as of dossier {result['as_of_seq']} (horizon {result['horizon_hours']} h, a voice needs {result['min_calls']} settled calls to carry weight; {result['pending_calls']} calls still pending)")
+    print(f"{'voice':18s} {'calls':>5s} {'hit':>5s} {'chance':>7s} {'skill':>7s} {'weight':>7s}")
+    for name, v in sorted(result["voices"].items(), key=lambda kv: -kv[1]["weight"]):
+        print(f"{name:18s} {v['n']:5d} {v['hit_rate']:5.2f} {v['chance_rate']:7.2f} {v['skill']:+7.3f} {v['weight']:7.3f}" + ("" if v["proven"] else "  (no track record yet)"))
+    return 0
+
+
+def cmd_trust_check(opts) -> int:
+    """Recompute every frozen trust table from the dossiers before it."""
+    ledger = dossier.read_ledger(opts.ledger)
+    problems = trust.check(ledger)
+    frozen = sum(1 for d in ledger if ((d.get("evidence") or {}).get("narrative") or {}).get("trust") is not None)
+    for problem in problems:
+        print(problem, file=sys.stderr)
+    print(f"trust tables: {frozen} frozen, {len(problems)} that the earlier ledger does not support")
+    return 1 if problems else 0
 
 
 def cmd_decide_v3(opts) -> int:
@@ -550,6 +582,20 @@ def main() -> int:
     p.add_argument("--risk-pct", type=float, metavar="PCT", help="risk per practice position as %% of simulated capital (max 25, default 1)")
     p.add_argument("--config", metavar="PATH", help="voices and risk limit chosen by the user (JSON, see config/voices.json); its hash is recorded in every dossier")
     p.set_defaults(func=cmd_decide_v4)
+    p = sub.add_parser("decide-v5", help="decide with rules v5: v4 + each convergence voice weighted by its measured skill above chance")
+    p.add_argument("symbols", nargs="+", metavar="SYMBOL")
+    p.add_argument("--interval", default="1h")
+    p.add_argument("--no-news", action="store_true")
+    p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
+    p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
+    p.add_argument("--risk-pct", type=float, metavar="PCT", help="risk per practice position as %% of simulated capital (max 25, default 1)")
+    p.add_argument("--config", metavar="PATH", help="voices and risk limit chosen by the user (JSON, see config/voices.json); its hash is recorded in every dossier")
+    p.set_defaults(func=cmd_decide_v5)
+    p = sub.add_parser("trust", help="per-voice track record: hit rate against chance, measured from the ledger alone")
+    p.add_argument("--out", metavar="FILE", help="write the full table as JSON instead of printing it")
+    p.set_defaults(func=cmd_trust)
+    p = sub.add_parser("trust-check", help="recompute every frozen trust table from the dossiers before it (no lookahead)")
+    p.set_defaults(func=cmd_trust_check)
     p = sub.add_parser("replay", help="re-run decisions from the frozen evidence")
     p.add_argument("seq", nargs="?", type=int)
     p.set_defaults(func=cmd_replay)

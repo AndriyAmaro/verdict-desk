@@ -32,21 +32,29 @@ class Rules(NamedTuple):
     # deterministico (regra transparente de peso), fechando o destaque do premio:
     # "criar uma posicao pratica usando regras de sinalizacao transparentes".
     narrative_signal: bool = False
+    # v5: o peso de cada voz da convergencia vem da habilidade medida dela (trust.py), congelada
+    # no proprio dossier. Sem historico a voz vale 1.0, o mesmo da v4.
+    trust_weighted: bool = False
 
 
 V2 = Rules()
 V3 = Rules(version="v3", rich_states=True)
 V4 = Rules(version="v4", rich_states=True, narrative_signal=True)
+V5 = Rules(version="v5", rich_states=True, narrative_signal=True, trust_weighted=True)
 DEFAULT = V2
 
 
-def convergence_args(narrative, symbol) -> tuple[list[dict], list[dict]]:
+def convergence_args(narrative, symbol, trust_weighted: bool = False) -> tuple[list[dict], list[dict]]:
     """Convergencia multi-KOL -> argumento deterministico, com peso transparente.
 
     Regra (documentada, replay reproduz): cada convergencia que casa com o simbolo vira um
     argumento do lado correspondente (bullish -> bull, bearish -> bear). Peso = 0.5 por voz
     distinta (maximo 4) + 0.5 se a conviccao de topo for 'high'. Duas vozes sem conviccao alta
     valem 1.0; quatro vozes com conviccao alta valem 2.5. Nada de LLM decide aqui.
+
+    v5 (`trust_weighted`): cada voz vale 0.5 x o peso congelado em `narrative.trust` (1.0 sem
+    historico), contando as 4 de maior peso. Uma voz que acertou acima do acaso pesa mais; uma que
+    nao, menos. A nota vem do ledger anterior ao dossier e e verificavel (`trust-check`).
     """
     if not narrative or not symbol:
         return [], []
@@ -61,12 +69,19 @@ def convergence_args(narrative, symbol) -> tuple[list[dict], list[dict]]:
             continue
         voices = list(c.get("voices") or [])
         n = len(voices)
-        weight = min(n, 4) * 0.5
+        if trust_weighted:
+            table = (narrative.get("trust") or {}).get("voices") or {}
+            weights = {v: float((table.get(v) or {}).get("weight", 1.0)) for v in voices}
+            weight = sum(sorted(weights.values(), reverse=True)[:4]) * 0.5
+        else:
+            weight = min(n, 4) * 0.5
         if c.get("max_conviction") == "high":
             weight += 0.5
         weight = round(weight, 2)
         claim = (f"{n} market voices converge {c.get('bias')} on {c.get('token')} "
                  f"(top conviction {c.get('max_conviction')}, urgency {c.get('max_urgency')})")
+        if trust_weighted:
+            claim += ", weighted by track record: " + ", ".join(f"{v} {w:.2f}" for v, w in sorted(weights.items()))
         arg = {"claim": claim, "evidence_ref": f"narrative.convergence.{c.get('token')}",
                "value": voices, "weight": weight}
         (bull_args if c.get("bias") == "bullish" else bear_args).append(arg)
@@ -336,7 +351,7 @@ def decide(f: dict, rules: Rules = V2, narrative: dict | None = None, symbol: st
     bull_args = bull(f)
     bear_args = bear(f)
     if rules.narrative_signal:
-        cb, cs = convergence_args(narrative, symbol)
+        cb, cs = convergence_args(narrative, symbol, rules.trust_weighted)
         bull_args.extend(cb)
         bear_args.extend(cs)
     return {

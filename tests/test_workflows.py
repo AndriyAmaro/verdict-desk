@@ -160,3 +160,19 @@ class PacemakerTest(unittest.TestCase):
     def test_a_manual_run_without_the_flag_still_always_records(self):
         gate = self.HOURLY[self.HOURLY.index("gate:"):self.HOURLY.index("  decide:")]
         self.assertIn('echo "run=true"', gate)
+
+
+class WitnessChainTest(unittest.TestCase):
+    """The Sigstore witness had its own schedule, and GitHub dropped it like the others: 6 heads signed in 18 hours.
+    Every hourly run that publishes a head now asks the witness workflow to sign it."""
+
+    HOURLY = (ROOT / ".github" / "workflows" / "hourly.yml").read_text(encoding="utf-8")
+
+    def test_the_publishing_job_dispatches_the_witness(self):
+        pages = self.HOURLY[self.HOURLY.index("  pages:"):]
+        self.assertIn("gh workflow run rekor-witness", pages)
+        self.assertIn("actions: write", pages)
+
+    def test_the_witness_workflow_can_be_dispatched(self):
+        rekor = (ROOT / ".github" / "workflows" / "rekor.yml").read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:", rekor)

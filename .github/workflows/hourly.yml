@@ -178,6 +178,7 @@ jobs:
       contents: read
       pages: write
       id-token: write
+      actions: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -205,3 +206,9 @@ jobs:
           path: site
       - id: deploy
         uses: actions/deploy-pages@v4
+      # The witness workflow's own schedule is dropped by GitHub like the others (6 heads signed in 18 hours on 25 Oct),
+      # so every run that publishes a head asks it to sign that head in the Sigstore log. It signs only an unsigned head.
+      - name: Ask the Sigstore witness to sign the new head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run rekor-witness --repo "$GITHUB_REPOSITORY" --ref main || echo "::warning::could not dispatch the witness this hour"

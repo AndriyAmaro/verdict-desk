@@ -223,7 +223,7 @@ Counted over `ledger/ledger.jsonl` on the chain as of **dossier 179** (head `63c
 | Claims **rejected** by the citation validator | 115 (bull 57, bear 58); reason: "no citation" 1, "number not in cited evidence" 114 |
 | Share of claims accepted | 88.5% |
 
-The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures.
+The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures. From 25 Oct the workflow is triggered four times an hour and a gate job records only when the newest dossier is at least 50 minutes old, so extra triggers add chances to run without duplicating decisions; these rows will show whether that helped, and they are not rewritten if it did not.
 
 Earlier dossiers stay exactly as they were recorded, so the history of how the LLM layer came to work is in the ledger itself:
 
@@ -264,7 +264,7 @@ The offline study in [`research/`](research/README.md) searched a tuned set of v
 
 ## Live history
 
-The workflow [`.github/workflows/hourly.yml`](.github/workflows/hourly.yml) is scheduled every hour. Each run appends decisions for BTCUSDT, ETHUSDT and SOLUSDT with `decide-v2`, verifies the chain, writes `ledger/head.json`, commits, and redeploys the dashboard. Git commit times are an independent clock. GitHub scheduled runs are best effort and can be delayed or skipped, so read "Live operation" above, the dashboard's cadence panel and the commit log for the real cadence and the gaps. The commands `decide` and `decide-v2` refuse to append to the public ledger outside the workflow (set `VERDICT_DESK_APPEND_PUBLIC=1` to override, or use `--ledger PATH` for a scratch copy), and when they do append to it they refresh `ledger/head.json`, so the published head cannot lag the chain.
+The workflow [`.github/workflows/hourly.yml`](.github/workflows/hourly.yml) is triggered four times an hour (a gate records at most one set of decisions per 50 minutes). Each run appends decisions for BTCUSDT, ETHUSDT and SOLUSDT with `decide-v2`, verifies the chain, writes `ledger/head.json`, commits, and redeploys the dashboard. Git commit times are an independent clock. GitHub scheduled runs are best effort and can be delayed or skipped, so read "Live operation" above, the dashboard's cadence panel and the commit log for the real cadence and the gaps. The commands `decide` and `decide-v2` refuse to append to the public ledger outside the workflow (set `VERDICT_DESK_APPEND_PUBLIC=1` to override, or use `--ledger PATH` for a scratch copy), and when they do append to it they refresh `ledger/head.json`, so the published head cannot lag the chain.
 
 ## Chainlink CRE
 

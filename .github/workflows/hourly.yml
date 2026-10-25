@@ -6,9 +6,13 @@ name: hourly-decision
 # Setup: add the secret LLM (Mistral API key; read into the MISTRAL_API_KEY env var) and set Pages to "GitHub Actions".
 # Without the key the run still records the deterministic core and labels the LLM layers as off.
 
+# GitHub drops and delays scheduled runs: measured on this repository's run history, a single hourly
+# trigger fired every 2 to 6 hours, so the ledger covered 30% of the clock hours. The workflow is now
+# triggered four times an hour and the gate job lets a run record only when the newest dossier is at
+# least 50 minutes old, so extra triggers add chances to run, never duplicate decisions.
 on:
   schedule:
-    - cron: "11 * * * *"
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 concurrency:
@@ -16,7 +20,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.due.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: due
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            python -m verdict_desk due --min-minutes 50 | tee -a "$GITHUB_OUTPUT"
+          fi
+
   decide:
+    needs: gate
+    # Fail open: if the gate itself breaks, record anyway, because a lost hour costs more than a repeated attempt.
+    if: ${{ always() && (needs.gate.result != 'success' || needs.gate.outputs.run == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:

@@ -111,3 +111,45 @@ class AnchorInstallTest(unittest.TestCase):
     def test_a_download_error_stops_the_step(self):
         self.assertIn("curl -fsSL", self.FLOW)
         self.assertIn("set -o pipefail", self.FLOW)
+
+
+class PacemakerTest(unittest.TestCase):
+    """GitHub drops scheduled runs (none fired for 6 hours on 25 Oct, four triggers an hour or not), so the
+    ledger cannot depend on the schedule alone. A second workflow starts when a run of the hourly one ends,
+    waits, and dispatches the next one; the schedule and a manual run only have to restart the chain."""
+
+    PACE = (ROOT / ".github" / "workflows" / "pacemaker.yml").read_text(encoding="utf-8")
+    HOURLY = (ROOT / ".github" / "workflows" / "hourly.yml").read_text(encoding="utf-8")
+
+    def test_it_starts_when_a_run_of_the_hourly_workflow_finishes_whatever_the_outcome(self):
+        self.assertIn("workflow_run:", self.PACE)
+        self.assertIn("workflows: [hourly-decision]", self.PACE)
+        self.assertIn("types: [completed]", self.PACE)
+        self.assertNotIn("conclusion", self.PACE.split("jobs:")[0], "a failed run must not break the chain")
+
+    def test_it_has_a_group_of_its_own_that_replaces_an_older_waiter(self):
+        group = re.search(r"concurrency:\s*\n\s*group:\s*(\S+)\s*\n\s*cancel-in-progress:\s*(\w+)", self.PACE)
+        self.assertIsNotNone(group)
+        self.assertNotEqual(group.group(1), "ledger")
+        self.assertEqual(group.group(2), "true", "otherwise every restart would add another waiting chain")
+
+    def test_it_waits_less_than_an_hour_inside_a_longer_timeout_and_then_dispatches(self):
+        minutes = re.search(r"WAIT_MINUTES:\s*(\d+)", self.PACE)
+        self.assertIsNotNone(minutes)
+        self.assertLess(int(minutes.group(1)), 60)
+        self.assertGreaterEqual(int(minutes.group(1)), 45)
+        timeout = int(re.search(r"timeout-minutes:\s*(\d+)", self.PACE).group(1))
+        self.assertGreater(timeout, int(minutes.group(1)) + 5)
+        self.assertIn("gh workflow run hourly-decision", self.PACE)
+        self.assertIn("actions: write", self.PACE)
+
+    def test_the_dispatch_it_sends_goes_through_the_cadence_gate(self):
+        self.assertIn("paced", self.PACE)
+        self.assertIn("inputs:", self.HOURLY)
+        self.assertIn("paced:", self.HOURLY)
+        gate = self.HOURLY[self.HOURLY.index("gate:"):self.HOURLY.index("  decide:")]
+        self.assertIn("inputs.paced", gate)
+
+    def test_a_manual_run_without_the_flag_still_always_records(self):
+        gate = self.HOURLY[self.HOURLY.index("gate:"):self.HOURLY.index("  decide:")]
+        self.assertIn('echo "run=true"', gate)

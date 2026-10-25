@@ -1,0 +1,37 @@
+name: pacemaker
+
+# GitHub drops scheduled runs: on 25 Oct none fired for six hours, with four triggers an hour. The ledger
+# cannot depend on the schedule alone, so every finished run of hourly-decision starts this workflow, which
+# waits and then dispatches the next one. The schedule and a manual run only have to restart the chain.
+#
+# A dispatch sent with the GITHUB_TOKEN does start a run (workflow_dispatch is the documented exception to
+# "events from the token do not trigger workflows"). The dispatch is `paced`, so it goes through the same
+# gate as a scheduled run and never records two sets of decisions within 50 minutes.
+# The group cancels an older waiter, so a manual restart never leaves two chains running.
+
+on:
+  workflow_run:
+    workflows: [hourly-decision]
+    types: [completed]
+
+concurrency:
+  group: pacemaker
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  next:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      WAIT_MINUTES: 52
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Wait, then ask for the next run
+        run: |
+          echo "next decision requested in ${WAIT_MINUTES} minutes"
+          sleep $((WAIT_MINUTES * 60))
+          gh workflow run hourly-decision --repo "$GITHUB_REPOSITORY" --ref main -f paced=true

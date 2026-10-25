@@ -223,7 +223,7 @@ Counted over `ledger/ledger.jsonl` on the chain as of **dossier 215** (head `493
 | Claims **rejected** by the citation validator | 120 (bull 58, bear 62); reason: "no citation" 1, "number not in cited evidence" 119 |
 | Share of claims accepted | 89.6% |
 
-The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures.
+The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures. From 25 Oct the hourly workflow is triggered four times an hour behind a gate that records at most one set of decisions per 50 minutes, and a second workflow, `pacemaker`, starts when a run finishes, waits 52 minutes and dispatches the next one, because scheduled runs alone did not fire for six hours that day; these rows will show whether that helped, and they are not rewritten if it did not.
 
 Earlier dossiers stay exactly as they were recorded, so the history of how the LLM layer came to work is in the ledger itself:
 

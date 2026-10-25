@@ -127,11 +127,18 @@ class PacemakerTest(unittest.TestCase):
         self.assertIn("types: [completed]", self.PACE)
         self.assertNotIn("conclusion", self.PACE.split("jobs:")[0], "a failed run must not break the chain")
 
-    def test_it_has_a_group_of_its_own_that_replaces_an_older_waiter(self):
+    def test_it_has_a_group_of_its_own_and_never_cancels_the_waiter_that_is_running(self):
         group = re.search(r"concurrency:\s*\n\s*group:\s*(\S+)\s*\n\s*cancel-in-progress:\s*(\w+)", self.PACE)
         self.assertIsNotNone(group)
         self.assertNotEqual(group.group(1), "ledger")
-        self.assertEqual(group.group(2), "true", "otherwise every restart would add another waiting chain")
+        # one running and at most one pending: a newer pending run replaces an older pending one, so chains cannot multiply
+        self.assertEqual(group.group(2), "false")
+
+    def test_it_queues_its_own_successor_because_runs_made_by_the_token_do_not_start_workflow_run(self):
+        """Measured on 25 Oct: the run the pacemaker dispatched recorded decisions, but its end did not wake the pacemaker."""
+        self.assertIn("workflow_dispatch:", self.PACE.split("jobs:")[0])
+        self.assertIn("gh workflow run pacemaker", self.PACE)
+        self.assertLess(self.PACE.index("gh workflow run pacemaker"), self.PACE.index("sleep "), "the successor is queued before the wait, so a failure later cannot end the chain")
 
     def test_it_waits_less_than_an_hour_inside_a_longer_timeout_and_then_dispatches(self):
         minutes = re.search(r"WAIT_MINUTES:\s*(\d+)", self.PACE)

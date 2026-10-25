@@ -41,9 +41,11 @@ class PacksCommandTest(unittest.TestCase):
             self.assertEqual(pack["format"], "verdict-desk/evidence-pack/v1")
 
     def test_the_anchored_dossier_is_included_even_when_it_is_not_recent(self):
+        from verdict_desk import scoreboard
+        anchored = scoreboard._sepolia(ROOT, LEDGER, None)["seq"]  # the newest anchor the evidence folder records; it changes whenever one is made
         out = Path(tempfile.mkdtemp())
         run(out, 1, anchored=True)
-        self.assertTrue((out / "212.json").exists(), sorted(p.name for p in out.glob("*.json")))
+        self.assertTrue((out / f"{anchored}.json").exists(), sorted(p.name for p in out.glob("*.json")))
 
     def test_without_a_ledger_it_fails_instead_of_writing_nothing_silently(self):
         opts = argparse.Namespace(ledger=Path(tempfile.mkdtemp()) / "none.jsonl", recent=3, outdir=Path(tempfile.mkdtemp()), anchored=False)

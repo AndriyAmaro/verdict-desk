@@ -55,7 +55,9 @@
 
   function portfolio(ledger) {
     var positions = [];
-    ledger.forEach(function (d, i) { if (d.verdict.action !== "FLAT") positions.push(resolve(d, laterCandles(ledger, i))); });
+    // Only a sized LONG or SHORT is a position. FLAT, WATCH_REVERSAL, REDUCE_EXPOSURE and BLOCKED_STALE record a
+    // decision not to enter, with no entry or size; treating them as positions produced NaN (same rule as portfolio.py).
+    ledger.forEach(function (d, i) { if (d.verdict.action === "LONG" || d.verdict.action === "SHORT") positions.push(resolve(d, laterCandles(ledger, i))); });
     var closed = positions.filter(function (p) { return p.status !== "OPEN"; });
     var wins = closed.filter(function (p) { return p.pnl > 0; });
     var equity = START_CAPITAL, peak = START_CAPITAL, maxDd = 0;
@@ -67,7 +69,7 @@
     var sum = function (list) { return list.reduce(function (a, p) { return a + p.pnl; }, 0); };
     return {
       decisions: ledger.length,
-      flat: ledger.filter(function (d) { return d.verdict.action === "FLAT"; }).length,
+      flat: ledger.length - positions.length,
       positions: positions,
       closed: closed.length,
       open: positions.length - closed.length,

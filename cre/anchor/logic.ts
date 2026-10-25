@@ -39,6 +39,14 @@ export function parseHead(text: string): LedgerHead {
 	return { seq, hash, symbol }
 }
 
+/** Two independent sources must publish exactly the same head; anything else is refused, never averaged or guessed. */
+export function agreeOnHead(a: LedgerHead, b: LedgerHead): LedgerHead {
+	if (a.seq !== b.seq) throw new Error(`ledger head sources disagree: seq ${a.seq} vs ${b.seq}`)
+	if (a.hash !== b.hash) throw new Error(`ledger head sources disagree: hash differs at seq ${a.seq}`)
+	if (a.symbol !== b.symbol) throw new Error(`ledger head sources disagree: symbol ${a.symbol} vs ${b.symbol}`)
+	return a
+}
+
 const REPORT_TYPES = [
 	{ type: 'uint64' },
 	{ type: 'bytes32' },

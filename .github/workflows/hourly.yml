@@ -40,6 +40,9 @@ jobs:
           # LLM_KEYLESS=1 for a provider that needs no key: no Authorization header is sent, even though the
           # LLM secret may hold a key for another provider. LLM_MIN_INTERVAL spaces calls (seconds), e.g. a
           # free tier that allows one reply every 30 seconds.
+          # LLM_PROVIDER=anthropic reads the LLM secret as an Anthropic key and talks to Claude through the native
+          # Messages API (default model claude-haiku-5-5). Unset: an OpenAI-style chat API, Mistral by default.
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
           LLM_KEYLESS: ${{ vars.LLM_KEYLESS }}
           MISTRAL_MIN_INTERVAL: ${{ vars.LLM_MIN_INTERVAL }}
         run: python -m verdict_desk decide-v5 BTCUSDT ETHUSDT SOLUSDT --config config/voices.json
@@ -93,6 +96,9 @@ jobs:
           # LLM_KEYLESS=1 for a provider that needs no key: no Authorization header is sent, even though the
           # LLM secret may hold a key for another provider. LLM_MIN_INTERVAL spaces calls (seconds), e.g. a
           # free tier that allows one reply every 30 seconds.
+          # LLM_PROVIDER=anthropic reads the LLM secret as an Anthropic key and talks to Claude through the native
+          # Messages API (default model claude-haiku-5-5). Unset: an OpenAI-style chat API, Mistral by default.
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
           LLM_KEYLESS: ${{ vars.LLM_KEYLESS }}
           MISTRAL_MIN_INTERVAL: ${{ vars.LLM_MIN_INTERVAL }}
         run: |

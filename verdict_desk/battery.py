@@ -85,9 +85,41 @@ def timestamped_heads(stamps: Path) -> list[dict]:
     return heads
 
 
-def witness_index(stamps: Path, deployment: Path) -> dict:
-    """O que a pagina de testemunhas le: as pontas carimbadas (com onde estao os arquivos) e o contrato
-    de ancora. A pagina confere tudo sozinha; este indice so diz onde procurar."""
+def _log_index(bundle: dict) -> int:
+    """O indice da entrada no log do Sigstore, no formato antigo do cosign ou no novo."""
+    legacy = (bundle.get("rekorBundle") or {}).get("Payload") or {}
+    if legacy.get("logIndex") is not None:
+        return int(legacy["logIndex"])
+    entries = (bundle.get("verificationMaterial") or {}).get("tlogEntries") or []
+    if entries and entries[0].get("logIndex") is not None:
+        return int(entries[0]["logIndex"])
+    raise ValueError("the bundle holds no transparency log entry")
+
+
+def rekor_heads(rekor: Path, stamps: Path) -> list[dict]:
+    """As pontas assinadas pelo workflow e registradas no log do Sigstore. So conta a que tem o snapshot
+    assinado ao lado; um bundle ilegivel e pulado (a pagina pergunta ao log, entao um indice errado
+    pode esconder uma testemunha, nunca inventar uma)."""
+    rekor, stamps = Path(rekor), Path(stamps)
+    root = stamps.parent.parent  # os caminhos sao relativos ao site, que serve ledger/...
+    heads = []
+    for bundle_path in sorted(rekor.glob("*.bundle.json")):
+        snapshot = stamps / f"{bundle_path.name.removesuffix('.bundle.json')}.json"
+        if not snapshot.exists():
+            continue
+        try:
+            data = json.loads(snapshot.read_text(encoding="utf-8"))
+            log_index = _log_index(json.loads(bundle_path.read_text(encoding="utf-8")))
+            heads.append({"seq": int(data["seq"]), "hash": data["hash"], "log_index": log_index,
+                          "snapshot": snapshot.relative_to(root).as_posix(), "bundle": bundle_path.relative_to(root).as_posix()})
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return sorted(heads, key=lambda h: h["seq"])
+
+
+def witness_index(stamps: Path, deployment: Path, rekor: Path | None = None) -> dict:
+    """O que a pagina de testemunhas le: as pontas carimbadas (com onde estao os arquivos), as assinadas no
+    log do Sigstore e o contrato de ancora. A pagina confere tudo sozinha; este indice so diz onde procurar."""
     stamps = Path(stamps)
     root = stamps.parent.parent
     heads = []
@@ -101,7 +133,7 @@ def witness_index(stamps: Path, deployment: Path) -> dict:
                   "rpc": "https://ethereum-sepolia-rpc.publicnode.com", "explorer": data.get("explorer", {}).get("contract")}
     except (OSError, ValueError, KeyError):
         pass
-    return {"heads": heads, "anchor": anchor}
+    return {"heads": heads, "anchor": anchor, "rekor": rekor_heads(rekor, stamps) if rekor else []}
 
 
 def witness_problems(ledger: list[dict], heads: list[dict]) -> list[str]:

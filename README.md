@@ -12,7 +12,7 @@ Nothing to install and nothing to take on trust: each page below downloads the r
 |---|---|
 | [Dashboard](https://andriyamaro.github.io/verdict-desk/) | Recomputes every SHA-256 of the ledger. Press **Test the chain** and watch an edited record turn red. |
 | [Market voices](https://andriyamaro.github.io/verdict-desk/narrative.html) | Recomputes each voice's track record (skill above what luck gives, no lookahead). Tick the voices that agree, set your own risk limit and see the practice position that follows. |
-| [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) | Reads the Bitcoin proof of the ledger head, asks two block explorers for the block, reads the Sepolia anchor, and shows how many attacks on our own verifier got through. |
+| [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) | Reads the Bitcoin proof of the ledger head, asks two block explorers for the block, asks the Sigstore transparency log for the hourly signature of the head (signed by a GitHub workflow, no key of ours), reads the Sepolia anchor, and shows how many attacks on our own verifier got through. |
 | [Evidence for a lawyer](https://andriyamaro.github.io/verdict-desk/evidence.html) | What each layer establishes and what it does not, and a foundation declaration drafted from a real dossier. |
 | [Cause and effect lab](https://andriyamaro.github.io/verdict-desk/lab.html) | Remove one argument from a real decision and watch the verdict flip. |
 | [Learn it by breaking it](https://andriyamaro.github.io/verdict-desk/learn.html) | Seven short exercises, each one a way to try to fool the system and what it should teach you. |
@@ -324,7 +324,7 @@ The key is read from the environment only and is never written to a dossier or a
 |---|---|
 | `verdict_desk/` | The engine: evidence, narrative, voices (the user's config), trust (per-voice track record), features, agents, citations, llm, dossier, portfolio, battery (attacks on our own verifier), backtest, research, canonical JSON, CLI |
 | `config/voices.json` | The voices and the risk limit the user chooses (up to 20 voices); its hash is frozen in every dossier |
-| `web/` | Static dashboard and the browser verifiers: ledger hashes, voice track record (`trust.js`), OpenTimestamps proofs (`ots.js`), the policy mirror (`policy.js`); pages for market voices, witnesses and evidence |
+| `web/` | Static dashboard and the browser verifiers: ledger hashes, voice track record (`trust.js`), OpenTimestamps proofs (`ots.js`), Sigstore log entries (`rekor.js`), the policy mirror (`policy.js`); pages for market voices, witnesses and evidence |
 | `ledger/` | The public ledger and its head |
 | `cre/` | Chainlink CRE workflow, receiver contract and tests |
 | `docs/architecture.md` | Architecture, decisions and risks |

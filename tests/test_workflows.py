@@ -96,3 +96,18 @@ class CadenceGateTest(unittest.TestCase):
 
     def test_the_gate_uses_a_real_command_with_the_limit_the_comment_promises(self):
         self.assertIn("verdict_desk due --min-minutes 50", self.FLOW)
+
+
+class AnchorInstallTest(unittest.TestCase):
+    """The CRE CLI installer moved and the old URL answered 404; piping that into bash looked like
+    "command not found" and the anchor run died. Keep the URL on the current path and let curl fail loudly."""
+
+    FLOW = (ROOT / ".github" / "workflows" / "anchor.yml").read_text(encoding="utf-8")
+
+    def test_the_installer_url_is_the_current_path(self):
+        self.assertIn("cre-cli/main/install/install.sh", self.FLOW)
+        self.assertNotIn("cre-cli/main/install.sh", self.FLOW)
+
+    def test_a_download_error_stops_the_step(self):
+        self.assertIn("curl -fsSL", self.FLOW)
+        self.assertIn("set -o pipefail", self.FLOW)

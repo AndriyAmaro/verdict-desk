@@ -2,17 +2,26 @@
 
 **An autonomous agent makes a market decision. Verdict Desk turns it into evidence a lawyer can file.**
 
-Audit-grade, replayable decisions for AI market agents. Simulated only: no order is ever placed.
+Audit-grade, replayable decisions for AI market agents. **Simulated only: no order is ever placed.** Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
+
+## Check it yourself in 60 seconds
+
+Nothing to install and nothing to take on trust: each page below downloads the raw ledger and redoes the work in **your own browser**.
+
+| Open | What your browser does |
+|---|---|
+| [Dashboard](https://andriyamaro.github.io/verdict-desk/) | Recomputes every SHA-256 of the ledger. Press **Test the chain** and watch an edited record turn red. |
+| [Market voices](https://andriyamaro.github.io/verdict-desk/narrative.html) | Recomputes each voice's track record (skill above what luck gives, no lookahead). Tick the voices that agree, set your own risk limit and see the practice position that follows. |
+| [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) | Reads the Bitcoin proof of the ledger head, asks two block explorers for the block, reads the Sepolia anchor, and shows how many attacks on our own verifier got through. |
+| [Evidence for a lawyer](https://andriyamaro.github.io/verdict-desk/evidence.html) | What each layer establishes and what it does not, and a foundation declaration drafted from a real dossier. |
+| [Cause and effect lab](https://andriyamaro.github.io/verdict-desk/lab.html) | Remove one argument from a real decision and watch the verdict flip. |
+| [Judge path](https://andriyamaro.github.io/verdict-desk/judge.html) | Every requirement of both bounties, each mapped to the file, command or transaction that proves it. |
+
+From a terminal: `python3 -m unittest discover -s tests` (the suite), `python3 -m verdict_desk verify` (the chain), `replay` (every verdict re-derived from its frozen evidence), `trust-check` (every frozen voice table recomputed from the dossiers before it) and `battery` (attack a copy of the ledger and count what the verifier misses).
 
 **Why it exists.** When an autonomous agent acts, the people who answer for it afterwards (an auditor, a compliance officer, a lawyer) need two things: exactly what the agent saw and decided at that moment, and a way to check that record without taking the operator's word for it. Verdict Desk produces that trail. Each decision is frozen as a **dossier**: the evidence the agent saw, with its sources and times, the arguments for and against, and the verdict. Dossiers are hash-chained, so editing a record leaves a mark that anyone can find by recomputing the hashes in their own browser, with no account and no server in the loop. Rewriting every later hash would hide an edit inside the chain but changes its head, so the head is published where the operator cannot quietly rewrite it: in git history today, and in an on-chain anchor on Sepolia that the CRE workflow wrote on 2026-10-21 (the evidence is below). The reasoning can be re-run from the frozen evidence and either gives the same verdict or shows exactly where it differs. The trail shows what was decided and why; it does not show that a decision was right, and this repository makes no claim about customers or deployments. The agent here trades on paper only, so the mechanism can be tested in public.
 
 How it works in one paragraph: Verdict Desk reads public market evidence, freezes it, lets a bull agent and a bear agent argue over the same facts, and lets a deterministic judge size a *simulated* position inside declared risk limits. Every decision becomes a dossier that is hash-chained to the one before it. Open the dashboard, press **Test the chain**, and break the chain yourself in 30 seconds.
-
-Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
-
-**Market voices (the multi-KOL spotlight):** [`web/narrative.html`](web/narrative.html) — the featured direction: who converged, on what, and every token that never did, with the reason. Published at `https://andriyamaro.github.io/verdict-desk/narrative.html`.
-
-**Judge path (start here):** [`web/judge.html`](web/judge.html) — every requirement of both bounties, each one mapped to the file, command or transaction that proves it, with the live numbers recomputed from the ledger in the visitor's browser. Published at `https://andriyamaro.github.io/verdict-desk/judge.html`.
 
 **Watch it first (narrated, 77 s):** [`web/demo/verdict-desk-demo-v4.mp4`](web/demo/verdict-desk-demo-v4.mp4) — eight scenes, every frame a real rendered page driven by Playwright: the live hero, the one-click tamper demo turning the banner red, the cause-and-effect lab with its deciding argument, the anchored exhibit, the verify page, and the scorecard with its losing rows. Published at `https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo-v4.mp4`.
 
@@ -108,13 +117,24 @@ Two details that decide whether this is evidence or decoration:
 
 The live site publishes the last five exhibits plus the anchored record, regenerated on every hourly run: [`web/exhibit/`](https://andriyamaro.github.io/verdict-desk/exhibit/index.html). The anchored record also ships as a signed PDF certificate with a VERIFIED seal: [`exhibit-80.pdf`](https://andriyamaro.github.io/verdict-desk/exhibit/exhibit-80.pdf).
 
-## Rules v4: the multi-KOL convergence creates the position
+## Rules v4 and v5: the multi-KOL convergence creates the position
 
 The spotlight asks the agent to "create a practice position using transparent signal rules". Since
 rules v4, a narrative convergence matching the symbol becomes a **deterministic** argument whose
 weight is a stated formula — 0.5 per distinct voice (max 4) plus 0.5 when top conviction is high —
 so the multi-KOL layer drives the position by a rule the replay reproduces, not by the LLM's
 opinion. Earlier versions (v1/v2/v3) are unchanged and keep replaying under their own version.
+
+Rules v5 answers "which voices are trusted?" with a measurement instead of a list. Each voice's
+directional calls are scored against the market's move over the next 4 hours (read from the candles
+frozen in the dossiers), compared with the hit rate **luck alone would give that voice** (a voice that
+only says "up" earns exactly zero), and the excess is shrunk toward zero on small samples; under 8
+settled calls a voice has no record and counts 1.00. A convergence then weighs 0.5 × each voice's
+weight (the four heaviest) plus 0.5 at high conviction. There is **no lookahead**: each dossier
+freezes the table of the voices it read, computed only from the dossiers before its run, and
+`python3 -m verdict_desk trust-check` recomputes every frozen table from that earlier ledger. The
+browser recomputes the same table from the raw ledger ([Market voices](web/narrative.html)), compared
+with the Python by a test. With no record, v5 equals v4.
 
 ## The chain of custody in one image
 
@@ -285,6 +305,11 @@ python3 -m verdict_desk --ledger scratch.jsonl decide-v2 BTCUSDT ETHUSDT SOLUSDT
 python3 -m verdict_desk backtest BTCUSDT
 python3 -m verdict_desk research BTCUSDT ETHUSDT SOLUSDT
 python3 -m verdict_desk audit-journal path/to/agent_journal.jsonl --out audit.json   # check a third-party agent journal against public data, replay it in shadow
+python3 -m verdict_desk --ledger scratch.jsonl decide-v5 BTCUSDT ETHUSDT SOLUSDT --config config/voices.json   # what the hourly workflow runs
+python3 -m verdict_desk trust                                          # per-voice track record, skill above chance
+python3 -m verdict_desk trust-check                                    # every frozen trust table, recomputed from the dossiers before it
+python3 -m verdict_desk battery                                        # attack a copy of the ledger and count what verify misses (about a minute)
+python3 -m verdict_desk witnesses --out witnesses.json                 # the stamped heads and anchor contract the witnesses page reads
 python3 -m verdict_desk head --out ledger/head.json
 python3 -m verdict_desk stats --git                                    # live-operation numbers counted from the ledger
 python3 -m verdict_desk --ledger ledger-tampered.jsonl verify          # check a copy downloaded from the dashboard
@@ -296,8 +321,9 @@ The key is read from the environment only and is never written to a dossier or a
 
 | Path | What it is |
 |---|---|
-| `verdict_desk/` | The engine: evidence, narrative, features, agents, citations, llm, dossier, portfolio, backtest, research, canonical JSON, CLI |
-| `web/` | Static dashboard and the browser verifier |
+| `verdict_desk/` | The engine: evidence, narrative, voices (the user's config), trust (per-voice track record), features, agents, citations, llm, dossier, portfolio, battery (attacks on our own verifier), backtest, research, canonical JSON, CLI |
+| `config/voices.json` | The voices and the risk limit the user chooses (up to 20 voices); its hash is frozen in every dossier |
+| `web/` | Static dashboard and the browser verifiers: ledger hashes, voice track record (`trust.js`), OpenTimestamps proofs (`ots.js`), the policy mirror (`policy.js`); pages for market voices, witnesses and evidence |
 | `ledger/` | The public ledger and its head |
 | `cre/` | Chainlink CRE workflow, receiver contract and tests |
 | `docs/architecture.md` | Architecture, decisions and risks |

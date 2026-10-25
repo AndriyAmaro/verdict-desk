@@ -127,7 +127,10 @@ def collect_with_gaps(feeds: dict[str, str], log=None) -> tuple[list[dict], dict
     com o motivo, nunca um silencio: quem audita ve quais vozes faltaram em cada decisao."""
     voices: list[dict] = []
     gaps: dict[str, str] = {}
-    for name, url in list(feeds.items())[:MAX_VOICES]:
+    selected = list(feeds.items())
+    for name, _ in selected[MAX_VOICES:]:
+        gaps[name] = f"not fetched: over the limit of {MAX_VOICES} voices per decision"
+    for name, url in selected[:MAX_VOICES]:
         try:
             got = fetch_feed(url, name)
         except (OSError, ValueError, ET.ParseError) as err:

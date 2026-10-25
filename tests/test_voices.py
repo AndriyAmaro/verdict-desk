@@ -168,6 +168,32 @@ class DecideWithConfigTest(unittest.TestCase):
         self.assertEqual(record["voices"], 2)
         self.assertEqual(record["gaps"], {"Desk Two": "HTTPError: 503"})
 
+    def test_the_collector_receives_the_sources_the_user_configured(self):
+        seen = {}
+
+        def spy(feeds, log=None):
+            seen.update(feeds)
+            return [], {}
+
+        config = self.write_config(GOOD)
+        path = Path(tempfile.mkdtemp()) / "ledger" / "ledger.jsonl"
+        opts = argparse.Namespace(symbols=["BTCUSDT"], interval="1h", no_news=True, feed=None, default_feeds=False,
+                                  ledger=path, config=config, risk_pct=None)
+        with mock.patch.object(evidence, "collect", lambda symbol, interval, with_news: {**packet(0.004), "symbol": symbol}), \
+                mock.patch.object(narrative, "collect_with_gaps", spy), \
+                mock.patch.object(cli.llm, "available", lambda: False), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            cli._decide_flow(opts, "v4")
+        self.assertEqual(set(seen), {v["name"] for v in GOOD["voices"]})
+
+    def test_sources_over_the_limit_are_recorded_as_gaps_not_dropped_silently(self):
+        feeds = {f"Voice {i}": f"https://example.org/{i}.xml" for i in range(narrative.MAX_VOICES + 2)}
+        with mock.patch.object(narrative, "fetch_feed", lambda url, name: [{"name": name, "title": "Bitcoin surge", "link": url}]):
+            got, gaps = narrative.collect_with_gaps(feeds)
+        self.assertEqual(len(got), narrative.MAX_VOICES)
+        self.assertEqual(set(gaps), {f"Voice {narrative.MAX_VOICES}", f"Voice {narrative.MAX_VOICES + 1}"})
+        self.assertIn("over the limit", gaps[f"Voice {narrative.MAX_VOICES}"])
+
     def test_the_users_risk_limit_sizes_the_position_unless_the_command_line_asks_for_another(self):
         config = self.write_config(GOOD)
         _, path, _ = self.run_decide(config)

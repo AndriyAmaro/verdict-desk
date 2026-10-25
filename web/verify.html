@@ -62,7 +62,10 @@ th{font-weight:600;font-size:12px;color:var(--mut)}
   const V = window.VerdictDesk, P = window.VerdictPolicy;
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-  function parse(text) {
+  // An evidence pack (the file the exhibits offer for download) wraps the record under `dossier`; check the record inside it.
+  function unwrapPack(r) { return r && r.format === "verdict-desk/evidence-pack/v1" && r.dossier ? r.dossier : r; }
+  function parse(text) { return parseRaw(text).map(unwrapPack); }
+  function parseRaw(text) {
     const trimmed = text.trim();
     if (!trimmed) return [];
     if (trimmed.startsWith("[")) {
@@ -70,10 +73,10 @@ th{font-weight:600;font-size:12px;color:var(--mut)}
       return Array.isArray(arr) ? arr : [arr];
     }
     if (trimmed.startsWith("{")) {
-      // a single object, or JSONL
+      // a single object (pretty-printed or not), or JSONL
+      try { return [JSON.parse(trimmed)]; } catch (e) { /* more than one object: JSONL */ }
       const lines = trimmed.split("\n").filter((l) => l.trim().startsWith("{"));
-      if (lines.length > 1) return lines.map((l) => JSON.parse(l));
-      return [JSON.parse(trimmed)];
+      return lines.map((l) => JSON.parse(l));
     }
     return trimmed.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
   }

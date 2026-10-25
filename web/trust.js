@@ -123,6 +123,48 @@
     };
   }
 
-  const api = { compute, calls, settled, weightFor, HORIZON_HOURS, MIN_CALLS };
+  /* The weight a convergence carries as an argument. Rules v4: 0.5 per distinct voice, at most four.
+   * Rules v5 (trustWeighted): 0.5 x each voice's track-record weight, the four heaviest. Plus 0.5 when
+   * the top conviction is high. A mirror of `agents_v2.convergence_args`. */
+  function convergenceWeight(weights, highConviction, trustWeighted) {
+    const list = trustWeighted ? fsum([...weights].sort((a, b) => b - a).slice(0, 4)) : Math.min(weights.length, 4);
+    return roundHalfEven(list * 0.5 + (highConviction ? 0.5 : 0), 2);
+  }
+
+  /* Exactly rounded sum (Shewchuk), the same as Python's math.fsum: the order and the width of the
+   * floats cannot change the result, so the browser and the Python judge cannot disagree by an ulp. */
+  function fsum(values) {
+    const partials = [];
+    for (let x of values) {
+      let i = 0;
+      for (let y of partials) {
+        if (Math.abs(x) < Math.abs(y)) [x, y] = [y, x];
+        const hi = x + y;
+        const lo = y - (hi - x);
+        if (lo) partials[i++] = lo;
+        x = hi;
+      }
+      partials.length = i;
+      partials.push(x);
+    }
+    return partials.reduce((a, b) => a + b, 0);
+  }
+
+  /* Python's round(): the exact binary value decides, and an exact tie goes to the even digit. A plain
+   * Math.round would put 1.835 (really 1.83499...) at 1.84 and 0.625 (an exact tie) at 0.63. */
+  function roundHalfEven(x, places) {
+    const long = x.toFixed(places + 20);
+    const dot = long.indexOf(".");
+    const tail = long.slice(dot + 1 + places);
+    if (/^50*$/.test(tail)) {
+      const kept = long.slice(0, dot + 1 + places);
+      const lastDigit = Number(kept.replace(/[^0-9]/g, "").slice(-1));
+      if (lastDigit % 2 === 0) return Number(kept);
+      return Number((Number(kept) + (x < 0 ? -1 : 1) * 10 ** -places).toFixed(places));
+    }
+    return Number(x.toFixed(places));
+  }
+
+  const api = { compute, calls, settled, weightFor, convergenceWeight, HORIZON_HOURS, MIN_CALLS };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.VerdictTrust = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -42,6 +42,23 @@ class RenderTest(unittest.TestCase):
         self.assertIn("MATCH — the record is unchanged", page)
         self.assertIn(self.row["hash"], page)
 
+    def test_an_analyst_layer_that_failed_says_why_instead_of_saying_nothing(self):
+        """"Nothing kept" is true and useless; a reader needs to know the provider failed, and what decided instead."""
+        broken = json.loads(json.dumps(self.row))
+        reason = "HTTP 402 Payment Required from https://api.example.com/v1 model m: quota"
+        broken["llm"] = {"bull": {"accepted": [], "rejected": [], "error": reason}, "bear": {"accepted": [], "rejected": [], "error": reason}}
+        page = exhibit.render(broken)
+        self.assertEqual(page.count("returned an error and produced no claims"), 2)
+        self.assertIn("HTTP 402 Payment Required", page)
+        self.assertIn("deterministic engine alone", page)
+
+    def test_an_analyst_that_ran_and_kept_nothing_still_says_so(self):
+        quiet = json.loads(json.dumps(self.row))
+        quiet["llm"] = {"bull": {"accepted": [], "rejected": []}, "bear": {"accepted": [], "rejected": []}}
+        page = exhibit.render(quiet)
+        self.assertIn("Nothing kept.", page)
+        self.assertNotIn("returned an error", page)
+
     def test_a_tampered_record_says_mismatch_on_its_face(self):
         tampered = json.loads(json.dumps(self.row))
         tampered["verdict"]["action"] = "LONG" if tampered["verdict"]["action"] != "LONG" else "SHORT"

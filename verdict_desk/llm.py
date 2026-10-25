@@ -13,6 +13,7 @@ import email.utils
 import json
 import math
 import os
+import re
 import threading
 import time
 import urllib.error
@@ -52,8 +53,17 @@ def _key() -> str:
     return os.environ.get("MISTRAL_API_KEY", "").strip()
 
 
+def _keyless() -> bool:
+    """LLM_KEYLESS=1: the provider needs no key (a free anonymous tier).
+
+    In this mode no Authorization header is sent at all, even when MISTRAL_API_KEY holds a key for
+    another provider: a credential is never handed to a host it does not belong to.
+    """
+    return os.environ.get("LLM_KEYLESS", "").strip() == "1"
+
+
 def available() -> bool:
-    return bool(_key())
+    return bool(_key()) or _keyless()
 
 
 def message_text(content) -> str:
@@ -105,15 +115,31 @@ def _retry_delay(err: urllib.error.HTTPError, attempt: int) -> float | None:
     return wait if wait <= MAX_WAIT else None
 
 
-def _http_error(err: urllib.error.HTTPError, key: str) -> LLMError:
-    # O erro vai para o dossie: inclui o corpo da resposta (curto, sem a chave) para a causa aparecer no historico.
-    detail = ""
+def _read_detail(err: urllib.error.HTTPError) -> str:
     try:
-        detail = err.read(300).decode("utf-8", "replace")
+        detail = err.read(600).decode("utf-8", "replace")
         err.close()
+        return detail
     except Exception:  # corpo ausente ou ja consumido: o status basta
-        pass
-    detail = detail.replace(key, "***").replace("\n", " ").strip()
+        return ""
+
+
+def _free_limit_delay(err: urllib.error.HTTPError, detail: str) -> float | None:
+    """A free anonymous tier answers HTTP 402 FREE_LIMIT with "Retry after Ns": wait that long, once it fits MAX_WAIT."""
+    if err.code != 402 or "FREE_LIMIT" not in detail:
+        return None
+    found = re.search(r"[Rr]etry after (\d+)\s*s", detail)
+    wait = float(found.group(1)) + 1.0 if found else 31.0
+    return wait if wait <= MAX_WAIT else None
+
+
+def _http_error(err: urllib.error.HTTPError, key: str, detail: str | None = None) -> LLMError:
+    # O erro vai para o dossie: inclui o corpo da resposta (curto, sem a chave) para a causa aparecer no historico.
+    if detail is None:
+        detail = _read_detail(err)
+    if key:  # an empty key would be "redacted" into every gap of the text
+        detail = detail.replace(key, "***")
+    detail = detail[:300].replace("\n", " ").strip()
     return LLMError(f"HTTP {err.code} {err.reason} from {BASE_URL} model {MODEL}: {detail or 'no body'}")
 
 
@@ -128,12 +154,14 @@ def _first_choice(raw: bytes) -> dict:
 
 
 def chat(system: str, user: str, timeout: int = 90, max_tokens: int | None = None) -> str:
-    key = _key()
-    if not key:
-        raise LLMError("MISTRAL_API_KEY is not set")
-    if not key.isprintable() or " " in key:
-        # Nao ecoa o valor: um cabecalho invalido faz o urllib imprimir a chave no erro.
-        raise LLMError("MISTRAL_API_KEY has spaces or control characters; paste only the key")
+    keyless = _keyless()
+    key = "" if keyless else _key()
+    if not keyless:
+        if not key:
+            raise LLMError("MISTRAL_API_KEY is not set")
+        if not key.isprintable() or " " in key:
+            # Nao ecoa o valor: um cabecalho invalido faz o urllib imprimir a chave no erro.
+            raise LLMError("MISTRAL_API_KEY has spaces or control characters; paste only the key")
     body = json.dumps(
         {"model": MODEL, "temperature": 0, "max_tokens": max_tokens or MAX_TOKENS, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
     ).encode("utf-8")
@@ -142,16 +170,19 @@ def chat(system: str, user: str, timeout: int = 90, max_tokens: int | None = Non
         request = urllib.request.Request(
             f"{BASE_URL}/chat/completions",
             data=body,
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            headers={**({"Authorization": f"Bearer {key}"} if key else {}), "Content-Type": "application/json"},
         )
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 choice = _first_choice(response.read())
             break
         except urllib.error.HTTPError as err:
+            detail = _read_detail(err)
             delay = _retry_delay(err, attempt) if err.code in RETRY_STATUS and attempt < MAX_RETRIES else None
+            if delay is None and keyless and attempt < MAX_RETRIES:
+                delay = _free_limit_delay(err, detail)
             if delay is None:
-                raise _http_error(err, key) from err
+                raise _http_error(err, key, detail) from err
             _pause(delay)
     message = choice.get("message")
     content = message_text(message.get("content") if isinstance(message, dict) else None)

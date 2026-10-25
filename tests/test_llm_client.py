@@ -252,6 +252,74 @@ class ClientTest(unittest.TestCase):
                 self.assertEqual(out, expected)
 
 
+class KeylessTest(unittest.TestCase):
+    """A provider that needs no key (a free anonymous tier) must never receive a key we happen to hold.
+
+    The repository secret still holds a key for a different provider; in keyless mode that key is not
+    sent anywhere, and the free tier's "one reply every 30 seconds" is waited out instead of failing.
+    """
+
+    FREE_LIMIT = b'{"status":402,"error":{"code":"FREE_LIMIT","message":"Free limit reached: 1 reply every 30 seconds per IP. Retry after 23s"}}'
+
+    def setUp(self):
+        for patch in (
+            mock.patch.dict(os.environ, {"LLM_KEYLESS": "1"}),
+            mock.patch.object(llm, "BASE_URL", "https://free.example/openai"),
+            mock.patch.object(llm, "MIN_INTERVAL", 0.0),
+            mock.patch.object(llm, "_next_start", 0.0),
+        ):
+            patch.start()
+            self.addCleanup(patch.stop)
+        pause = mock.patch.object(llm, "_pause")
+        self.pause = pause.start()
+        self.addCleanup(pause.stop)
+
+    def test_it_is_available_without_a_key_and_sends_no_authorization(self):
+        with mock.patch.dict(os.environ):
+            os.environ.pop("MISTRAL_API_KEY", None)
+            self.assertTrue(llm.available())
+            with mock.patch("urllib.request.urlopen", return_value=reply("hello")) as urlopen:
+                self.assertEqual(llm.chat("s", "u"), "hello")
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, "https://free.example/openai/chat/completions")
+        self.assertIsNone(request.get_header("Authorization"))
+
+    def test_a_key_that_happens_to_be_set_is_never_forwarded(self):
+        with mock.patch.dict(os.environ, {"MISTRAL_API_KEY": KEY}):
+            with mock.patch("urllib.request.urlopen", return_value=reply("hello")) as urlopen:
+                llm.chat("s", "u")
+        request = urlopen.call_args.args[0]
+        self.assertIsNone(request.get_header("Authorization"))
+        self.assertNotIn(KEY.encode(), request.data)
+
+    def test_the_free_limit_is_waited_out_and_retried(self):
+        with mock.patch("urllib.request.urlopen", side_effect=[http_error(402, self.FREE_LIMIT), reply("ok")]) as urlopen:
+            self.assertEqual(llm.chat("s", "u"), "ok")
+        self.assertEqual(urlopen.call_count, 2)
+        self.pause.assert_any_call(24.0)
+
+    def test_a_free_limit_that_asks_for_too_long_a_wait_is_an_error_now(self):
+        long_wait = self.FREE_LIMIT.replace(b"23s", b"600s")
+        with mock.patch("urllib.request.urlopen", side_effect=[http_error(402, long_wait)]) as urlopen:
+            with self.assertRaises(llm.LLMError):
+                llm.chat("s", "u")
+        self.assertEqual(urlopen.call_count, 1)
+
+    def test_other_errors_are_not_retried_and_the_message_is_not_mangled(self):
+        with mock.patch("urllib.request.urlopen", side_effect=[http_error(401, b'{"detail":"nope"}')]):
+            with self.assertRaises(llm.LLMError) as caught:
+                llm.chat("s", "u")
+        self.assertIn("nope", str(caught.exception))
+        self.assertNotIn("***", str(caught.exception), "an empty key must not be 'redacted' into every gap of the message")
+
+    def test_a_402_with_a_key_set_and_keyless_off_is_still_a_plain_error(self):
+        with mock.patch.dict(os.environ, {"LLM_KEYLESS": "", "MISTRAL_API_KEY": KEY}):
+            with mock.patch("urllib.request.urlopen", side_effect=[http_error(402, self.FREE_LIMIT)]) as urlopen:
+                with self.assertRaises(llm.LLMError):
+                    llm.chat("s", "u")
+        self.assertEqual(urlopen.call_count, 1)
+
+
 class LocalServerTest(unittest.TestCase):
     """Caminho real de HTTP (socket, cabecalhos, corpo de erro) contra um servidor local que imita a Mistral."""
 

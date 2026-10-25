@@ -46,7 +46,7 @@ class PageTest(unittest.TestCase):
 
     def test_the_new_pages_are_reachable_from_the_navigation(self):
         index = (WEB / "index.html").read_text(encoding="utf-8")
-        for target in ("narrative.html", "witnesses.html", "evidence.html"):
+        for target in ("narrative.html", "witnesses.html", "evidence.html", "learn.html"):
             self.assertIn(f'href="{target}"', index, f"the dashboard does not link to {target}")
 
     @unittest.skipUnless(NODE, "node is not installed")

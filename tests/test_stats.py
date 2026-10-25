@@ -101,3 +101,28 @@ class CadenceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(NODE, "node not installed")
+class StatsOnTheRealLedgerTest(unittest.TestCase):
+    """The fixture above has no declined entries, and the dashboard shows what the JavaScript computes on the
+    published ledger: a WATCH_REVERSAL counted as a position gave 'unrealized NaN' and 215 positions beside
+    '163 sized LONG or SHORT'. The two implementations must agree on the real file, not only on a fixture."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.path = HERE.parent / "ledger" / "ledger.jsonl"
+        cls.node = run_node(cls.path)["portfolio"]
+        cls.py = portfolio.summarize(dossier.read_ledger(cls.path))
+
+    def test_a_declined_entry_is_not_a_position(self):
+        actions = {p["action"] for p in self.node["positions"]}
+        self.assertEqual(actions - {"LONG", "SHORT"}, set())
+
+    def test_the_same_positions_and_money_on_the_published_ledger(self):
+        self.assertEqual(len(self.node["positions"]), len(self.py["positions"]))
+        for key in ("closed", "open", "flat", "win_rate_pct"):
+            self.assertEqual(self.node[key], self.py[key], key)
+        for key in ("realized_pnl", "unrealized_pnl", "max_drawdown_pct"):
+            self.assertIsNotNone(self.node[key], key)
+            self.assertAlmostEqual(self.node[key], self.py[key], places=2, msg=key)

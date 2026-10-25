@@ -181,7 +181,7 @@ function renderStats(dossiers, broken) {
     return;
   }
   const p = VerdictStats.portfolio(dossiers);
-  $("portfolio").textContent = `${p.decisions} decisions, ${p.flat} flat, ${p.positions.length} simulated positions (${p.closed} closed, ${p.open} open). Win rate ${p.win_rate_pct === null ? "n/a" : p.win_rate_pct + "%"}, realized ${p.realized_pnl}, unrealized ${p.unrealized_pnl}, max drawdown ${p.max_drawdown_pct}%. Decisions are simulated; no real orders are placed. Recomputed in this browser from the ledger with the same rule as portfolio.py.`;
+  $("portfolio").textContent = `${p.decisions} decisions, ${p.flat} opened no position (flat or declined), ${p.positions.length} simulated positions (${p.closed} closed, ${p.open} open). Win rate ${p.win_rate_pct === null ? "n/a" : p.win_rate_pct + "%"}, realized ${p.realized_pnl.toFixed(2)}, unrealized ${p.unrealized_pnl.toFixed(2)}, max drawdown ${p.max_drawdown_pct}%. Decisions are simulated; no real orders are placed. Recomputed in this browser from the ledger with the same rule as portfolio.py.`;
   const holder = $("positions");
   holder.replaceChildren();
   if (!p.positions.length) { holder.appendChild(el("p", "No position has been opened yet: every decision so far stayed flat.", "mut")); return; }

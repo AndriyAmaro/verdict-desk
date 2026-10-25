@@ -188,6 +188,17 @@ def cmd_battery(opts) -> int:
     return 0 if result["all_caught"] else 1
 
 
+def cmd_witnesses(opts) -> int:
+    """Write the index the witnesses page reads: the stamped heads, their proofs, the anchor contract."""
+    stamps = Path(opts.stamps) if opts.stamps else opts.ledger.parent / "timestamps"
+    index = battery.witness_index(stamps, Path(opts.deployment))
+    if opts.out:
+        Path(opts.out).write_text(json.dumps(index, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"wrote {opts.out}")
+    print(f"{len(index['heads'])} stamped heads" + (f", anchor contract {index['anchor']['address']}" if index["anchor"] else ", no anchor contract on file"))
+    return 0
+
+
 def cmd_trust_check(opts) -> int:
     """Recompute every frozen trust table from the dossiers before it."""
     ledger = dossier.read_ledger(opts.ledger)
@@ -622,6 +633,11 @@ def main() -> int:
     p.add_argument("--stamps", metavar="DIR", help="directory with the timestamped heads (default: <ledger dir>/timestamps)")
     p.add_argument("--out", metavar="FILE", help="also write the full result as JSON")
     p.set_defaults(func=cmd_battery)
+    p = sub.add_parser("witnesses", help="write the index of timestamped heads and the anchor contract that the witnesses page reads")
+    p.add_argument("--stamps", metavar="DIR", help="directory with the timestamped heads (default: <ledger dir>/timestamps)")
+    p.add_argument("--deployment", default="cre/deployment.sepolia.json", metavar="FILE", help="the anchor deployment record")
+    p.add_argument("--out", metavar="FILE", help="write the index as JSON")
+    p.set_defaults(func=cmd_witnesses)
     p = sub.add_parser("trust-check", help="recompute every frozen trust table from the dossiers before it (no lookahead)")
     p.set_defaults(func=cmd_trust_check)
     p = sub.add_parser("replay", help="re-run decisions from the frozen evidence")

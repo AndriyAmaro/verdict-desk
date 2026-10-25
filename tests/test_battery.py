@@ -108,5 +108,27 @@ class WitnessTest(unittest.TestCase):
         self.assertTrue(battery.witness_problems(rewritten, heads))
 
 
+class WitnessIndexTest(unittest.TestCase):
+    """The list the browser page reads: which heads were stamped, where their proofs are, what is anchored."""
+
+    def test_the_index_lists_every_stamped_head_with_files_that_exist(self):
+        index = battery.witness_index(STAMPS, ROOT / "cre" / "deployment.sepolia.json")
+        self.assertGreaterEqual(len(index["heads"]), 5)
+        for head in index["heads"]:
+            self.assertTrue((ROOT / head["snapshot"]).is_file(), head["snapshot"])
+            self.assertTrue((ROOT / head["proof"]).is_file(), head["proof"])
+        seqs = [h["seq"] for h in index["heads"]]
+        self.assertEqual(seqs, sorted(seqs))
+
+    def test_the_index_names_the_anchor_contract_the_page_will_read(self):
+        anchor = battery.witness_index(STAMPS, ROOT / "cre" / "deployment.sepolia.json")["anchor"]
+        self.assertRegex(anchor["address"], r"^0x[0-9a-fA-F]{40}$")
+        self.assertEqual(anchor["chain_id"], 11155111)
+
+    def test_a_missing_deployment_file_leaves_the_anchor_out_instead_of_inventing_one(self):
+        index = battery.witness_index(STAMPS, ROOT / "cre" / "nope.json")
+        self.assertIsNone(index["anchor"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -252,6 +252,105 @@ class ClientTest(unittest.TestCase):
                 self.assertEqual(out, expected)
 
 
+def anthropic_reply(text=None, stop="end_turn", blocks=None, **extra):
+    content = blocks if blocks is not None else ([{"type": "text", "text": text}] if text is not None else [])
+    return FakeResponse({"id": "msg_1", "type": "message", "role": "assistant", "content": content, "stop_reason": stop, **extra})
+
+
+class AnthropicTest(unittest.TestCase):
+    """Claude Haiku 5.5 through the native Messages API (LLM_PROVIDER=anthropic), standard library only.
+
+    The shape that matters: the key goes in `x-api-key` (not Authorization), the system prompt is a
+    top-level field, sampling parameters are left out (Haiku 5.5 rejects non-default values with a 400),
+    thinking is turned off so no tokens are spent before the answer, and the answer is the text blocks.
+    """
+
+    def setUp(self):
+        for patch in (
+            mock.patch.dict(os.environ, {"LLM_PROVIDER": "anthropic", "MISTRAL_API_KEY": KEY, "LLM_KEYLESS": ""}),
+            mock.patch.object(llm, "BASE_URL", "https://api.anthropic.com/v1"),
+            mock.patch.object(llm, "MODEL", "claude-haiku-5-5"),
+            mock.patch.object(llm, "MIN_INTERVAL", 0.0),
+            mock.patch.object(llm, "_next_start", 0.0),
+        ):
+            patch.start()
+            self.addCleanup(patch.stop)
+        pause = mock.patch.object(llm, "_pause")
+        self.pause = pause.start()
+        self.addCleanup(pause.stop)
+
+    def test_request_shape(self):
+        with mock.patch("urllib.request.urlopen", return_value=anthropic_reply("hi")) as urlopen:
+            self.assertEqual(llm.chat("be brief", "question", max_tokens=500), "hi")
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, "https://api.anthropic.com/v1/messages")
+        self.assertEqual(request.get_header("X-api-key"), KEY)
+        self.assertEqual(request.get_header("Anthropic-version"), "2023-06-01")
+        self.assertIsNone(request.get_header("Authorization"))
+        body = json.loads(request.data)
+        self.assertEqual(body["model"], "claude-haiku-5-5")
+        self.assertEqual(body["max_tokens"], 500)
+        self.assertEqual(body["system"], "be brief")
+        self.assertEqual(body["messages"], [{"role": "user", "content": "question"}])
+        self.assertNotIn("temperature", body, "Haiku 5.5 answers a non-default sampling value with a 400")
+        self.assertEqual(body["thinking"], {"type": "disabled"})
+
+    def test_the_answer_is_the_text_blocks_and_nothing_else(self):
+        blocks = [{"type": "thinking", "thinking": ""}, {"type": "text", "text": "[1,"}, {"type": "text", "text": "2]"}]
+        with mock.patch("urllib.request.urlopen", return_value=anthropic_reply(blocks=blocks)):
+            self.assertEqual(llm.chat("s", "u"), "[1,2]")
+
+    def test_a_refusal_says_so_with_its_category(self):
+        refused = anthropic_reply(stop="refusal", stop_details={"type": "refusal", "category": "cyber"})
+        with mock.patch("urllib.request.urlopen", return_value=refused):
+            with self.assertRaisesRegex(ValueError, "refus.*cyber"):
+                llm.chat("s", "u")
+
+    def test_running_out_of_tokens_is_named_not_hidden(self):
+        with mock.patch("urllib.request.urlopen", return_value=anthropic_reply(stop="max_tokens")):
+            with self.assertRaisesRegex(ValueError, "max_tokens"):
+                llm.chat("s", "u")
+
+    def test_overloaded_529_and_rate_limit_429_are_retried(self):
+        for code in (529, 429):
+            with self.subTest(code=code):
+                with mock.patch("urllib.request.urlopen", side_effect=[http_error(code), anthropic_reply("ok")]) as urlopen:
+                    self.assertEqual(llm.chat("s", "u"), "ok")
+                self.assertEqual(urlopen.call_count, 2)
+
+    def test_an_error_never_carries_the_key(self):
+        body = f'{{"type":"error","error":{{"type":"authentication_error","message":"invalid x-api-key {KEY}"}}}}'.encode()
+        with mock.patch("urllib.request.urlopen", side_effect=[http_error(401, body)]):
+            with self.assertRaises(llm.LLMError) as caught:
+                llm.chat("s", "u")
+        self.assertIn("authentication_error", str(caught.exception))
+        self.assertNotIn(KEY, str(caught.exception))
+        self.assertIn("https://api.anthropic.com/v1 model claude-haiku-5-5", str(caught.exception))
+
+    def test_the_defaults_follow_the_provider_and_the_old_overrides_still_win(self):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        code = f"import sys; sys.path.insert(0, {root!r}); from verdict_desk import llm; print(llm.MODEL, llm.BASE_URL)"
+        cases = (
+            ({"LLM_PROVIDER": "anthropic"}, "claude-haiku-5-5 https://api.anthropic.com/v1"),
+            ({"LLM_PROVIDER": "anthropic", "MISTRAL_MODEL": "claude-sonnet-5-5"}, "claude-sonnet-5-5 https://api.anthropic.com/v1"),
+            ({"LLM_PROVIDER": ""}, "mistral-small-latest https://api.mistral.ai/v1"),
+        )
+        for extra, expected in cases:
+            with self.subTest(extra=extra):
+                env = {k: v for k, v in os.environ.items() if k not in ("MISTRAL_MODEL", "MISTRAL_BASE_URL", "LLM_PROVIDER")}
+                env.update(extra)
+                out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True).stdout.strip()
+                self.assertEqual(out, expected)
+
+    def test_without_a_key_it_is_a_clear_error_and_nothing_is_sent(self):
+        with mock.patch.dict(os.environ):
+            del os.environ["MISTRAL_API_KEY"]
+            with mock.patch("urllib.request.urlopen") as urlopen:
+                with self.assertRaisesRegex(llm.LLMError, "not set"):
+                    llm.chat("s", "u")
+        urlopen.assert_not_called()
+
+
 class KeylessTest(unittest.TestCase):
     """A provider that needs no key (a free anonymous tier) must never receive a key we happen to hold.
 

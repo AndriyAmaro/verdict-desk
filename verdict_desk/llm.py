@@ -1,4 +1,7 @@
-"""Cliente Mistral (API de chat no formato da OpenAI) com modo offline para testes.
+"""Cliente de LLM com modo offline para testes. Dois formatos, so biblioteca padrao:
+
+- padrao: API de chat no formato da OpenAI (Mistral, ou qualquer outra via MISTRAL_BASE_URL e MISTRAL_MODEL);
+- LLM_PROVIDER=anthropic: Claude pela API de Mensagens nativa (modelo padrao claude-haiku-5-5).
 
 A chave vem so da variavel de ambiente MISTRAL_API_KEY. Sem chave, `available()`
 e falso e os agentes LLM nao rodam (o nucleo deterministico segue sozinho).
@@ -29,12 +32,16 @@ def _number(name: str, default, cast, valid):
     return value if valid(value) else default
 
 
-BASE_URL = os.environ.get("MISTRAL_BASE_URL") or "https://api.mistral.ai/v1"
-MODEL = os.environ.get("MISTRAL_MODEL") or "mistral-small-latest"
+# LLM_PROVIDER=anthropic talks to Claude through the native Messages API; anything else is an OpenAI-style
+# chat API (Mistral by default). The MISTRAL_* names are historical and still win over the provider defaults.
+ANTHROPIC = os.environ.get("LLM_PROVIDER", "").strip().lower() == "anthropic"
+BASE_URL = os.environ.get("MISTRAL_BASE_URL") or ("https://api.anthropic.com/v1" if ANTHROPIC else "https://api.mistral.ai/v1")
+MODEL = os.environ.get("MISTRAL_MODEL") or ("claude-haiku-5-5" if ANTHROPIC else "mistral-small-latest")
+ANTHROPIC_VERSION = "2023-06-01"
 MAX_TOKENS = _number("MISTRAL_MAX_TOKENS", 3000, int, lambda v: v > 0)  # modelos com raciocinio gastam tokens antes da resposta
 MIN_INTERVAL = _number("MISTRAL_MIN_INTERVAL", 1.1, float, lambda v: math.isfinite(v) and v >= 0)  # segundos entre inicios de chamada
 MAX_RETRIES = 4
-RETRY_STATUS = {429, 500, 502, 503, 504}
+RETRY_STATUS = {429, 500, 502, 503, 504, 529}  # 529: the Anthropic API is overloaded
 MAX_WAIT = 60.0
 
 _gate = threading.Lock()
@@ -51,6 +58,10 @@ def _pause(seconds: float) -> None:
 
 def _key() -> str:
     return os.environ.get("MISTRAL_API_KEY", "").strip()
+
+
+def _anthropic() -> bool:
+    return os.environ.get("LLM_PROVIDER", "").strip().lower() == "anthropic"
 
 
 def _keyless() -> bool:
@@ -153,6 +164,23 @@ def _first_choice(raw: bytes) -> dict:
     return choice
 
 
+def _anthropic_text(raw: bytes) -> str:
+    """The answer of a Messages API response: its text blocks, joined. Thinking blocks are not the answer."""
+    try:
+        data = json.loads(raw.decode("utf-8"))
+        blocks = data["content"]
+    except (KeyError, TypeError, ValueError):
+        raise ValueError("unexpected response shape from the Anthropic API") from None
+    text = "".join(str(b.get("text", "")) for b in blocks if isinstance(b, dict) and b.get("type") == "text")
+    if text:
+        return text
+    stop = data.get("stop_reason")
+    if stop == "refusal":
+        category = (data.get("stop_details") or {}).get("category")
+        raise ValueError(f"the model refused this request (stop_reason=refusal, category={category})")
+    raise ValueError(f"model returned no text (stop_reason={stop}); raise MISTRAL_MAX_TOKENS" if stop == "max_tokens" else f"model returned no text (stop_reason={stop})")
+
+
 def chat(system: str, user: str, timeout: int = 90, max_tokens: int | None = None) -> str:
     keyless = _keyless()
     key = "" if keyless else _key()
@@ -162,19 +190,29 @@ def chat(system: str, user: str, timeout: int = 90, max_tokens: int | None = Non
         if not key.isprintable() or " " in key:
             # Nao ecoa o valor: um cabecalho invalido faz o urllib imprimir a chave no erro.
             raise LLMError("MISTRAL_API_KEY has spaces or control characters; paste only the key")
-    body = json.dumps(
-        {"model": MODEL, "temperature": 0, "max_tokens": max_tokens or MAX_TOKENS, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
-    ).encode("utf-8")
+    native = _anthropic()
+    if native:
+        # Claude Haiku 5.5 rejects non-default sampling values with a 400, so no temperature; thinking is off so no
+        # token is spent before the answer. The replay never calls the model: the text is frozen in the dossier.
+        payload = {"model": MODEL, "max_tokens": max_tokens or MAX_TOKENS, "thinking": {"type": "disabled"},
+                   "system": system, "messages": [{"role": "user", "content": user}]}
+        url = f"{BASE_URL}/messages"
+        headers = {"x-api-key": key, "anthropic-version": ANTHROPIC_VERSION, "Content-Type": "application/json"}
+    else:
+        payload = {"model": MODEL, "temperature": 0, "max_tokens": max_tokens or MAX_TOKENS,
+                   "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+        url = f"{BASE_URL}/chat/completions"
+        headers = {**({"Authorization": f"Bearer {key}"} if key else {}), "Content-Type": "application/json"}
+    body = json.dumps(payload).encode("utf-8")
     for attempt in range(MAX_RETRIES + 1):
         _wait_turn()
-        request = urllib.request.Request(
-            f"{BASE_URL}/chat/completions",
-            data=body,
-            headers={**({"Authorization": f"Bearer {key}"} if key else {}), "Content-Type": "application/json"},
-        )
+        request = urllib.request.Request(url, data=body, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
-                choice = _first_choice(response.read())
+                raw = response.read()
+            if native:
+                return _anthropic_text(raw)
+            choice = _first_choice(raw)
             break
         except urllib.error.HTTPError as err:
             detail = _read_detail(err)

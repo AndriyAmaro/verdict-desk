@@ -42,6 +42,82 @@ class RenderTest(unittest.TestCase):
         self.assertIn("MATCH — the record is unchanged", page)
         self.assertIn(self.row["hash"], page)
 
+    # ---- the plain-English summary: for a reader who is not a specialist ----------------------
+
+    def synthetic(self, **verdict):
+        base = {
+            "seq": 7, "prev_hash": "0" * 64,
+            "evidence": {"symbol": "BTCUSDT", "collected_at": "2026-10-25T02:22:12+00:00", "freshness": {}, "narrative": {}},
+            "verdict": {"rules_version": "v5", "policy": {}, "bull_score": 3.0, "bear_score": 1.0, "edge": 2.0, "threshold": 1.5,
+                        "action": "LONG", "rationale": "x", "entry": 100.0, "stop": 97.0, "take_profit": 106.0, "size": 33.3333, "risk_pct": 1.0},
+            "sensitivity": {"drop_one": [{"side": "bull", "claim": "Trend is up", "weight": 3.0, "flips": True}]},
+            "bull": [], "bear": [], "llm": {},
+        }
+        base["verdict"].update(verdict)
+        return base
+
+    def plain(self, page):
+        start = page.index('id="plain"')
+        return re.sub(r"<[^>]+>", " ", page[start:page.index('id="custody"')])
+
+    def test_the_summary_comes_first_and_says_nothing_real_was_traded(self):
+        page = exhibit.render(self.synthetic())
+        self.assertIn('id="plain"', page)
+        self.assertLess(page.index('id="plain"'), page.index('id="custody"'))
+        text = self.plain(page)
+        self.assertIn("In plain English", text)
+        self.assertIn("No real order", text)
+
+    def test_a_long_is_explained_with_its_stop_target_and_the_most_it_can_lose(self):
+        text = self.plain(exhibit.render(self.synthetic()))
+        for fact in ("BTCUSDT", "100", "97", "106", "1.0%", "buy", "Trend is up"):
+            self.assertIn(fact, text)
+
+    def test_a_short_says_sell(self):
+        text = self.plain(exhibit.render(self.synthetic(action="SHORT", stop=103.0, take_profit=94.0)))
+        self.assertIn("sell", text.lower())
+        self.assertIn("103", text)
+
+    def test_a_declined_entry_says_no_position_was_opened_and_why(self):
+        text = self.plain(exhibit.render(self.synthetic(action="WATCH_REVERSAL", bull_score=1.0, bear_score=1.5, edge=-0.5,
+                                                        rationale="one argument away from flipping", entry=None)))
+        self.assertIn("did not open a position", text)
+        self.assertNotIn("stop at", text)
+
+    def test_a_stale_price_is_a_refusal_not_a_decision(self):
+        text = self.plain(exhibit.render(self.synthetic(action="BLOCKED_STALE", rationale="newest price too old")))
+        self.assertIn("refused to decide", text)
+
+    def test_a_failed_analyst_layer_is_named_in_the_summary(self):
+        record = self.synthetic()
+        record["llm"] = {"bull": {"accepted": [], "rejected": [], "error": "HTTP 402 Payment Required"}, "bear": {"accepted": [], "rejected": [], "error": "x"}}
+        text = self.plain(exhibit.render(record))
+        self.assertIn("could not run", text)
+        self.assertIn("fixed rules alone", text)
+
+    def test_claims_that_passed_and_failed_the_citation_check_are_counted(self):
+        record = self.synthetic()
+        record["llm"] = {"bull": {"accepted": [{"claim": "a", "cites": ["x"]}] * 2, "rejected": [{"claim": "b"}]}, "bear": {"accepted": [{"claim": "c", "cites": ["y"]}], "rejected": []}}
+        text = self.plain(exhibit.render(record))
+        self.assertIn("wrote 4 claims", text)
+        self.assertIn("3 passed", text)
+        self.assertIn("1 was refused", text)
+
+    def test_an_untouched_real_record_is_called_unchanged(self):
+        text = self.plain(exhibit.render(self.row))
+        self.assertIn("matches its saved fingerprint", text)
+        self.assertNotIn("does NOT match", text)
+
+    def test_an_edited_record_is_called_out_in_the_summary_too(self):
+        record = self.synthetic()
+        record["hash"] = "f" * 64  # not the record's real fingerprint
+        text = self.plain(exhibit.render(record))
+        self.assertIn("does NOT match", text)
+
+    def test_every_published_dossier_gets_a_summary_without_error(self):
+        for row in self.rows[-40:]:
+            self.assertIn("In plain English", self.plain(exhibit.render(row)))
+
     def test_an_analyst_layer_that_failed_says_why_instead_of_saying_nothing(self):
         """"Nothing kept" is true and useless; a reader needs to know the provider failed, and what decided instead."""
         broken = json.loads(json.dumps(self.row))

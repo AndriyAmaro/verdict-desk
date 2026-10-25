@@ -9,6 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The published numbers include who recorded each dossier (git blame of the ledger). A shallow clone
+          # attributes every line to one commit, so the freshness test failed in CI while passing locally.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

@@ -1,22 +1,28 @@
 name: pacemaker
 
 # GitHub drops scheduled runs: on 25 Oct none fired for six hours, with four triggers an hour. The ledger
-# cannot depend on the schedule alone, so every finished run of hourly-decision starts this workflow, which
-# waits and then dispatches the next one. The schedule and a manual run only have to restart the chain.
+# cannot depend on the schedule alone, so a waiter keeps the hourly workflow going: it waits, then dispatches
+# the next hourly run (`paced`, so it goes through the same 50-minute gate as a scheduled run).
 #
-# A dispatch sent with the GITHUB_TOKEN does start a run (workflow_dispatch is the documented exception to
-# "events from the token do not trigger workflows"). The dispatch is `paced`, so it goes through the same
-# gate as a scheduled run and never records two sets of decisions within 50 minutes.
-# The group cancels an older waiter, so a manual restart never leaves two chains running.
+# How the chain continues, as measured on 25 Oct:
+#   * A run of hourly-decision started by a person or by the schedule wakes this workflow when it ends
+#     (workflow_run). That is how the chain is started and restarted.
+#   * A run started with the GITHUB_TOKEN does NOT wake it (the dispatched hourly run recorded decisions and its
+#     end started nothing), so the waiter queues its own successor with workflow_dispatch, which the token is
+#     allowed to start. The successor is queued before the wait, so a failure later cannot end the chain.
+#
+# The group allows one running waiter and one pending: a newer pending run replaces an older pending one, so
+# restarts never multiply chains and a running waiter is never cancelled.
 
 on:
   workflow_run:
     workflows: [hourly-decision]
     types: [completed]
+  workflow_dispatch:
 
 concurrency:
   group: pacemaker
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   actions: write
@@ -30,7 +36,9 @@ jobs:
       WAIT_MINUTES: 52
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Wait, then ask for the next run
+      - name: Queue the next waiter (it starts when this one ends)
+        run: gh workflow run pacemaker --repo "$GITHUB_REPOSITORY" --ref main
+      - name: Wait, then ask for the next decision
         run: |
           echo "next decision requested in ${WAIT_MINUTES} minutes"
           sleep $((WAIT_MINUTES * 60))

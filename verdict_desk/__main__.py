@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from . import voices as voices_config
-from . import anchor, backtest, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research, trust
+from . import anchor, backtest, battery, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research, trust
 
 DEFAULT_LEDGER = Path("ledger/ledger.jsonl")
 
@@ -164,6 +164,28 @@ def cmd_trust(opts) -> int:
     for name, v in sorted(result["voices"].items(), key=lambda kv: -kv[1]["weight"]):
         print(f"{name:18s} {v['n']:5d} {v['hit_rate']:5.2f} {v['chance_rate']:7.2f} {v['skill']:+7.3f} {v['weight']:7.3f}" + ("" if v["proven"] else "  (no track record yet)"))
     return 0
+
+
+def cmd_battery(opts) -> int:
+    """Attack a copy of the ledger in every way we know and count what the verifier misses."""
+    ledger = dossier.read_ledger(opts.ledger)
+    if not ledger:
+        print(f"no ledger at {opts.ledger}", file=sys.stderr)
+        return 1
+    if dossier.verify(ledger):
+        print("the ledger itself does not verify, so there is nothing to attack", file=sys.stderr)
+        return 1
+    stamps = Path(opts.stamps) if opts.stamps else opts.ledger.parent / "timestamps"
+    result = battery.run(ledger, stamps, opts.seed or ledger[-1]["hash"], trials=opts.trials)
+    if opts.out:
+        Path(opts.out).write_text(json.dumps(result, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"wrote {opts.out}")
+    print(f"tamper battery on {result['dossiers']} dossiers (head {result['head']['hash'][:16]}, seed {str(result['seed'])[:16]}): "
+          f"{result['total_trials']} attacks, {result['total_missed']} missed")
+    for row in result["attacks"]:
+        alone = f", {row['chain_alone_missed']} invisible to the chain alone" if row["chain_alone_missed"] else ""
+        print(f"  {row['attack']:34s} {row['caught']:5d}/{row['trials']:<5d} caught by {row['caught_by']}{alone}")
+    return 0 if result["all_caught"] else 1
 
 
 def cmd_trust_check(opts) -> int:
@@ -594,6 +616,12 @@ def main() -> int:
     p = sub.add_parser("trust", help="per-voice track record: hit rate against chance, measured from the ledger alone")
     p.add_argument("--out", metavar="FILE", help="write the full table as JSON instead of printing it")
     p.set_defaults(func=cmd_trust)
+    p = sub.add_parser("battery", help="attack a copy of the ledger (edit, delete, swap, duplicate, forge, truncate, rewrite) and count what the verifier misses")
+    p.add_argument("--trials", type=int, default=2000, help="value edits to try; the other attacks scale from it")
+    p.add_argument("--seed", help="seed for the attacks (default: the head hash, so anyone re-running gets the same ones)")
+    p.add_argument("--stamps", metavar="DIR", help="directory with the timestamped heads (default: <ledger dir>/timestamps)")
+    p.add_argument("--out", metavar="FILE", help="also write the full result as JSON")
+    p.set_defaults(func=cmd_battery)
     p = sub.add_parser("trust-check", help="recompute every frozen trust table from the dossiers before it (no lookahead)")
     p.set_defaults(func=cmd_trust_check)
     p = sub.add_parser("replay", help="re-run decisions from the frozen evidence")

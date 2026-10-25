@@ -142,10 +142,13 @@ def replay(dossier: dict, rules_version: str = "v1") -> dict:
     return result
 
 
-def verify(ledger: list[dict]) -> list[str]:
-    """Lista os problemas da cadeia; lista vazia significa cadeia integra."""
+def verify(ledger: list[dict], prev: str = GENESIS) -> list[str]:
+    """Lista os problemas da cadeia; lista vazia significa cadeia integra.
+
+    `prev` e o hash que deve vir antes do primeiro dossier da lista: GENESIS para o ledger inteiro,
+    ou o hash do dossier anterior quando se confere so uma janela da cadeia.
+    """
     problems = []
-    prev = GENESIS
     for dossier in ledger:
         body = {k: v for k, v in dossier.items() if k != "hash"}
         if dossier["prev_hash"] != prev:

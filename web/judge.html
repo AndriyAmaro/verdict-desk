@@ -33,11 +33,20 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
 
 <div id="live">Reading the public ledger…</div>
 
+<section class="crit" style="margin-top:14px">
+  <h3>In thirty seconds</h3>
+  <ul>
+    <li><b>What it is:</b> an autonomous agent that argues bull against bear from one frozen evidence packet, reads public market voices you choose and weighs each by its <i>measured</i> skill, records the practice trade it would make with a stop, a target and a risk limit, and chains every decision to the one before it.</li>
+    <li><b>Why you can believe it:</b> your browser recomputes the chain, asks Bitcoin (through two block explorers), the public Sigstore transparency log and the Sepolia contract whether the head is the one they saw, and shows how many attacks on our own verifier got through.</li>
+    <li><b>What it is not:</b> a money machine. Nothing is ever traded, and the published backtest of the first rules does not profit after fees; the page says so below instead of hiding it.</li>
+  </ul>
+</section>
+
 <div>
   <a class="btn p" href="./index.html">Open the live dashboard</a>
   <a class="btn" href="./demo/verdict-desk-demo-v5.mp4">Watch the narrated demo (2 min 42 s)</a>
   <a class="btn" href="https://github.com/AndriyAmaro/verdict-desk">Repository</a>
-  <a class="btn" href="https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d">Sepolia anchor transaction</a>
+  <a class="btn" href="https://sepolia.etherscan.io/tx/0x8b355823c734026aed28493aeb45b88e3c589a7bcc56c9eb9d4e8be63f3139ca">Latest Sepolia anchor transaction</a>
 </div>
 
 <figure style="margin:18px 0"><img src="custody.svg" alt="Verdict Desk chain of custody" style="width:100%;height:auto;border:1px solid var(--line);border-radius:10px"></figure>
@@ -64,7 +73,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <p class="asks">"…and record the practice trades they would make."</p>
   <ul>
     <li>Every dossier carries entry, size, stop and target, sized from a fixed risk budget — no real order is ever placed</li>
-    <li>It commits instead of hiding behind a HOLD: as of dossier 179, 99 of them carry a sized LONG or SHORT; the other 80 are labelled FLAT (63) or WATCH_REVERSAL (17), each naming the argument or condition that would flip it. The live counts are the <b>Positions</b> card on the <a href="./index.html">dashboard</a></li>
+    <li>It commits instead of hiding behind a HOLD: as of dossier 215, 116 of them carry a sized LONG or SHORT; the other 99 are labelled FLAT (63) or WATCH_REVERSAL (36), each naming the argument or condition that would flip it. The live counts are the <b>Positions</b> card on the <a href="./index.html">dashboard</a></li>
     <li>Positions are marked against later candles; the dashboard shows the simulated result of each one — <code>verdict_desk/portfolio.py</code></li>
     <li>Open any row in the <a href="./index.html">dashboard</a> to see the trade and the reasoning that produced it</li>
   </ul>
@@ -88,7 +97,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
     <li>Dossiers are hash-chained; the dashboard recomputes every SHA-256 in your browser and lets you break the chain yourself with one button</li>
     <li><code>python3 -m verdict_desk replay</code> re-derives every verdict from its own frozen evidence — all of them match</li>
     <li><code>python3 -m verdict_desk export --seq N --out pack.json</code> hands one dossier to a third party as a self-verifying file</li>
-    <li>The scale behind the page: 300 tests, standard library only, pin the ledger, the pages and the docs to each other - one of them re-runs <code>scripts/refresh_numbers.py --check</code>, so a figure that no longer matches the chain, a link to a renamed card, or a doc that disagrees with the ledger fails the build instead of shipping</li>
+    <li>The scale behind the page: 423 tests, standard library only, pin the ledger, the pages and the docs to each other - one of them re-runs <code>scripts/refresh_numbers.py --check</code>, so a figure that no longer matches the chain, a link to a renamed card, or a doc that disagrees with the ledger fails the build instead of shipping</li>
   </ul>
 </section>
 
@@ -100,9 +109,9 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
     <li>The workflow fetches the published ledger head over HTTP under DON consensus, reads the <b>BTC/USD Data Feed</b> on Sepolia, and writes both through the CRE forwarder</li>
     <li>The receiver only accepts forwarder reports with a strictly increasing sequence number, so an anchored head can never be overwritten</li>
     <li>The contract is <b>source-verified with an exact match</b> — the explorer serves the code that matches the deployed bytecode: <a href="https://sourcify.dev/#/lookup/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7">Sourcify record</a></li>
-    <li>Address <code>0x50443D51Db71A61E131B147B1d36aF21d48CDdF7</code> · <a href="https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d">anchor transaction</a> (SUCCESS, block 11964023)</li>
+    <li>Address <code>0x50443D51Db71A61E131B147B1d36aF21d48CDdF7</code> · anchor transactions: <a href="https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d">#80, the first (block 11964023)</a> and <a href="https://sepolia.etherscan.io/tx/0x8b355823c734026aed28493aeb45b88e3c589a7bcc56c9eb9d4e8be63f3139ca">#212, the latest (25 Oct)</a>, both SUCCESS; the contract answers <code>isAnchored(212, hash)</code> TRUE</li>
     <li><b>The workflow is re-run against the live head, not a fixture:</b> the simulation recorded in <code>cre/evidence/simulate-live-head.txt</code> fetched <code>ledger/head.json</code> under consensus, read the Data Feed at 81,317.07 and encoded record <b>#113</b> — and a test checks that the sequence and hash it names are the ones actually published in the ledger, so the evidence cannot drift from the record</li>
-    <li><b>Anchoring is a script, not a ceremony:</b> <code>cre/scripts/anchor-existing.sh</code> anchors the current head against the same deployed contract every hour (a new deployment each run would orphan the history). It refuses to run without a key rather than silently doing nothing, and the scheduled job reports a skip that says why</li>
+    <li><b>Anchoring is a script, not a ceremony:</b> <code>cre/scripts/anchor-existing.sh</code> anchors the current head against the same deployed contract (a new deployment each run would orphan the history). It refuses to run without a key rather than silently doing nothing. The hourly job is wired and reports a skip that says why; until the CRE organisation gets deployment access (needed for an API key) the anchor is sent by hand, and the Witnesses page shows how far the ledger is past the last one</li>
     <li><b>And a clock that needs no wallet:</b> every hourly run also stamps the published head with <a href="https://opentimestamps.org">OpenTimestamps</a>, which commits the digest into a Bitcoin block through independent public calendars. Proofs are archived per record (<code>ledger/timestamps/</code>) and a test checks each snapshot equals the published hash — <code>ots verify ledger/timestamps/116.json.ots</code></li>
     <li><b>And it is monitored, not just written once:</b> <code>python3 -m verdict_desk monitor</code> reads the anchored value back from the contract and compares it with the dossier of that same sequence in the published ledger. It says MATCH, or it names the divergence. The hourly job runs it as a guard: a mismatch fails the run.</li>
   </ul>

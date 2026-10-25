@@ -44,8 +44,16 @@ th{font-weight:600;font-size:12px;color:var(--mut);text-transform:uppercase;lett
 </section>
 
 <section>
+  <h2>Which voices earned trust</h2>
+  <p class="mut">"Trusted voices converge" only means something if trust is measured. This table is <b>recomputed here, in your browser, from the raw ledger</b>: nothing below comes from a server. Each accepted bullish or bearish call is scored by the market's move over the next <span id="horizon">4</span> hours, read from the candles frozen in the dossiers. <b>Hit rate</b> alone flatters a voice that only ever says "up" in a rising market, so it is set beside the hit rate <b>luck alone would give</b> for that voice's own bias; <b>skill</b> is what is left, shrunk toward zero on small samples. A voice with fewer than <span id="mincalls">8</span> settled calls has no record yet and counts as 1.00. Weights stay inside 0.5 to 1.5.</p>
+  <div class="scroll" style="overflow-x:auto"><table id="trust"><thead><tr><th>Voice</th><th>Settled calls</th><th>Hit rate</th><th>By luck</th><th>Skill</th><th>Weight</th></tr></thead><tbody></tbody></table></div>
+  <p class="mut" id="trustnote"></p>
+  <p class="mut">No lookahead: each dossier freezes the table of the voices it read, computed only from the dossiers before its run, and <code>python3 -m verdict_desk trust-check</code> recomputes every frozen table from that earlier ledger. Small, overlapping samples from one market regime: read a weight as a nudge, not a rating. The worst voices are listed too.</p>
+</section>
+
+<section>
   <h2>What a convergence does</h2>
-  <p class="mut">A convergence is not decoration — it <b>creates the position by a transparent rule</b> (rules v4): a convergence matching the symbol becomes a deterministic argument on that side, with weight <b>0.5 per distinct voice (max 4) + 0.5 if top conviction is high</b>. Two voices are a nudge; four agreeing voices are decisive. The same convergence is also a citable evidence item the analysts may cite. Either way, the trail shows exactly which voices said it.</p>
+  <p class="mut">A convergence is not decoration — it <b>creates the position by a transparent rule</b>: a convergence matching the symbol becomes a deterministic argument on that side, with weight <b>0.5 × each voice's track-record weight (1.00 until it has a record; the four heaviest voices count) + 0.5 if top conviction is high</b> (rules v5; dossiers recorded under v4 count 0.5 per voice, flat). Two voices are a nudge; four trusted voices are decisive. The same convergence is also a citable evidence item the analysts may cite. Either way, the trail shows exactly which voices said it and the weight each carried.</p>
   <ul class="mut">
     <li>the voices are named, so a convergence can be checked back to its sources</li>
     <li>the stance is closed-vocabulary, so "bullish" means the same thing every run</li>
@@ -61,6 +69,7 @@ th{font-weight:600;font-size:12px;color:var(--mut);text-transform:uppercase;lett
 
 <p class="mut">Feeds are user-selected and extensible to 20 via <code>--feed NAME=URL</code> — RSS/Atom, X through any public bridge, and <b>Telegram channels natively</b> (the keyless public preview <code>https://t.me/s/&lt;channel&gt;</code>). The hourly run reads the voices listed in <code>config/voices.json</code> (today 5 newsrooms and 8 public Telegram channels); choose your own there, up to 20. The resulting practice position is sized inside a <b>user-set risk limit, capped at 25%</b> (<code>--risk-pct</code>). Simulated decisions only; no order is ever placed.</p>
 
+<script src="trust.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -92,6 +101,17 @@ th{font-weight:600;font-size:12px;color:var(--mut);text-transform:uppercase;lett
     $("conv").querySelector("tbody").innerHTML = convs.slice().reverse().map(({ seq, at, c }) =>
       `<tr><td>${seq}</td><td class="mut">${esc((at || "").slice(0, 16))}</td><td><b>${esc(c.token)}</b></td><td class="${esc(c.bias)}">${esc(c.bias)}</td><td>${esc((c.voices || []).join(", "))}</td><td>${esc(c.max_conviction)}</td><td>${esc(c.max_urgency)}</td></tr>`
     ).join("") || `<tr><td colspan="7" class="mut">no convergences yet</td></tr>`;
+
+    const record = VerdictTrust.compute(rows);
+    $("horizon").textContent = record.horizon_hours;
+    $("mincalls").textContent = record.min_calls;
+    const pct = (x) => (x * 100).toFixed(0) + "%";
+    const bar = (w) => `<span style="display:inline-block;width:${Math.round(((w - 0.5) / 1.0) * 70) + 4}px;height:8px;border-radius:4px;background:var(--${w >= 1 ? "ok" : "bad"});vertical-align:middle;margin-right:6px"></span>`;
+    $("trust").querySelector("tbody").innerHTML = Object.entries(record.voices).sort((a, b) => b[1].weight - a[1].weight).map(([name, v]) =>
+      `<tr><td><b>${esc(name)}</b>${v.proven ? "" : ' <span class="mut">(no record yet)</span>'}</td><td>${v.n}</td><td>${pct(v.hit_rate)}</td><td class="mut">${pct(v.chance_rate)}</td>` +
+      `<td class="${v.skill > 0 ? "ok" : v.skill < 0 ? "bad" : "mut"}">${v.skill > 0 ? "+" : ""}${(v.skill * 100).toFixed(1)} pts</td><td>${bar(v.weight)}<b>${v.weight.toFixed(2)}</b></td></tr>`
+    ).join("") || `<tr><td colspan="6" class="mut">no settled calls yet</td></tr>`;
+    $("trustnote").textContent = `As of dossier ${record.as_of_seq}: ${Object.keys(record.voices).length} voices with settled calls; ${record.pending_calls} calls still waiting for their ${record.horizon_hours}-hour window to close.`;
 
     $("rejected").querySelector("tbody").innerHTML = Object.entries(rejected).sort().map(([tok, r]) =>
       `<tr><td><b>${esc(tok)}</b></td><td>${esc((r.voices || []).join(", "))}</td><td>${esc((r.stances || []).join(", "))}</td><td class="mut">${esc(r.reason)}</td></tr>`

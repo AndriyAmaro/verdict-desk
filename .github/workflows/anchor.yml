@@ -53,8 +53,11 @@ jobs:
 
       - name: Install the CRE CLI
         if: steps.gate.outputs.enabled == 'true'
+        # The installer moved from /install.sh to /install/install.sh and the old URL started answering 404, which
+        # the pipe into bash turned into "command not found" (run 2026-10-25). -f makes curl fail on an HTTP error.
         run: |
-          curl -sSL https://raw.githubusercontent.com/smartcontractkit/cre-cli/main/install.sh | bash
+          set -o pipefail
+          curl -fsSL https://raw.githubusercontent.com/smartcontractkit/cre-cli/main/install/install.sh | bash
           echo "$HOME/.cre/bin" >> "$GITHUB_PATH"
 
       - name: Anchor the current head

@@ -70,5 +70,30 @@
     return value;
   }
 
-  return { THRESHOLD, VOL_PCT, MARKET_WINDOW_MINUTES, SYSTEM_MAX_RISK_PCT, STATES, evaluate, riskPct };
+  const STOP_ATR = 1.5;
+  const TAKE_ATR = 3.0;
+  const round = (x, places) => { const f = 10 ** places; return Math.round(x * f) / f; };
+
+  /* The practice position a LONG or SHORT becomes, sized under the user's risk limit.
+   * A mirror of the sizing in `agents_v2.judge`: the stop sits 1.5 ATR away, the target 3 ATR, and the
+   * size is the cash the user is willing to lose (capital x risk%) divided by the stop distance. */
+  function position(entry, atr, action, riskPercent, capital) {
+    if (action !== "LONG" && action !== "SHORT") throw new Error(`no position for ${action}`);
+    const pct = riskPct(riskPercent == null ? 1 : riskPercent);
+    const cap = capital == null ? 10000 : Number(capital);
+    const direction = action === "LONG" ? 1 : -1;
+    const stopDistance = atr * STOP_ATR;
+    const riskCash = cap * pct / 100;
+    return {
+      entry,
+      stop: round(entry - direction * stopDistance, 6),
+      take_profit: round(entry + direction * atr * TAKE_ATR, 6),
+      size: round(riskCash / stopDistance, 8),
+      risk_cash: round(riskCash, 6),
+      risk_pct: pct,
+      stop_distance: round(stopDistance, 6),
+    };
+  }
+
+  return { THRESHOLD, VOL_PCT, MARKET_WINDOW_MINUTES, SYSTEM_MAX_RISK_PCT, STATES, evaluate, riskPct, position };
 });

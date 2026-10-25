@@ -25,6 +25,11 @@ th{font-weight:600;font-size:12px;color:var(--mut);text-transform:uppercase;lett
 .stat .v{font-size:20px;font-weight:700;margin:2px 0 0}
 .stat .s{font-size:11.5px;color:var(--mut);margin-top:2px}
 .pill{display:inline-block;padding:2px 9px;border:1px solid var(--line);border-radius:999px;font-size:12px;margin-right:6px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin:10px 0}
+.chips label{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 11px;margin:3px 6px 3px 0;background:var(--bg);cursor:pointer;font-size:13px}
+.chips label.on{border-color:var(--accent);background:var(--card);font-weight:600}
+.box{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:10px 0}
+select,input[type=number]{font:inherit;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
 </style></head><body>
 
 <h1>Market voices — the multi-KOL narrative agent</h1>
@@ -52,6 +57,20 @@ th{font-weight:600;font-size:12px;color:var(--mut);text-transform:uppercase;lett
 </section>
 
 <section>
+  <h2>Try it: your voices, your limit, the position that follows</h2>
+  <p class="mut">Pick the voices that agree, choose how much of a simulated <b>$10,000</b> you are willing to lose, and see the practice position the same rules would open on the latest recorded market for that token. Every number is computed in your browser by the same formulas the Python judge uses, and a test compares the two over hundreds of random inputs. Nothing here is a trade: it is the rule, laid open.</p>
+  <div class="grid2" id="try">
+    <label>Token <select id="t-token"><option>BTC</option><option>ETH</option><option>SOL</option></select></label>
+    <label>The voices agree <select id="t-stance"><option value="bullish">bullish</option><option value="bearish">bearish</option></select></label>
+    <label>Rules <select id="t-rules"><option value="v5">v5: weigh each voice by its track record</option><option value="v4">v4: every voice counts the same</option></select></label>
+    <label><input type="checkbox" id="t-high"> top conviction is high (+0.5)</label>
+    <label>Risk limit, % of capital <input id="t-risk" type="number" min="0" max="100" step="0.1" value="1" style="width:5em"></label>
+  </div>
+  <div id="t-voices" class="chips"></div>
+  <div id="t-out" class="box"></div>
+</section>
+
+<section>
   <h2>What a convergence does</h2>
   <p class="mut">A convergence is not decoration — it <b>creates the position by a transparent rule</b>: a convergence matching the symbol becomes a deterministic argument on that side, with weight <b>0.5 × each voice's track-record weight (1.00 until it has a record; the four heaviest voices count) + 0.5 if top conviction is high</b> (rules v5; dossiers recorded under v4 count 0.5 per voice, flat). Two voices are a nudge; four trusted voices are decisive. The same convergence is also a citable evidence item the analysts may cite. Either way, the trail shows exactly which voices said it and the weight each carried.</p>
   <ul class="mut">
@@ -69,6 +88,7 @@ th{font-weight:600;font-size:12px;color:var(--mut);text-transform:uppercase;lett
 
 <p class="mut">Feeds are user-selected and extensible to 20 via <code>--feed NAME=URL</code> — RSS/Atom, X through any public bridge, and <b>Telegram channels natively</b> (the keyless public preview <code>https://t.me/s/&lt;channel&gt;</code>). The hourly run reads the voices listed in <code>config/voices.json</code> (today 5 newsrooms and 8 public Telegram channels); choose your own there, up to 20. The resulting practice position is sized inside a <b>user-set risk limit, capped at 25%</b> (<code>--risk-pct</code>). Simulated decisions only; no order is ever placed.</p>
 
+<script src="policy.js"></script>
 <script src="trust.js"></script>
 <script>
 (function () {
@@ -112,6 +132,64 @@ th{font-weight:600;font-size:12px;color:var(--mut);text-transform:uppercase;lett
       `<td class="${v.skill > 0 ? "ok" : v.skill < 0 ? "bad" : "mut"}">${v.skill > 0 ? "+" : ""}${(v.skill * 100).toFixed(1)} pts</td><td>${bar(v.weight)}<b>${v.weight.toFixed(2)}</b></td></tr>`
     ).join("") || `<tr><td colspan="6" class="mut">no settled calls yet</td></tr>`;
     $("trustnote").textContent = `As of dossier ${record.as_of_seq}: ${Object.keys(record.voices).length} voices with settled calls; ${record.pending_calls} calls still waiting for their ${record.horizon_hours}-hour window to close.`;
+
+    // Try it: your voices, your limit, the position that follows.
+    const P = window.VerdictPolicy;
+    const allVoices = {};
+    Object.keys(record.voices).forEach((n) => { allVoices[n] = record.voices[n].weight; });
+    rows.slice(-3).forEach((d) => (((d.evidence.narrative || {}).voices) || []).forEach((v) => { if (v.name && !(v.name in allVoices)) allVoices[v.name] = 1; }));
+    const chosen = new Set(Object.keys(record.voices).sort((a, b) => record.voices[b].weight - record.voices[a].weight).slice(0, 3));
+    const chips = $("t-voices");
+    chips.innerHTML = Object.keys(allVoices).sort().map((n) =>
+      `<label><input type="checkbox" value="${esc(n)}" ${chosen.has(n) ? "checked" : ""}> ${esc(n)} <span class="mut">${allVoices[n].toFixed(2)}${record.voices[n] && record.voices[n].proven ? "" : " · no record"}</span></label>`).join("");
+    const latest = (token) => [...rows].reverse().find((d) => d.evidence && d.evidence.symbol === token + "USDT" && d.features);
+    const n2 = (x, places) => Number(x).toLocaleString("en-US", { maximumFractionDigits: places == null ? 2 : places });
+    const isConv = (a) => String(a.evidence_ref || "").startsWith("narrative.convergence");
+
+    function renderTry() {
+      chips.querySelectorAll("label").forEach((l) => l.classList.toggle("on", l.querySelector("input").checked));
+      const token = $("t-token").value, stance = $("t-stance").value, v5 = $("t-rules").value === "v5", high = $("t-high").checked;
+      const picked = [...chips.querySelectorAll("input:checked")].map((i) => i.value);
+      const out = $("t-out");
+      const d = latest(token);
+      if (!d) { out.innerHTML = `<span class="mut">No recorded market for ${esc(token)} yet.</span>`; return; }
+      if (picked.length < 2) { out.innerHTML = '<span style="color:var(--warn);font-weight:600">A convergence needs at least two distinct voices on the same token and stance. Tick two or more.</span>'; return; }
+
+      const weights = picked.map((n) => allVoices[n]);
+      const w = VerdictTrust.convergenceWeight(weights, high, v5);
+      const counted = (v5 ? [...weights].sort((a, b) => b - a) : weights).slice(0, 4);
+      const formula = v5
+        ? `0.5 × (${counted.map((x) => x.toFixed(2)).join(" + ")})${high ? " + 0.5" : ""} = <b>${w}</b>`
+        : `0.5 × ${counted.length} voices${high ? " + 0.5" : ""} = <b>${w}</b>`;
+      const base = (list) => list.filter((a) => !isConv(a)).reduce((s, a) => s + a.weight, 0);
+      let bull = base(d.bull), bear = base(d.bear);
+      if (stance === "bullish") bull += w; else bear += w;
+      const f = d.features;
+      const verdict = P.evaluate({ bull, bear, atrPct: f.atr_14 / f.last_close * 100, ageMinutes: 0 });
+
+      let html = `<p>Your convergence is a <b class="${stance}">${stance}</b> argument on ${esc(token)} weighing ${formula}.</p>` +
+        `<p>Against the market recorded in dossier #${d.seq} (${esc(d.evidence.collected_at.slice(0, 16).replace("T", " "))} UTC), the other arguments add up to bull ${n2(base(d.bull))} and bear ${n2(base(d.bear))}; with yours, <b>bull ${n2(bull)} vs bear ${n2(bear)}</b>, edge ${n2(verdict.edge)}. The rule that fires: <span class="mut">${esc(verdict.rule)}</span>.</p>` +
+        `<p>The judge's verdict: <b class="${verdict.state}">${esc(verdict.state)}</b></p>`;
+      let risk = null, refused = null;
+      try { risk = P.riskPct($("t-risk").value); } catch (e) { refused = e.message; }
+      if (refused) {
+        html += `<p class="bearish">Refused: ${esc(refused)}. The command line refuses the same way (<code>--risk-pct</code>), so a limit above the ceiling can never be recorded by accident.</p>`;
+      } else if (verdict.state === "LONG" || verdict.state === "SHORT") {
+        const p = P.position(f.last_close, f.atr_14, verdict.state, risk, 10000);
+        html += `<table><tbody>` +
+          `<tr><td>Entry (last close)</td><td><b>${n2(p.entry, 6)}</b></td></tr>` +
+          `<tr><td>Stop, 1.5 × ATR away</td><td>${n2(p.stop, 6)}</td></tr>` +
+          `<tr><td>Take-profit, 3 × ATR away</td><td>${n2(p.take_profit, 6)}</td></tr>` +
+          `<tr><td>Size = (capital × ${n2(risk)}%) ÷ stop distance</td><td><b>${n2(p.size, 6)}</b> units</td></tr>` +
+          `<tr><td>If the stop is hit you lose</td><td><b>$${n2(p.risk_cash)}</b>, exactly your limit (${n2(risk)}% of $10,000)</td></tr></tbody></table>`;
+      } else {
+        html += `<p class="mut">No position opens in this state, so the risk limit has nothing to size. Try more voices, a bearish side, or the high-conviction box.</p>`;
+      }
+      out.innerHTML = html;
+    }
+    ["t-token", "t-stance", "t-rules", "t-high", "t-risk"].forEach((id) => $(id).addEventListener("input", renderTry));
+    chips.addEventListener("input", renderTry);
+    renderTry();
 
     $("rejected").querySelector("tbody").innerHTML = Object.entries(rejected).sort().map(([tok, r]) =>
       `<tr><td><b>${esc(tok)}</b></td><td>${esc((r.voices || []).join(", "))}</td><td>${esc((r.stances || []).join(", "))}</td><td class="mut">${esc(r.reason)}</td></tr>`

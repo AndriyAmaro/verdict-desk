@@ -4,6 +4,7 @@ Mantem compatibilidade com v1 (mesmo juiz, mesma hash chain).
 Adiciona argumentos baseados em indicadores que geram edge mais alto.
 """
 
+import math
 from typing import NamedTuple
 
 RULES_VERSION = "v2"
@@ -72,7 +73,7 @@ def convergence_args(narrative, symbol, trust_weighted: bool = False) -> tuple[l
         if trust_weighted:
             table = (narrative.get("trust") or {}).get("voices") or {}
             weights = {v: float((table.get(v) or {}).get("weight", 1.0)) for v in voices}
-            weight = sum(sorted(weights.values(), reverse=True)[:4]) * 0.5
+            weight = math.fsum(sorted(weights.values(), reverse=True)[:4]) * 0.5  # fsum: the same exact sum in every Python and in web/trust.js
         else:
             weight = min(n, 4) * 0.5
         if c.get("max_conviction") == "high":

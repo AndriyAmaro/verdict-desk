@@ -240,6 +240,7 @@ Reproduce any row:
 python3 -m verdict_desk stats --git                                  # the table above
 python3 -m verdict_desk stats --first-llm-seq 35 --last-llm-seq 45   # an earlier range, e.g. the third row of the history
 python3 -m verdict_desk stats --json                                 # every number, machine readable
+python3 -m verdict_desk scoreboard --check docs/scoreboard.txt           # the exact-numbers block of the build page: recomputed from the ledger as of the dossier it cites; fails on any difference
 ```
 
 ## Auditing someone else's agent

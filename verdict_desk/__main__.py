@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import voices as voices_config
-from . import anchor, backtest, battery, cadence, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research, trust
+from . import anchor, backtest, battery, cadence, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research, scoreboard, trust
 
 DEFAULT_LEDGER = Path("ledger/ledger.jsonl")
 
@@ -466,6 +466,35 @@ def cmd_monitor(opts) -> int:
     return 1
 
 
+def _count_tests() -> int:
+    import unittest
+    return unittest.defaultTestLoader.discover(str(Path(__file__).resolve().parent.parent / "tests")).countTestCases()
+
+
+def cmd_scoreboard(opts) -> int:
+    """Print (or save) the scoreboard block for the build page, or check a saved one against the ledger."""
+    ledger = dossier.read_ledger(opts.ledger)
+    if not ledger:
+        print("The ledger is empty; nothing to count.", file=sys.stderr)
+        return 1
+    root = Path(opts.ledger).resolve().parent.parent
+    tests = opts.tests if opts.tests is not None else _count_tests()
+    if opts.check:
+        problems = scoreboard.check(Path(opts.check).read_text(encoding="utf-8"), ledger, root, tests)
+        for problem in problems:
+            print(problem, file=sys.stderr)
+        print(f"scoreboard {opts.check}: " + ("every figure reproduced from the ledger" if not problems else f"{len(problems)} figure line(s) differ"))
+        return 1 if problems else 0
+    seq = opts.seq or ledger[-1]["seq"]
+    text = scoreboard.render(scoreboard.compute(ledger, seq, root, tests))
+    if opts.out:
+        Path(opts.out).write_text(text, encoding="utf-8")
+        print(f"wrote {opts.out} (as of dossier {seq})")
+    else:
+        print(text, end="")
+    return 0
+
+
 def cmd_due(opts) -> int:
     """Print `run=true` or `run=false` for a workflow to append to its outputs; never fails the job."""
     now = datetime.now(timezone.utc)
@@ -681,6 +710,12 @@ def main() -> int:
     p = sub.add_parser("head", help="print the verified head of the chain as JSON, for the CRE anchor workflow")
     p.add_argument("--out", type=Path, help="also write the JSON to this file (published next to the ledger)")
     p.set_defaults(func=cmd_head)
+    p = sub.add_parser("scoreboard", help="the exact-numbers block for the build page, counted from the raw ledger; --check recomputes a saved block and fails on any difference")
+    p.add_argument("--seq", type=int, metavar="N", help="count as of dossier N (default: the head)")
+    p.add_argument("--out", metavar="FILE", help="write the block to FILE")
+    p.add_argument("--check", metavar="FILE", help="recompute the block FILE cites and fail if any figure differs")
+    p.add_argument("--tests", type=int, metavar="N", help="the number of tests (default: counted by discovering the suite)")
+    p.set_defaults(func=cmd_scoreboard)
     p = sub.add_parser("due", help="print run=true when the last decision is old enough for a new one (the workflow is triggered several times an hour)")
     p.add_argument("--min-minutes", type=float, default=50, metavar="N", help="minimum minutes since the newest dossier (default 50)")
     p.set_defaults(func=cmd_due)

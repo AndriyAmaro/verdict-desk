@@ -32,7 +32,7 @@ jobs:
         env:
           MISTRAL_API_KEY: ${{ secrets.LLM }}
           # MISTRAL_MODEL is optional; defaults to mistral-small-latest in code
-        run: python -m verdict_desk decide-v4 BTCUSDT ETHUSDT SOLUSDT --default-feeds
+        run: python -m verdict_desk decide-v4 BTCUSDT ETHUSDT SOLUSDT --config config/voices.json
       - name: Verify the chain and write the head
         run: |
           python -m verdict_desk verify
@@ -101,7 +101,7 @@ jobs:
             echo "push attempt $attempt raced; re-recording from the freshest published head..."
             git rebase --abort 2>/dev/null || true
             git reset --hard "origin/${{ github.ref_name }}"
-            python -m verdict_desk decide-v4 BTCUSDT ETHUSDT SOLUSDT --default-feeds || true
+            python -m verdict_desk decide-v4 BTCUSDT ETHUSDT SOLUSDT --config config/voices.json || true
             python -m verdict_desk verify
             python -m verdict_desk head --out ledger/head.json
             git add ledger

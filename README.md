@@ -34,21 +34,24 @@ The bounty's spotlight describes an agent that monitors user-selected crypto voi
 
 | Spotlight requirement | What runs today | Measured evidence |
 |---|---|---|
-| Up to 20 user-selected voices | 5 default crypto newsroom and creator feeds, extensible to 20 via `--feed NAME=URL` (RSS/Atom) | 40 headlines per run; 171 of 179 dossiers carry a narrative layer |
+| Up to 20 user-selected voices | 13 voices in [`config/voices.json`](config/voices.json): 5 newsroom RSS feeds and 8 public Telegram channels (market trackers and analysts), all read without a key. Edit the file to choose up to 20; its SHA-256 is frozen in every dossier (`narrative.config`) together with the voices that returned nothing that hour | up to 8 messages per voice per run; 171 of 179 dossiers carry a narrative layer |
 | Tokens, sentiment, conviction, urgency | LLM extraction per headline into a closed vocabulary, each with a literal quote from the headline | 14 extractions accepted and 13 rejected by the grounding gate in the latest dossier |
 | Convergence across distinct voices | A narrative needs at least two different voices on the same token **and** the same stance | **101 convergences** recorded across the live ledger |
 | Explain the candidates it rejected | Every mentioned token that did not become a narrative is kept with its reason: only one voice, voices disagreeing, or neutral mentions only | `narrative.rejected_candidates`, frozen in the dossier |
-| Practice position under transparent rules and risk limits | The convergence becomes a citable evidence item; the deterministic judge sizes a simulated position at 1% risk with an ATR stop and target | `verdict_desk/agents_v2.py`, `portfolio.py` |
+| Practice position under transparent rules and risk limits | The convergence becomes a citable evidence item; the deterministic judge sizes a simulated position inside the risk limit the user sets in the same file (`risk.max_risk_pct`, default 1%, system ceiling 25%, refused loudly above it) with an ATR stop and target | `verdict_desk/agents_v2.py`, `portfolio.py` |
 
 Example from the live ledger: BTC bullish, converging across **CoinDesk, Cointelegraph, Decrypt and The Block**, top conviction *high*, top urgency *medium* — and that convergence is one of the items the judge is allowed to cite when it rules.
 
-**One honest gap:** the spotlight names X as the KOL source. This build reads public RSS/Atom feeds, because the X API is paid and the project runs at zero budget. The voice adapter accepts **any** feed URL, so an X or Telegram source works through a public RSS bridge without touching the extraction, convergence or grounding logic — which is covered by a test that parses an X-shaped feed:
+Choose your own voices and your own limit, then run it:
 
 ```bash
-python3 -m verdict_desk decide-v3 BTCUSDT --feed "kol=https://<your-rss-bridge>/<handle>/rss" --feed "chan=https://<your-rss-bridge>/telegram/<channel>"
+$EDITOR config/voices.json                                    # up to 20 voices (rss or telegram) and risk.max_risk_pct
+python3 -m verdict_desk decide-v4 BTCUSDT --config config/voices.json
 ```
 
-What this repository does not claim is a native X API integration that does not exist.
+An invalid file is refused with the field and the reason, and nothing is recorded. A voice that fails or has nothing about a tracked token is written into the dossier as a gap (`narrative.config.gaps`), never skipped silently.
+
+**One honest gap:** the spotlight names X as the KOL source. Telegram channels are read natively (their public preview needs no key); there is **no native X API integration**, because that API is paid and this project runs at zero budget. An X account works today through any public RSS bridge declared as `kind: rss` in the config, without touching the extraction, convergence or grounding logic (a test parses an X-shaped feed).
 
 ## Verifying a record someone hands you
 

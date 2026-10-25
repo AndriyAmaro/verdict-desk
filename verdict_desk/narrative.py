@@ -16,6 +16,7 @@ vies. O pacote congela as extracoes, entao o replay nunca chama o modelo de novo
 import concurrent.futures
 import json
 import re
+from html import unescape
 import urllib.request
 import xml.etree.ElementTree as ET
 
@@ -25,6 +26,7 @@ BEAR = ("crash", "hack", "ban", "lawsuit", "outflow", "plunge", "exploit")
 MIN_VOICES = 2
 MAX_VOICES = 20  # limite de feeds por decisao
 PER_FEED = 8
+TELEGRAM_PAGE = 40  # mensagens lidas do preview de um canal antes do filtro por token
 CHUNK = 10  # titulos por chamada ao LLM (lotes menores gastam menos tokens de raciocinio)
 MAX_WORKERS = 4  # lotes em paralelo
 LLM_TIMEOUT = 240  # segundos por chamada de extracao: modelo de raciocinio no tier gratuito oscila
@@ -73,27 +75,38 @@ def parse_feed(xml_text: str, name: str, limit: int = PER_FEED) -> list[dict]:
     return out
 
 
-def parse_telegram(html: str, channel: str, limit: int = PER_FEED) -> list[dict]:
+_TG_POST = re.compile(r'data-post="([^"/]+)/(\d+)"')
+_TG_TEXT = re.compile(r'tgme_widget_message_text[^>]*>(.*?)</div>', re.S)
+_TG_TIME = re.compile(r'<time[^>]*datetime="([^"]+)"')
+
+
+def parse_telegram(html: str, channel: str, limit: int = PER_FEED, name: str | None = None) -> list[dict]:
     """Le o preview publico de um canal Telegram (https://t.me/s/<canal>) — sem chave.
 
-    O HTML publico expoe cada mensagem como um bloco `.tgme_widget_message_text` com um
-    `<time datetime=...>`. Extrai texto e data; o link aponta para o proprio preview do canal.
-    A voz e o canal, entao dois canais contam como duas vozes distintas na convergencia. Se o
-    Telegram mudar o HTML, devolve vazio e a coleta registra a lacuna — nunca inventa.
+    Cada mensagem e um bloco com `data-post="<canal>/<id>"`; texto, data e id saem DO MESMO bloco,
+    entao uma mensagem so de midia (sem texto) nao desalinha as outras. O preview lista da mais
+    antiga para a mais nova, e a coleta quer as mais novas, devolvidas da mais nova para a mais
+    antiga como nos feeds RSS. O link e o permalink da propria mensagem (https://t.me/<canal>/<id>),
+    nao o do canal, para a citacao poder ser conferida. A voz e o canal, entao dois canais contam
+    como duas vozes distintas na convergencia. Se o Telegram mudar o HTML, devolve vazio e a coleta
+    registra a lacuna — nunca inventa.
     """
-    texts = re.findall(r'tgme_widget_message_text[^>]*>(.*?)</div>', html, re.S)
-    dates = re.findall(r'datetime="([^"]+)"', html)
-    out = []
-    for i, raw in enumerate(texts[:limit]):
-        text = re.sub(r"<[^>]+>", " ", raw)
-        text = re.sub(r"\s+", " ", text).strip()
+    marks = list(_TG_POST.finditer(html))
+    posts = []
+    for i, mark in enumerate(marks):
+        block = html[mark.end(): marks[i + 1].start() if i + 1 < len(marks) else len(html)]
+        found = _TG_TEXT.search(block)
+        if not found:
+            continue
+        text = re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", found.group(1)))).strip()
         if not text:
             continue
-        item = {"name": channel, "title": text[:280], "link": f"https://t.me/s/{channel}"}
-        if i < len(dates):
-            item["published"] = dates[i]
-        out.append(item)
-    return out
+        item = {"name": name or channel, "title": text[:280], "link": f"https://t.me/{mark.group(1)}/{mark.group(2)}"}
+        when = _TG_TIME.search(block)
+        if when:
+            item["published"] = when.group(1)
+        posts.append(item)
+    return posts[-limit:][::-1]
 
 
 def fetch_feed(url: str, name: str, timeout: int = 20) -> list[dict]:
@@ -102,20 +115,35 @@ def fetch_feed(url: str, name: str, timeout: int = 20) -> list[dict]:
         body = response.read().decode("utf-8", "replace")
     if "t.me/s/" in url:
         channel = url.rstrip("/").rsplit("/", 1)[-1]
-        return parse_telegram(body, channel or name)
+        # Um canal publica muita coisa que nao e sobre os ativos rastreados (transferencias de
+        # stablecoin, avisos): so entra o que cita um deles, antes de gastar uma chamada ao LLM.
+        page = parse_telegram(body, channel or name, limit=TELEGRAM_PAGE, name=name)
+        return [m for m in page if any(_names(_squash(m["title"]), tok) for tok in TOKENS)][:PER_FEED]
     return parse_feed(body, name)
+
+
+def collect_with_gaps(feeds: dict[str, str], log=None) -> tuple[list[dict], dict[str, str]]:
+    """Busca as vozes. Uma voz fora do ar, ou que nao devolveu nada, vira uma LACUNA registrada
+    com o motivo, nunca um silencio: quem audita ve quais vozes faltaram em cada decisao."""
+    voices: list[dict] = []
+    gaps: dict[str, str] = {}
+    for name, url in list(feeds.items())[:MAX_VOICES]:
+        try:
+            got = fetch_feed(url, name)
+        except (OSError, ValueError, ET.ParseError) as err:
+            gaps[name] = f"{type(err).__name__}: {err}"[:140]
+            if log:
+                log(f"  feed {name} skipped: {err}")
+            continue
+        if not got:
+            gaps[name] = "no message about a tracked token"
+        voices += got
+    return voices, gaps
 
 
 def collect(feeds: dict[str, str], log=None) -> list[dict]:
     """Busca as vozes; feed fora do ar e pulado e avisado, nunca derruba a coleta."""
-    voices: list[dict] = []
-    for name, url in list(feeds.items())[:MAX_VOICES]:
-        try:
-            voices += fetch_feed(url, name)
-        except (OSError, ValueError, ET.ParseError) as err:
-            if log:
-                log(f"  feed {name} skipped: {err}")
-    return voices
+    return collect_with_gaps(feeds, log)[0]
 
 
 def classify(title: str) -> tuple[list[str], int]:

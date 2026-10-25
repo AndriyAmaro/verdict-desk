@@ -55,6 +55,10 @@ button{border-color:var(--accent);color:var(--accent);cursor:pointer}
         <td>That the head of the chain, and so every earlier record it commits to, existed no later than the block that contains the stamp. Neither we nor a block explorer can change that.</td>
         <td>Strong supporting evidence of the time by which the record existed, and a defence against "you rewrote it later".</td>
         <td>It is <b>not a qualified electronic time stamp</b> under eIDAS. Article 41(2) gives its presumption of accuracy of date, time and integrity only to qualified time stamps issued by a qualified trust service provider; Article 41(1) says other electronic time stamps cannot be denied effect solely because they are electronic or not qualified, which leaves their weight to the court.</td></tr>
+      <tr><td><b>Sigstore transparency log</b><br><span class="mut">every hour, no key of ours; <a href="witnesses.html">checked in your browser</a></span></td>
+        <td>That the head was signed by this repository's GitHub workflow, and that a public log run by the Sigstore project recorded the signature at a time we do not control. The log cannot be back-dated by us.</td>
+        <td>A second, independent clock with a named signer, usable next to the Bitcoin stamp, and checkable by anyone with <code>cosign verify-blob</code>.</td>
+        <td>Not a qualified time stamp either. It shows <i>which workflow</i> signed, not who wrote the record; whoever controls the repository controls the workflow, so its worth is the log's time, not the signer's independence. The page checks the digest and the signer's name; the certificate chain and the log's inclusion proof need the <code>cosign</code> command.</td></tr>
       <tr><td><b>Ethereum Sepolia anchor</b><br><span class="mut">through a Chainlink CRE workflow</span></td>
         <td>A second, independent record of a head, in a contract that only accepts increasing sequence numbers.</td>
         <td>Redundancy for the Bitcoin stamp.</td>

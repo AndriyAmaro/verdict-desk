@@ -1,0 +1,72 @@
+name: rekor-witness
+
+# Signs the ledger head every hour with no key and no secret (Sigstore keyless signing) and writes the
+# signature to the public Rekor transparency log. The signature says which repository and which workflow
+# signed, and the log records a time that neither the operator nor GitHub's schedule controls.
+# The witnesses page asks Rekor for each entry in the visitor's browser and compares it with the head.
+# `cosign verify-blob` against ledger/rekor/<seq>.bundle.json is the independent way to check one by hand.
+
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+  # Testing this file on a pull request signs and verifies a head but never commits it.
+  pull_request:
+    paths:
+      - ".github/workflows/rekor.yml"
+
+# A group of its own: GitHub keeps one pending run per group and cancels the older pending one, so sharing
+# the hourly bot's group could let a witness run cancel an hourly decision that was waiting.
+concurrency:
+  group: rekor
+  cancel-in-progress: false
+
+jobs:
+  witness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: sigstore/cosign-installer@v3.7.0
+        with:
+          cosign-release: "v2.4.1"
+      - name: Sign the head in the transparency log and verify what the log kept
+        run: |
+          set -euo pipefail
+          seq=$(python3 -c "import json; print(json.load(open('ledger/head.json'))['seq'])")
+          mkdir -p ledger/rekor
+          if [ -e "ledger/rekor/$seq.bundle.json" ]; then
+            echo "head #$seq is already signed"
+            exit 0
+          fi
+          # The exact bytes the OpenTimestamps step saved for this head; the page downloads this same file.
+          [ -e "ledger/timestamps/$seq.json" ] || cp ledger/head.json "ledger/timestamps/$seq.json"
+          cosign sign-blob --yes --bundle "ledger/rekor/$seq.bundle.json" "ledger/timestamps/$seq.json" >/dev/null
+          cosign verify-blob --bundle "ledger/rekor/$seq.bundle.json" \
+            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/rekor.yml@refs/" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "ledger/timestamps/$seq.json"
+          echo "head #$seq signed and verified"
+      - name: Keep the bundle in the repository (never on a pull request)
+        if: github.event_name != 'pull_request'
+        run: |
+          set -uo pipefail
+          git config user.name "verdict-desk-bot"
+          git config user.email "verdict-desk-bot@users.noreply.github.com"
+          git add ledger/rekor ledger/timestamps
+          if git diff --cached --quiet; then
+            echo "nothing new to keep"
+            exit 0
+          fi
+          git commit -m "witness: sigstore signature for the head ($(date -u +%Y-%m-%dT%H:%MZ))"
+          # Only new files under ledger/rekor and ledger/timestamps, so a rebase over the hourly bot's commits
+          # has nothing to conflict on; retry because both can push in the same minute.
+          for attempt in 1 2 3 4; do
+            git pull --rebase origin "${{ github.ref_name }}" && git push && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((attempt * 5))
+          done
+          exit 1

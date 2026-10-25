@@ -37,6 +37,57 @@ def _pct(value) -> str:
         return ""
 
 
+def _plain_summary(dossier: dict, integrity_ok: bool) -> list[str]:
+    """The decision in words a non-specialist can follow, from the record's own fields and nothing else.
+
+    No model writes this: every sentence is a template filled from the dossier, so it can be checked
+    against the sections below it and it says the same thing every time it is regenerated.
+    """
+    verdict = dossier.get("verdict") or {}
+    ev = dossier.get("evidence") or {}
+    llm = dossier.get("llm") or {}
+    sens = dossier.get("sensitivity") or {}
+    symbol, seq = ev.get("symbol", "the market"), dossier.get("seq")
+    when = str(ev.get("collected_at", ""))
+    when = f"{when[:10]} at {when[11:16]} UTC" if len(when) >= 16 else when
+    action = verdict.get("action")
+    out = [f"On {when}, an automated desk looked at the market for {symbol} and recorded a decision. This is record #{seq}."]
+
+    if action in ("LONG", "SHORT") and verdict.get("entry") is not None:
+        way = "buy (bet on a rise)" if action == "LONG" else "sell short (bet on a fall)"
+        out.append(f"It decided to {way} {symbol} on paper at {verdict['entry']}, with a stop at {verdict.get('stop')} and a target at {verdict.get('take_profit')}. "
+                   f"The size is set so that if the stop is hit the loss is {verdict.get('risk_pct')}% of the simulated capital. No real order was placed.")
+    elif action == "BLOCKED_STALE":
+        out.append("It refused to decide, because the newest price it had was too old to trust. That is a safety rule, and the refusal itself is recorded. No real order was placed.")
+    elif action in ("WATCH_REVERSAL", "REDUCE_EXPOSURE", "FLAT"):
+        reason = {"WATCH_REVERSAL": "The two sides were close, and a single argument decides which way it would go.",
+                  "REDUCE_EXPOSURE": "Both sides were strong and the market was volatile, so it would rather shrink risk than add any.",
+                  "FLAT": "Neither side was strong enough."}[action]
+        out.append(f"It did not open a position. {reason} No real order was placed.")
+    else:
+        out.append(f"The recorded action is {action}. No real order was placed.")
+
+    if verdict.get("bull_score") is not None and verdict.get("bear_score") is not None:
+        flips = [d for d in (sens.get("drop_one") or []) if d.get("flips")]
+        line = (f"The arguments for a rise weighed {verdict['bull_score']} and the arguments for a fall weighed {verdict['bear_score']}; "
+                f"a position needs a gap of at least {verdict.get('threshold')}.")
+        if flips:
+            line += f" If this one argument were removed the verdict would change: \"{flips[0].get('claim')}\"."
+        out.append(line)
+
+    sides = [llm.get(side) or {} for side in ("bull", "bear")] if llm else []
+    if sides and all(b.get("error") for b in sides):
+        out.append("The AI analysts could not run for this record, so the decision rests on the fixed rules alone.")
+    elif sides:
+        kept = sum(len(b.get("accepted") or []) for b in sides)
+        refused = sum(len(b.get("rejected") or []) for b in sides)
+        out.append(f"AI analysts wrote {kept + refused} claims; {kept} passed the check that every number must appear in the evidence it cites and {refused} {'was' if refused == 1 else 'were'} refused.")
+
+    out.append("Checked just now: this record matches its saved fingerprint, so nobody has changed it since it was written."
+               if integrity_ok else "Checked just now: this record does NOT match its saved fingerprint, so it was changed after it was written. Do not rely on it.")
+    return out
+
+
 def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None) -> str:
     """Render one dossier as a printable exhibit. Pure function of its inputs."""
     body = {k: v for k, v in dossier.items() if k != "hash"}
@@ -60,6 +111,10 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None)
     prev = dossier.get("prev_hash", "")
 
     rows = []
+
+    # --- 0. in plain English -----------------------------------------------------
+    rows.append("<h2 id=\"plain\">In plain English</h2>")
+    rows.extend(f"<p class=\"lead\">{_e(line)}</p>" for line in _plain_summary(dossier, integrity_ok))
 
     # --- 1. custody --------------------------------------------------------------
     market = ev.get("market") or {}

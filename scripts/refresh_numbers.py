@@ -165,6 +165,18 @@ def refreshed(tests: int | None) -> dict[Path, str]:
                       f"{narrative} of {len(ledger)} dossiers carry a narrative layer", text)
     if n != 1:
         raise SystemExit("README.md has no narrative-coverage line to refresh")
+    convergences = sum(len((d.get("evidence") or {}).get("narrative", {}).get("convergence") or []) for d in ledger)
+    text, n = re.subn(r"\*\*\d+ convergences\*\* recorded across the live ledger, as of dossier \d+",
+                      f"**{convergences} convergences** recorded across the live ledger, as of dossier {ledger[-1]['seq']}", text)
+    if n != 1:
+        raise SystemExit("README.md has no convergence-count line to refresh")
+    latest = next((d for d in reversed(ledger) if (d.get("evidence") or {}).get("narrative", {}).get("method") == "llm"), None)
+    if latest is not None:
+        block = latest["evidence"]["narrative"]
+        text, n = re.subn(r"\d+ extractions accepted and \d+ rejected by the grounding gate in the latest dossier \(#\d+\)",
+                          f"{len(block.get('extractions') or [])} extractions accepted and {len(block.get('rejected') or [])} rejected by the grounding gate in the latest dossier (#{latest['seq']})", text)
+        if n != 1:
+            raise SystemExit("README.md has no extraction-count line to refresh")
     out[README] = text
     if BUILD_PAGE.exists():
         page = BUILD_PAGE.read_text(encoding="utf-8")

@@ -269,7 +269,7 @@ The workflow [`.github/workflows/hourly.yml`](.github/workflows/hourly.yml) is t
 
 ## Chainlink CRE
 
-[`cre/`](cre/README.md) holds a workflow that fetches the published ledger head with identical consensus, reads the BTC/USD Data Feed on Sepolia, and writes both to `LedgerAnchor` through a CRE report. The contract accepts reports only from the CRE forwarder and only with a higher sequence number than the last one.
+[`cre/`](cre/README.md) holds a workflow that fetches the published ledger head from two independent publications (raw file and Pages copy, which must be identical) with identical consensus, reads the BTC/USD Data Feed on Sepolia, and writes both to `LedgerAnchor` through a CRE report. The contract accepts reports only from the CRE forwarder and only with a higher sequence number than the last one.
 
 Status, stated plainly: the workflow is covered by 10 tests with the SDK mocks and type-checks; the contract is covered by 6 tests in an in-memory EVM. **Both ran on 2026-10-21**: the workflow simulated (dry, then with `--broadcast`), `LedgerAnchor` was deployed to Sepolia, and the head of dossier 80 is anchored in a real transaction. `node cre/contracts/scripts/check-anchor.mjs` answers `ok: true`.
 

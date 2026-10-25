@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { decodeAnchorReport, encodeAnchorReport, formatPrice, parseHead } from './logic'
+import { agreeOnHead, decodeAnchorReport, encodeAnchorReport, formatPrice, parseHead } from './logic'
 
 const HASH = 'ab'.repeat(32)
 
@@ -41,5 +41,19 @@ describe('formatPrice', () => {
 		expect(formatPrice(6_700_000_000_000n, 8)).toBe('67000')
 		expect(formatPrice(5n, 8)).toBe('0.00000005')
 		expect(formatPrice(123n, 0)).toBe('123')
+	})
+})
+
+describe('agreeOnHead', () => {
+	const head = { seq: 12, hash: HASH, symbol: 'BTCUSDT' }
+
+	test('returns the head when two independent sources publish the same one', () => {
+		expect(agreeOnHead(head, { ...head })).toEqual(head)
+	})
+
+	test('refuses when the sources differ in sequence, hash or symbol, and says which', () => {
+		expect(() => agreeOnHead(head, { ...head, seq: 13 })).toThrow('seq 12 vs 13')
+		expect(() => agreeOnHead(head, { ...head, hash: 'cd'.repeat(32) })).toThrow('hash')
+		expect(() => agreeOnHead(head, { ...head, symbol: 'ETHUSDT' })).toThrow('symbol')
 	})
 })

@@ -2,14 +2,14 @@
 
 A Chainlink Runtime Environment (CRE) workflow that makes the decision ledger tamper-evident beyond the operator's word. Once a day it:
 
-1. fetches the published ledger head (`seq`, SHA-256 `hash`, `symbol`) over HTTP, where every node must see the same bytes (identical consensus);
+1. fetches the published ledger head (`seq`, SHA-256 `hash`, `symbol`) over HTTP from **two independent publications** (the raw repository file and the GitHub Pages site); each node requires both to be identical, and the nodes must then agree with each other (identical consensus). If either source is down or they differ, nothing is anchored;
 2. reads a Chainlink **Data Feed** price (BTC/USD on Sepolia) as independent cross-check evidence;
 3. writes both to the `LedgerAnchor` contract on Sepolia through a CRE report.
 
 `LedgerAnchor` only accepts reports from the CRE forwarder and only with a sequence number higher than the last one, so an anchored head can never be overwritten or rolled back. A judge compares `isAnchored(seq, hash)` on-chain with the head they recompute from the public ledger in their own browser (`../web/index.html`).
 
 ```
-ledger/head.json (public) --HTTP, identical consensus--> CRE workflow --report--> Forwarder --> LedgerAnchor (Sepolia)
+ledger/head.json (raw file + Pages copy, must be identical) --HTTP, identical consensus--> CRE workflow --report--> Forwarder --> LedgerAnchor (Sepolia)
 Chainlink Data Feed BTC/USD ------EVM read------------^
 ```
 
@@ -84,11 +84,14 @@ bash cre/scripts/anchor-existing.sh
 
 It broadcasts the report against the contract recorded in `cre/deployment.sepolia.json`. The scheduled job in `.github/workflows/anchor.yml` runs it hourly and **skips with a visible notice** when `SEPOLIA_PRIVATE_KEY` or `CRE_API_KEY` are not configured: the published ledger stays verifiable without them, only the on-chain cadence pauses.
 
+**If a run says `sources disagree`:** the Pages copy is published a few minutes after the repository file, at the end of the hourly deploy. A run made in that window is refused on purpose; wait for the deploy and run again.
+
 ## Evidence kept in this folder
 
 | File | What it proves |
 |---|---|
 | `evidence/simulate-broadcast-output.txt` | a real transaction: seq 80, `0x7caa1f…`, later confirmed on chain at block 11964023 |
+| `evidence/simulate-two-sources.txt` | the workflow fetching the head from both publications (seq 224, no broadcast) and naming the feed it read, BTC / USD |
 | `evidence/simulate-live-head.txt` | the workflow reading the live published head (seq 113) under consensus and the Data Feed price |
 | `evidence/check-anchor-output.txt` | the contract read back and compared with the public ledger |
 

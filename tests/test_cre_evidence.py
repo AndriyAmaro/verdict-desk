@@ -41,6 +41,20 @@ class CreEvidenceTest(unittest.TestCase):
         self.assertIn("Data Feed", text)
         self.assertIn("Binary hash", text, "the simulation must record which binary produced it")
 
+    def test_the_two_source_simulation_names_a_head_the_ledger_really_has(self):
+        text = (ROOT / "cre" / "evidence" / "simulate-two-sources.txt").read_text()
+        match = re.search(r"Anchored seq (\d+) head ([0-9a-f]{64})", text)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.group(2), self.ledger[int(match.group(1))]["hash"])
+        self.assertIn("raw.githubusercontent.com", text)
+        self.assertIn("andriyamaro.github.io", text, "the second, independent source must be named in the log")
+        self.assertIn("Data Feed BTC / USD", text, "the feed must be named, not just its address")
+
+    def test_the_workflow_config_names_two_different_sources_for_the_head(self):
+        config = json.loads((ROOT / "cre" / "anchor" / "config.staging.json").read_text())
+        self.assertNotEqual(config["headUrl"], config["headUrlMirror"])
+        self.assertTrue(config["headUrl"].endswith("/ledger/head.json") and config["headUrlMirror"].endswith("/ledger/head.json"))
+
     def test_the_deployment_file_points_at_a_real_contract(self):
         dep = json.loads(DEPLOYMENT.read_text())
         self.assertRegex(dep["contract"], r"^0x[0-9a-fA-F]{40}$")

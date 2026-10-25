@@ -112,7 +112,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
 <section class="crit">
   <h3>Chainlink CRE, on Sepolia</h3>
   <ul>
-    <li>The workflow fetches the published ledger head over HTTP under DON consensus, reads the <b>BTC/USD Data Feed</b> on Sepolia, and writes both through the CRE forwarder</li>
+    <li>The workflow fetches the published ledger head over HTTP from <b>two independent publications</b> (the raw repository file and the Pages site), requires them to be identical and every node to agree under DON consensus, reads the <b>BTC/USD Data Feed</b> on Sepolia, and writes both through the CRE forwarder. If either source is down, or they differ, it anchors nothing</li>
     <li>The receiver only accepts forwarder reports with a strictly increasing sequence number, so an anchored head can never be overwritten</li>
     <li>The contract is <b>source-verified with an exact match</b> — the explorer serves the code that matches the deployed bytecode: <a href="https://sourcify.dev/#/lookup/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7">Sourcify record</a></li>
     <li>Address <code>0x50443D51Db71A61E131B147B1d36aF21d48CDdF7</code> · anchor transactions: <a href="https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d">#80, the first (block 11964023)</a> and <a href="https://sepolia.etherscan.io/tx/0x8b355823c734026aed28493aeb45b88e3c589a7bcc56c9eb9d4e8be63f3139ca">#212, the latest (25 Oct)</a>, both SUCCESS; the contract answers <code>isAnchored(212, hash)</code> TRUE</li>

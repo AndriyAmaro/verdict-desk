@@ -6,6 +6,7 @@ import os
 import sys
 from pathlib import Path
 
+from . import voices as voices_config
 from . import anchor, backtest, dossier, evidence, journal, learning, livestats, llm, narrative, portfolio, research
 
 DEFAULT_LEDGER = Path("ledger/ledger.jsonl")
@@ -100,12 +101,25 @@ def _decide_flow(opts, rules_version: str) -> int:
     for spec in opts.feed or []:
         name, _, url = spec.partition("=")
         feeds[name] = url
+    config = None
+    if getattr(opts, "config", None):
+        try:
+            config = voices_config.load(opts.config)
+        except voices_config.ConfigError as err:
+            print(f"refused: {err}", file=sys.stderr)
+            return 2
+        feeds |= config["feeds"]
+        if getattr(opts, "risk_pct", None) is None:
+            opts.risk_pct = config["risk_pct"]  # o limite do usuario vale quando a linha de comando nao pede outro
     block = None
     if feeds:
-        voices = narrative.collect(feeds, log=lambda m: print(m, file=sys.stderr))
+        voices, gaps = narrative.collect_with_gaps(feeds, log=lambda m: print(m, file=sys.stderr))
         ask = (lambda system, user: llm.chat(system, user, timeout=narrative.LLM_TIMEOUT, max_tokens=narrative.LLM_MAX_TOKENS)) if llm.available() else None
         block = narrative.build(voices, ask, llm.MODEL if ask else "")
-        print(f"narrative ({block['method']}): {len(voices)} headlines from {len({v['name'] for v in voices})} voices, {len(block['convergence'])} convergences")
+        if config is not None:
+            block["config"] = {**config["record"], "gaps": gaps}
+        print(f"narrative ({block['method']}): {len(voices)} headlines from {len({v['name'] for v in voices})} voices, {len(block['convergence'])} convergences"
+              + (f", {len(gaps)} voices without a message ({', '.join(sorted(gaps))})" if gaps else ""))
     rules = _rules_from_opts(opts, rules_version)
     recorded = 0
     for symbol in opts.symbols:
@@ -516,6 +530,7 @@ def main() -> int:
     p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
     p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
     p.add_argument("--risk-pct", type=float, metavar="PCT", help="risk per practice position as %% of simulated capital (max 25, default 1)")
+    p.add_argument("--config", metavar="PATH", help="voices and risk limit chosen by the user (JSON, see config/voices.json); its hash is recorded in every dossier")
     p.set_defaults(func=cmd_decide_v2)
     p = sub.add_parser("decide-v3", help="decide with rules v3: same sizing as v2, but a declined entry says why (WATCH_REVERSAL / REDUCE_EXPOSURE)")
     p.add_argument("symbols", nargs="+", metavar="SYMBOL")
@@ -524,6 +539,7 @@ def main() -> int:
     p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
     p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
     p.add_argument("--risk-pct", type=float, metavar="PCT", help="risk per practice position as %% of simulated capital (max 25, default 1)")
+    p.add_argument("--config", metavar="PATH", help="voices and risk limit chosen by the user (JSON, see config/voices.json); its hash is recorded in every dossier")
     p.set_defaults(func=cmd_decide_v3)
     p = sub.add_parser("decide-v4", help="decide with rules v4: v3 + a multi-KOL convergence becomes a deterministic signal")
     p.add_argument("symbols", nargs="+", metavar="SYMBOL")
@@ -532,6 +548,7 @@ def main() -> int:
     p.add_argument("--feed", action="append", metavar="NAME=URL", help="public RSS or Atom voice for the narrative agent (repeatable, up to 20)")
     p.add_argument("--default-feeds", action="store_true", help="also read the built-in public crypto news voices")
     p.add_argument("--risk-pct", type=float, metavar="PCT", help="risk per practice position as %% of simulated capital (max 25, default 1)")
+    p.add_argument("--config", metavar="PATH", help="voices and risk limit chosen by the user (JSON, see config/voices.json); its hash is recorded in every dossier")
     p.set_defaults(func=cmd_decide_v4)
     p = sub.add_parser("replay", help="re-run decisions from the frozen evidence")
     p.add_argument("seq", nargs="?", type=int)

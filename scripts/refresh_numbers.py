@@ -28,6 +28,7 @@ MSG = ROOT / "MSG_ORGANIZADORES.md"
 DESCRICAO_PAGE = ROOT / "DESCRICAO_PAGINA.md"
 
 
+# Private drafting docs (build page, organizer message, page description) live outside this repository; when present they are refreshed too.
 # Only the phrases that state the size of the suite: other "N tests" in the docs (the CRE ones) are different counts.
 TEST_COUNT_PATTERNS = [
     (README, r"(standard library only \()(?:\d+|TESTS_COUNT)( tests\))"),
@@ -165,11 +166,12 @@ def refreshed(tests: int | None) -> dict[Path, str]:
     if n != 1:
         raise SystemExit("README.md has no narrative-coverage line to refresh")
     out[README] = text
-    page = BUILD_PAGE.read_text(encoding="utf-8")
-    page, n = re.subn(r"<!-- numbers:start -->\n.*?\n<!-- numbers:end -->", lambda _: f"<!-- numbers:start -->\n- {build_page_line(ledger)}\n<!-- numbers:end -->", page, flags=re.S)
-    if n != 1:
-        raise SystemExit("SUBMISSAO_DORAHACKS.md has no numbers block to refresh")
-    out[BUILD_PAGE] = page
+    if BUILD_PAGE.exists():
+        page = BUILD_PAGE.read_text(encoding="utf-8")
+        page, n = re.subn(r"<!-- numbers:start -->\n.*?\n<!-- numbers:end -->", lambda _: f"<!-- numbers:start -->\n- {build_page_line(ledger)}\n<!-- numbers:end -->", page, flags=re.S)
+        if n != 1:
+            raise SystemExit("SUBMISSAO_DORAHACKS.md has no numbers block to refresh")
+        out[BUILD_PAGE] = page
     judge = JUDGE_PAGE.read_text(encoding="utf-8")
     now = livestats.summarize(ledger)
     acts = now["actions"]
@@ -182,7 +184,7 @@ def refreshed(tests: int | None) -> dict[Path, str]:
     if n != 1:
         raise SystemExit("web/judge.html has no commits-instead-of-HOLD line to refresh")
     out[JUDGE_PAGE] = judge
-    page_d = DESCRICAO_PAGE.read_text(encoding="utf-8")
+    page_d = DESCRICAO_PAGE.read_text(encoding="utf-8") if DESCRICAO_PAGE.exists() else None
     conv = sum(len((d.get("evidence") or {}).get("narrative", {}).get("convergence") or []) for d in ledger)
     llm = now["llm_era"]
     repl = {
@@ -191,13 +193,16 @@ def refreshed(tests: int | None) -> dict[Path, str]:
         r"(\d+) dossiers and counting": f"{len(ledger)} dossiers and counting",
         r"(\d+) published verdicts": f"{len(ledger)} published verdicts",
     }
-    for pat, repl_text in repl.items():
+    for pat, repl_text in (repl.items() if page_d is not None else []):
         page_d, n = re.subn(pat, repl_text, page_d)
         if n != 1:
             raise SystemExit(f"DESCRICAO_PAGINA.md has no line matching {pat!r}")
-    out[DESCRICAO_PAGE] = page_d
+    if page_d is not None:
+        out[DESCRICAO_PAGE] = page_d
     if tests is not None:
         for path, pattern in TEST_COUNT_PATTERNS:
+            if not path.exists():
+                continue
             out.setdefault(path, path.read_text(encoding="utf-8"))
             out[path], n = re.subn(pattern, lambda m: f"{m.group(1)}{tests}{m.group(2)}", out[path])
             if n != 1:

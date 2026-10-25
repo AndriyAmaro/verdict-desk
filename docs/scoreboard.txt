@@ -1,0 +1,17 @@
+LIVE SCOREBOARD: every number below is counted from the raw ledger, as of dossier 218 (head 4410e2f872659a63).
+Rebuild and check it yourself: python3 -m verdict_desk scoreboard --check docs/scoreboard.txt. The check fails if any figure differs; no number here is typed by hand.
+
+- 218 dossiers, hash-chained. Proves integrity after recording: an edit, deletion or swap anywhere breaks every later hash.
+- 1075 analyst claims accepted and 169 refused by the citation validator (124 number not in cited evidence; 44 unknown evidence id; 1 no citation); 108 analyst calls failed (provider outages, recorded in each dossier). Proves an audit trail: a refused claim is kept with its reason, so the record shows what was rejected and not only what survived.
+- 218 of 218 dossiers re-derive to the same verdict from their own frozen evidence. Proves repeatability: anyone can run the replay and get the same answer.
+- 442 tests pin the ledger, the pages and the docs to each other. Proves a controlled process: a figure that stops matching the chain fails the build.
+
+Three witnesses outside the operator (each one proves custody and authentication of the head, and a time we do not control; none is an eIDAS qualified time stamp):
+- Bitcoin (OpenTimestamps): head #212 stamped in block 973018. Proof: https://github.com/AndriyAmaro/verdict-desk/blob/main/ledger/timestamps/212.json.ots
+- Sigstore transparency log: head #206 signed by a GitHub workflow, log index 3450723352. Entry: https://search.sigstore.dev/?logIndex=3450723352
+- Ethereum Sepolia (Chainlink CRE): dossier #212 anchored, hash equal to the ledger's. Transaction: https://sepolia.etherscan.io/tx/0x8b355823c734026aed28493aeb45b88e3c589a7bcc56c9eb9d4e8be63f3139ca
+
+JUDGE PATH IN 60 SECONDS (three clicks, nothing to install):
+1. Verify the chain in your browser: https://andriyamaro.github.io/verdict-desk/
+2. Edit a dossier and watch the chain break (button on the same page): https://andriyamaro.github.io/verdict-desk/#tamper
+3. Check a witness outside our site: https://andriyamaro.github.io/verdict-desk/witnesses.html

@@ -310,7 +310,10 @@ def cmd_exhibit(opts) -> int:
         outdir.mkdir(parents=True, exist_ok=True)
         written = []
         for row in target:
-            page = exhibit.render(row, chain=chain, anchor=anchor_for(row))
+            href = None
+            if getattr(opts, "packs", None) and (Path(opts.packs) / f"{row['seq']}.json").exists():
+                href = f"../{Path(opts.packs).name}/{row['seq']}.json"
+            page = exhibit.render(row, chain=chain, anchor=anchor_for(row), pack_href=href)
             path = outdir / f"exhibit-{row['seq']}.html"
             path.write_text(page, encoding="utf-8")
             written.append((row, path))
@@ -436,6 +439,27 @@ def cmd_export(opts) -> int:
     else:
         print(text)
     return 0 if pack["replay"]["matches"] and pack["recomputed_hash"] == pack["recorded_hash"] else 1
+
+
+def cmd_packs(opts) -> int:
+    """Write evidence packs for the newest dossiers (and the anchored one) into a directory the site serves."""
+    ledger = dossier.read_ledger(opts.ledger) if Path(opts.ledger).exists() else []
+    if not ledger:
+        print(f"no ledger at {opts.ledger}", file=sys.stderr)
+        return 1
+    wanted = {d["seq"] for d in ledger[-opts.recent:]}
+    if opts.anchored:
+        root = Path(opts.ledger).resolve().parent.parent
+        found = scoreboard._sepolia(root, ledger, None)
+        if found:
+            wanted.add(found["seq"])
+    outdir = Path(opts.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    for seq in sorted(wanted):
+        pack = export_pack(ledger, seq)
+        (outdir / f"{seq}.json").write_text(json.dumps(pack, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"wrote {len(wanted)} evidence packs to {outdir}")
+    return 0
 
 
 def cmd_monitor(opts) -> int:
@@ -687,6 +711,11 @@ def main() -> int:
     p.add_argument("--seq", type=int, required=True, help="dossier sequence number to export")
     p.add_argument("--out", type=Path, required=True, help="where to write the pack (JSON)")
     p.set_defaults(func=cmd_export)
+    p = sub.add_parser("packs", help="write evidence packs for the newest dossiers (and the anchored one) into a directory the site serves")
+    p.add_argument("--recent", type=int, default=24, metavar="N", help="how many of the newest dossiers (default 24)")
+    p.add_argument("--outdir", required=True, metavar="DIR", help="where to write <seq>.json")
+    p.add_argument("--anchored", action="store_true", help="also write the dossier anchored on Sepolia")
+    p.set_defaults(func=cmd_packs)
     p = sub.add_parser("scorecard", help="score the decisions against later prices, from the ledger alone")
     p.add_argument("--out", metavar="FILE", help="write the HTML scorecard to FILE")
     p.add_argument("--markdown", action="store_true", help="print a markdown table instead of the HTML page")
@@ -699,6 +728,7 @@ def main() -> int:
     p.add_argument("--anchor", action="store_true", help="also attach the on-chain anchor status (network read)")
     p.add_argument("--rpc", default=anchor.DEFAULT_RPC, help="RPC endpoint for --anchor")
     p.add_argument("--address", default=anchor.DEFAULT_ADDRESS, help="LedgerAnchor address")
+    p.add_argument("--packs", metavar="DIR", help="directory of evidence packs written by `packs`; an exhibit links its pack when the file exists")
     p.set_defaults(func=cmd_exhibit)
     p = sub.add_parser("monitor", help="compare the ledger against the head anchored on Sepolia (read-only)")
     p.add_argument("--rpc", default="https://ethereum-sepolia-rpc.publicnode.com")

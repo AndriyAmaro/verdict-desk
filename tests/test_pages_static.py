@@ -40,7 +40,7 @@ class PageTest(unittest.TestCase):
     def test_every_local_link_resolves(self):
         for page in PAGES:
             for href in re.findall(r'<a [^>]*href="([^"#?]+\.html)"', page.read_text(encoding="utf-8")):
-                if href.startswith(("http://", "https://")) or href in GENERATED or "$" in href:
+                if href.startswith(("http://", "https://")) or href in GENERATED or "$" in href or re.fullmatch(r"exhibit/exhibit-\d+\.html", href):
                     continue  # absolute, generated at deploy time, or built by a script at run time
                 self.assertTrue((WEB / href).is_file(), f"{page.name} links to {href}, which is not in web/")
 

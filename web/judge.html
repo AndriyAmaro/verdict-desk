@@ -26,7 +26,7 @@ a{color:var(--accent)}
 table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left}
 .honest{border-left:4px solid #b3261e}
 </style></head><body>
-<p class="mut" style="margin:8px 0 14px"><a href="index.html">Dashboard</a> · <a href="judge.html"><b>Judge path</b></a> · <a href="lab.html">Cause and effect lab</a> · <a href="exhibit/index.html">Decision exhibits</a> · <a href="scorecard.html">Scorecard</a> · <a href="verify.html">Verify a record</a> · <a href="narrative.html">Market voices</a> · <a href="witnesses.html">Witnesses</a> · <a href="evidence.html">Evidence</a> · <a href="learn.html">Learn</a></p>
+<p class="mut" style="margin:8px 0 14px"><a href="index.html">Dashboard</a> · <a href="judge.html"><b>Judge path</b></a> · <a href="usecase.html">Use case</a> · <a href="lab.html">Cause and effect lab</a> · <a href="exhibit/index.html">Decision exhibits</a> · <a href="scorecard.html">Scorecard</a> · <a href="verify.html">Verify a record</a> · <a href="narrative.html">Market voices</a> · <a href="witnesses.html">Witnesses</a> · <a href="evidence.html">Evidence</a> · <a href="learn.html">Learn</a></p>
 
 <h1>Verdict Desk — what a judge can check in five minutes</h1>
 <p class="lead">Every claim below links to the artifact that proves it. Nothing here asks you to trust this page: the numbers are recomputed from <code>ledger/ledger.jsonl</code> in your browser, and the hashes are checked the same way.</p>
@@ -40,6 +40,12 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
     <li><b>Why you can believe it:</b> your browser recomputes the chain, asks Bitcoin (through two block explorers), the public Sigstore transparency log and the Sepolia contract whether the head is the one they saw, and shows how many attacks on our own verifier got through.</li>
     <li><b>What it is not:</b> a money machine. Nothing is ever traded, and the published backtest of the first rules does not profit after fees; the page says so below instead of hiding it.</li>
   </ul>
+</section>
+
+<section class="crit" id="findings-box">
+  <h3>What we measured (every figure recomputed in your browser)</h3>
+  <ul id="findings"><li class="mut">Reading the ledger…</li></ul>
+  <p class="mut">Reproduce them from a clone of the repository: <code>python3 -m verdict_desk scoreboard</code> prints the first two with the arithmetic, and <code>python3 -m verdict_desk battery</code> the third. A lawyer's walk through one real decision is on the <a href="usecase.html">use case page</a>.</p>
 </section>
 
 <div>
@@ -147,6 +153,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
 </table>
 
 <script src="canonical.js"></script>
+<script src="stats.js"></script>
 <script>
 fetch('battery.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('none'); return r.json(); }).then(function (b) {
   document.getElementById('battery-live').innerHTML = 'Latest run: <b>' + b.total_trials + '</b> attacks on ' + b.dossiers + ' dossiers, <b>' + b.total_missed + '</b> got through (the two the hash chain cannot see alone are caught by the stamped heads).';
@@ -165,17 +172,57 @@ fetch('battery.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) thro
     var first = new Date(rows[0].evidence.collected_at);
     var last = new Date(rows[rows.length - 1].evidence.collected_at);
     var hours = ((last - first) / 36e5).toFixed(1);
+    var cov = window.VerdictStats.cadence(rows);
+    window.__rows = rows;
     var symbols = {};
     rows.forEach(function (r) { symbols[r.evidence.symbol] = (symbols[r.evidence.symbol] || 0) + 1; });
     var syms = Object.keys(symbols).sort().map(function (s) { return s + ' ' + symbols[s]; }).join(' · ');
     el.innerHTML =
-      '<b>' + rows.length + '</b> dossiers · <b>' + hours + ' h</b> of continuous operation · ' + syms +
+      '<b>' + rows.length + '</b> dossiers over a <b>' + hours + ' h</b> window (' + cov.coverage_pct + '% of its clock hours have a dossier; scheduled runs are best effort) · ' + syms +
       ' · every hash recomputed here: <b style="color:' + (ok ? 'var(--ok)' : 'var(--bad)') + '">' +
       (ok ? 'chain intact' : 'CHAIN BROKEN') + '</b>' +
       (ok ? '' : '<br><small>' + check.problems.join('; ') + '</small>');
   } catch (e) {
     el.textContent = 'Could not load the ledger from this page: ' + e.message +
       '. Open the dashboard instead, it reads the same file.';
+  }
+})();
+</script>
+
+<script>
+(async function () {
+  var ul = document.getElementById('findings');
+  function li(html) { var e = document.createElement('li'); e.innerHTML = html; ul.appendChild(e); }
+  try {
+    var text = await (await fetch('ledger/ledger.jsonl', { cache: 'no-store' })).text();
+    var rows = text.split('\n').filter(Boolean).map(function (l) { return JSON.parse(l); });
+    ul.innerHTML = '';
+    var S = window.VerdictStats;
+
+    var era = S.llmEra(rows, 1), total = era.accepted + era.rejected;
+    var reasons = Object.keys(era.rejection_reasons).sort(function (a, b) { return era.rejection_reasons[b] - era.rejection_reasons[a]; })
+      .map(function (k) { return era.rejection_reasons[k] + ' ' + k; }).join(', ');
+    li('<b>The analysts are wrong often enough to need a validator.</b> Of <b>' + total + '</b> claims the two LLM analysts made, <b>' + era.rejected + '</b> (' +
+       (total ? (era.rejected / total * 100).toFixed(1) : '0') + '%) were refused because they did not match the evidence they cited (' + reasons +
+       '). Each refused claim stays in the record with its reason, so the audit trail shows what was rejected and not only what survived.');
+
+    var cov = S.cadence(rows);
+    li('<b>Coverage, stated plainly.</b> Dossiers exist in <b>' + cov.clock_hours_with_records + '</b> of the <b>' + cov.clock_hours_in_window + '</b> clock hours of the window (' +
+       cov.coverage_pct + '%), with a longest gap of ' + (cov.longest_gap_minutes / 60).toFixed(1) + ' h. GitHub drops scheduled runs; the workflow now fires four times an hour behind a gate that never records two sets of decisions within 50 minutes, so this figure should rise, and it is not rewritten if it does not.');
+
+    try {
+      var b = await (await fetch('battery.json', { cache: 'no-store' })).json();
+      var chainMissed = b.attacks.reduce(function (n, a) { return n + (a.chain_alone_missed || 0); }, 0);
+      li('<b>We attacked our own verifier.</b> <b>' + b.total_trials + '</b> attacks on <b>' + b.dossiers + '</b> dossiers, <b>' + b.total_missed + '</b> got through. The hash chain alone could not see <b>' + chainMissed +
+         '</b> of them (cutting the end off, or rewriting history and re-hashing it); the heads stamped outside our control caught all of them.');
+    } catch (e) { li('<span class="mut">No battery result is published with this copy of the site.</span>'); }
+
+    try {
+      var w = await (await fetch('witnesses.json', { cache: 'no-store' })).json();
+      li('<b>Outside witnesses.</b> <b>' + w.heads.length + '</b> heads stamped in Bitcoin (a mainnet clock, free of charge) and <b>' + (w.rekor || []).length + '</b> signed in the Sigstore transparency log; your browser can check each on the <a href="witnesses.html">witnesses page</a>.');
+    } catch (e) { /* the witness list is optional here */ }
+  } catch (e) {
+    ul.innerHTML = '<li class="mut">Could not read the ledger here (' + e.message + '). The dashboard reads the same file.</li>';
   }
 })();
 </script>

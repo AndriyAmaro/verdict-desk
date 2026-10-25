@@ -185,7 +185,9 @@ jobs:
           cp -r web/. site/
           cp -r ledger site/ledger
           # Exibe as ultimas decisoes como documentos de auditoria (o ancorado sempre entra).
-          python -m verdict_desk exhibit --recent 400 --outdir site/exhibit --anchor --rpc "${{ env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com' }}" || echo "exhibits skipped: anchor unreachable"
+          # Evidence packs (about 90 KB each) for the newest dossiers and the anchored one; an exhibit links its pack when it exists.
+          python -m verdict_desk packs --recent 24 --anchored --outdir site/pack
+          python -m verdict_desk exhibit --recent 400 --outdir site/exhibit --packs site/pack --anchor --rpc "${{ env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com' }}" || echo "exhibits skipped: anchor unreachable"
           ls site/exhibit | head -3
           python -m verdict_desk scorecard --out site/scorecard.html
           # What the witnesses page reads: the stamped heads and the anchor contract, and the result of

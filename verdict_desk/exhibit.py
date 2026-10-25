@@ -122,6 +122,10 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None)
                         for i in ids) or "<span class=\"small\">no citation</span>"
                     rows.append(f"<tr><td>{_e(c.get('claim'))}</td><td>{cited}</td></tr>")
                 rows.append("</tbody></table>")
+            elif block.get("error"):
+                # A provider failure is a fact about this record, not an empty debate: say what failed and what decided.
+                rows.append(f"<p class=\"small\">The {_e(side)} analyst layer returned an error and produced no claims for this record "
+                            f"({_e(str(block['error'])[:160])}). The decision below rests on the deterministic engine alone.</p>")
             else:
                 rows.append("<p class=\"small\">Nothing kept.</p>")
             if rejected:

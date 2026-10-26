@@ -114,6 +114,30 @@ class AnchorInstallTest(unittest.TestCase):
         self.assertIn("set -o pipefail", self.FLOW)
 
 
+class AnchorRouteTest(unittest.TestCase):
+    """This account cannot create a CRE API key, so the cadence runs on GitHub through cre/anchor/direct.ts: the
+    same checks and the same forwarder, named apart from a CRE run on-chain. The CRE route stays for when a key exists."""
+
+    FLOW = (ROOT / ".github" / "workflows" / "anchor.yml").read_text(encoding="utf-8")
+
+    def test_the_sepolia_key_alone_enables_the_direct_route_and_the_cre_route_is_opt_in(self):
+        """The stored CRE_API_KEY is rejected as unauthorized; choosing the CRE route because the secret exists failed every run."""
+        gate = self.FLOW.split("- uses: actions/checkout")[0]
+        self.assertIn('echo "route=direct"', gate)
+        self.assertIn('[ "${ANCHOR_ROUTE}" = "cre" ] && [ -n "${CRE_API_KEY}" ]', gate)
+        self.assertLess(gate.index('-z "${SEPOLIA_PRIVATE_KEY}"'), gate.index("ANCHOR_ROUTE}\" = \"cre\""))
+
+    def test_it_runs_twice_an_hour_so_one_dropped_schedule_does_not_open_a_gap(self):
+        self.assertIn('cron: "7,37 * * * *"', self.FLOW)
+
+    def test_the_direct_route_runs_the_checked_script_and_keeps_evidence_only_for_real_anchors(self):
+        step = self.FLOW.split("(direct, same checks, same forwarder)")[1].split("- name:")[0]
+        self.assertIn("bun run direct.ts", step)
+        self.assertNotIn("--dry-run", step)
+        self.assertIn('"status":"anchored"', step)
+        self.assertNotIn("CRE_API_KEY", step)
+
+
 class PacemakerTest(unittest.TestCase):
     """GitHub drops scheduled runs (none fired for 6 hours on 25 Oct, four triggers an hour or not), so the
     ledger cannot depend on the schedule alone. A second workflow starts when a run of the hourly one ends,

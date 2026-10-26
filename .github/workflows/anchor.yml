@@ -1,17 +1,23 @@
 name: anchor
 
-# Anchors the current published ledger head on Ethereum Sepolia through the CRE workflow.
+# Anchors the current published ledger head on Ethereum Sepolia, every half hour, from GitHub's runners, so the
+# cadence does not depend on the operator's machine being on.
 #
-# Why hourly: one anchored transaction proves the mechanism; a cadence of them proves the
-# custody story. A reviewer can take any anchored record, ask the contract for its hash, and
-# compare it with the ledger line published at that time.
+# Two routes:
+#   - repository variable ANCHOR_ROUTE=cre and a valid CRE_API_KEY: the CRE workflow itself, through
+#     `cre workflow simulate --broadcast`. Opt-in, because the CRE_API_KEY secret stored on 25 Oct is rejected
+#     ("unauthorized") and failed every run; this account cannot create a valid one, and `cre login` needs a browser.
+#   - otherwise, with SEPOLIA_PRIVATE_KEY: cre/anchor/direct.ts runs the same checks with the same code outside the CRE runtime (two
+#     publications agree on the head, its dossier re-derives its own verdict, the Data Feed agrees on Sepolia and
+#     mainnet) and hands the same report to the same forwarder, named "gh-actions" in the report header so it is
+#     never mistaken for a CRE run on-chain.
 #
-# This job SKIPS, loudly, when the secrets are absent. It never fails the repository because
-# a key was not provided -- a red X for a missing optional key trains people to ignore red Xs.
+# A head already anchored is skipped. A missing key SKIPS, loudly; it never fails the repository -- a red X for a
+# missing optional key trains people to ignore red Xs.
 
 on:
   schedule:
-    - cron: "7 * * * *"   # every hour at :07 UTC, after the hourly decide run
+    - cron: "7,37 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -30,29 +36,32 @@ jobs:
         env:
           SEPOLIA_PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
           CRE_API_KEY: ${{ secrets.CRE_API_KEY }}
+          ANCHOR_ROUTE: ${{ vars.ANCHOR_ROUTE }}
         run: |
-          if [ -z "${SEPOLIA_PRIVATE_KEY}" ] || [ -z "${CRE_API_KEY}" ]; then
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Anchor skipped::SEPOLIA_PRIVATE_KEY and CRE_API_KEY are not set, so nothing was anchored this hour. The published ledger stays verifiable without them; only the on-chain cadence is paused."
+          if [ -z "${SEPOLIA_PRIVATE_KEY}" ]; then
+            echo "route=none" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Anchor skipped::SEPOLIA_PRIVATE_KEY is not set, so nothing was anchored. The published ledger stays verifiable without it; only the on-chain cadence is paused."
+          elif [ "${ANCHOR_ROUTE}" = "cre" ] && [ -n "${CRE_API_KEY}" ]; then
+            echo "route=cre" >> "$GITHUB_OUTPUT"
           else
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "route=direct" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/checkout@v4
-        if: steps.gate.outputs.enabled == 'true'
+        if: steps.gate.outputs.route != 'none'
         with:
           ref: ${{ github.ref_name }}
 
       - uses: oven-sh/setup-bun@v2
-        if: steps.gate.outputs.enabled == 'true'
+        if: steps.gate.outputs.route != 'none'
 
       - uses: actions/setup-node@v4
-        if: steps.gate.outputs.enabled == 'true'
+        if: steps.gate.outputs.route == 'cre'
         with:
           node-version: "22"
 
       - name: Install the CRE CLI
-        if: steps.gate.outputs.enabled == 'true'
+        if: steps.gate.outputs.route == 'cre'
         # The installer moved from /install.sh to /install/install.sh and the old URL started answering 404, which
         # the pipe into bash turned into "command not found" (run 2026-10-25). -f makes curl fail on an HTTP error.
         run: |
@@ -60,15 +69,29 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/smartcontractkit/cre-cli/main/install/install.sh | bash
           echo "$HOME/.cre/bin" >> "$GITHUB_PATH"
 
-      - name: Anchor the current head
-        if: steps.gate.outputs.enabled == 'true'
+      - name: Anchor the current head (CRE workflow)
+        if: steps.gate.outputs.route == 'cre'
         env:
           SEPOLIA_PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
           CRE_API_KEY: ${{ secrets.CRE_API_KEY }}
         run: bash cre/scripts/anchor-existing.sh
 
+      - name: Anchor the current head (direct, same checks, same forwarder)
+        if: steps.gate.outputs.route == 'direct'
+        env:
+          SEPOLIA_PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
+        run: |
+          set -o pipefail
+          cd cre/anchor
+          bun install --frozen-lockfile >/dev/null
+          out="$(mktemp)"
+          bun run direct.ts | tee "$out"
+          if grep -q '"status":"anchored"' "$out"; then
+            cp "$out" "../evidence/direct-$(date -u +%Y%m%dT%H%M%SZ).txt"
+          fi
+
       - name: Keep the evidence, if anything was produced
-        if: steps.gate.outputs.enabled == 'true'
+        if: steps.gate.outputs.route != 'none'
         run: |
           git config user.name "verdict-desk-bot"
           git config user.email "verdict-desk-bot@users.noreply.github.com"

@@ -31,3 +31,10 @@ transaction on [`PracticeDesk`](contracts/evm/src/PracticeDesk.sol), deployed at
 
 **Check it**: open the transaction from a dossier's `execution.tx`, read the `PracticeTrade` (or `PracticeRecord`)
 event, and compare its `decision` with the digest recomputed from the dossier.
+
+## Keeping the desk funded
+
+Each ETHUSDT SHORT sells about 0.0019 test WETH from the desk and each LONG spends about 88 test USDC; a close returns
+the other token. When a balance runs out, the send fails and the dossier records the position as simulated, saying so.
+`cre/contracts/scripts/fund-practice.mjs <eth>` wraps that much of the wallet's Sepolia ETH into WETH and sends it to
+the desk (dry run without `--send`; it keeps 0.002 ETH for gas). Sepolia ETH comes from a public faucet.

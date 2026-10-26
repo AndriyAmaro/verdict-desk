@@ -85,6 +85,18 @@ class OpenTest(unittest.TestCase):
         self.assertIn("nonce", d["execution"]["error"])
         self.assertIn("simulated", d["execution"]["label"])
 
+    def test_a_send_recovered_after_a_push_race_says_so_and_counts_as_done(self):
+        class Recovered(FakeChain):
+            def __call__(self, request):
+                self.requests.append(request)
+                return {"status": "executed", "recovered": True, "tx": "0x" + "cd" * 32, "block": 99,
+                        "amount_in": "2000000000000000", "amount_out": "92000000"}
+
+        d = dossier.build(opened(), dossier.GENESIS, 1, use_llm=False, rules_version="v6", execute=Recovered())
+        self.assertEqual(d["execution"]["status"], "executed")
+        self.assertIn("earlier attempt", d["execution"]["label"])
+        self.assertEqual(d["execution"]["tx"], "0x" + "cd" * 32)
+
     def test_the_on_chain_size_is_the_position_scaled_down_and_declared(self):
         chain = FakeChain()
         d = dossier.build(opened(), dossier.GENESIS, 1, use_llm=False, rules_version="v6", execute=chain)

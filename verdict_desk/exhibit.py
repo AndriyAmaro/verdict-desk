@@ -15,6 +15,8 @@ generated from a tampered record says so on its face.
 
 import hashlib
 import html
+import json
+from pathlib import Path
 
 from . import canonical, citations
 
@@ -89,6 +91,52 @@ def _plain_summary(dossier: dict, integrity_ok: bool) -> list[str]:
     out.append("Checked just now: this record matches its saved fingerprint, so nobody has changed it since it was written."
                if integrity_ok else "Checked just now: this record does NOT match its saved fingerprint, so it was changed after it was written. Do not rely on it.")
     return out
+
+
+_PRACTICE = Path(__file__).resolve().parents[1] / "cre" / "practice.sepolia.json"
+
+
+def _tokens() -> dict:
+    """The test tokens of the Sepolia practice desk: address -> (symbol, decimals), from cre/practice.sepolia.json."""
+    try:
+        data = json.loads(_PRACTICE.read_text(encoding="utf-8"))
+        return {data["weth"].lower(): ("WETH", 18), data["usdc"].lower(): ("USDC", 6)}
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
+def _units(raw, token) -> str:
+    """1895000000000000 of WETH -> '0.001895 WETH': an on-chain amount is an integer count of the smallest unit."""
+    known = _tokens().get(str(token).lower())
+    if not known or not str(raw).isdigit():
+        return f"{raw} (raw units of {token})"
+    symbol, decimals = known
+    digits = str(raw).rjust(decimals + 1, "0")
+    value = f"{digits[:-decimals]}.{digits[-decimals:]}".rstrip("0").rstrip(".")
+    return f"{value} {symbol}"
+
+
+def _practice_rows(dossier: dict) -> list[str]:
+    """The Sepolia practice trade this record sent (and any earlier position it closed on-chain)."""
+    rows = []
+    ex = dossier.get("execution")
+    if isinstance(ex, dict):
+        tx = str(ex.get("tx") or "")
+        link = f'<a href="https://sepolia.etherscan.io/tx/{_e(tx)}"><code>{_e(tx)}</code></a>' if tx.startswith("0x") else "none"
+        rows.append(f"<p><b>Practice trade on Sepolia testnet:</b> {_e(ex.get('label'))}. Transaction {link}"
+                    + (f", block {_e(ex.get('block'))}" if ex.get("block") else "") + ".</p>")
+        if ex.get("status") == "executed" and ex.get("amount_in") is not None:
+            rows.append(f"<p class=\"small\">The swap sent {_e(_units(ex.get('amount_in'), ex.get('token_in')))} and received "
+                        f"{_e(_units(ex.get('amount_out'), ex.get('token_out')))} on the Uniswap v3 test pool, whose price is not the market price.</p>")
+        if ex.get("decision_digest"):
+            rows.append(f"<p class=\"small\">The transaction carries the digest of this decision, <code>{_e(ex['decision_digest'])}</code>, "
+                        "and this record holds the transaction: it was written in before the record was sealed. Test tokens only.</p>")
+    for c in dossier.get("executions_closed") or []:
+        tx = str(c.get("tx") or "")
+        rows.append(f"<p class=\"small\">This record also closed the on-chain position of record #{_e(c.get('opened_seq'))}: "
+                    f"{_e(c.get('label') or c.get('status'))}"
+                    + (f', transaction <a href="https://sepolia.etherscan.io/tx/{_e(tx)}"><code>{_e(tx[:18])}…</code></a>' if tx.startswith("0x") else "") + ".</p>")
+    return rows
 
 
 def _who(block: dict) -> str:
@@ -306,6 +354,8 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
                               for k, v in policy.items())
                     + "</tbody></table>")
 
+    rows += _practice_rows(dossier)
+
     # --- 5. narrative, if any ----------------------------------------------------
     if narrative.get("convergence") or narrative.get("rejected_candidates"):
         rows.append("<h2 id=\"narrative\">5. Market voices</h2>")
@@ -348,7 +398,7 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
     rows.append("<h2 id=\"limits\">7. What this exhibit does not prove</h2>")
     rows.append("""<ul class="limits">
       <li>It does not prove the decision was wise, only that it was <b>made on this evidence, by this rule, at this time</b>, and that nobody edited it afterwards.</li>
-      <li>Positions are <b>simulated</b>. The system holds no exchange credentials, builds no orders and signs nothing.</li>
+      <li>Positions are <b>simulated</b>: no real-money order is ever placed and the system holds no exchange credentials. From record 375 each new position is also sent to Sepolia testnet with test tokens (ETHUSDT as a swap, BTC and SOL as a receipt), shown in section 4.</li>
       <li>Results exclude fees, funding costs and slippage. Realised figures over a short window are not evidence of edge.</li>
       <li>The analyst layer is an LLM. Its claims are constrained to cited evidence and validated automatically, but the validator checks the citation, not the financial merit of the opinion.</li>
       <li>News and voices are secondary sources read through public feeds; they inherit those feeds' errors.</li>
@@ -411,7 +461,7 @@ This document is generated from the public ledger line for record #{_e(seq)}. It
 <div class="pack"><b>Ask this record.</b> <a href="../ask.html?seq={_e(seq)}">Ask it why it acted, what would have changed its mind and what happened next</a>, on the chart of the candles it saw. Every number in an answer is cited and checked in your browser.</div>
 {''.join(rows)}
 <footer>Verdict Desk publishes one dossier per hour and hash-chains each to the previous one. The chain head is anchored on Ethereum Sepolia.
-No order is placed, signed or transmitted by this system. This exhibit is evidence of a decision process, not investment advice.</footer>
+No real-money order is placed by this system; practice trades use test tokens on Sepolia testnet. This exhibit is evidence of a decision process, not investment advice.</footer>
 </body></html>
 """
 
@@ -462,6 +512,6 @@ a{{color:#1f5fbf}}
 <table><thead><tr><th>Record</th><th>Symbol</th><th>Decision</th><th>Edge</th><th>Evidence collected</th><th>Hash</th></tr></thead><tbody>
 {''.join(rows)}
 </tbody></table>
-<p class="sub">Simulated decisions only. No order is placed, signed or transmitted.</p>
+<p class="sub">Simulated decisions only: no real-money order is ever placed. From record 375, practice trades also go to Sepolia testnet with test tokens.</p>
 </body></html>
 """

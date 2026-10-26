@@ -2,7 +2,7 @@
 
 **An autonomous agent makes a market decision. Verdict Desk turns it into evidence a lawyer can file.**
 
-Audit-grade, replayable decisions for AI market agents. **Simulated only: no order is ever placed.** Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
+Audit-grade, replayable decisions for AI market agents. **Simulated only: no real-money order is ever placed** (from dossier 375 practice trades also go to Sepolia testnet with test tokens). Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
 
 ## Check it yourself in 60 seconds
 

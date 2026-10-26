@@ -233,6 +233,9 @@ def cmd_models(opts) -> int:
     from datetime import datetime, timezone
     from . import models
     ledger = dossier.read_ledger(opts.ledger)
+    if not ledger:
+        print("empty ledger: nothing to rank")
+        return 0
     if opts.route:
         path = Path(opts.route)
         current = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None

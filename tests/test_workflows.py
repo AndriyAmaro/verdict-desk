@@ -144,13 +144,24 @@ class AnchorRouteTest(unittest.TestCase):
         self.assertNotIn("CRE_API_KEY", step)
 
 
+class QueuedRunTest(unittest.TestCase):
+    """A queued run must check out the tip of the branch: the event's commit predates what the run before it pushed."""
+
+    HOURLY = (ROOT / ".github" / "workflows" / "hourly.yml").read_text(encoding="utf-8")
+
+    def test_every_checkout_takes_the_tip_of_the_branch(self):
+        checkouts = re.findall(r"- uses: actions/checkout@v4\n(\s+with:\n\s+ref: \$\{\{ github.ref_name \}\})?", self.HOURLY)
+        self.assertEqual(len(checkouts), 3)
+        self.assertTrue(all(checkouts), "a checkout without ref: reads the commit the event was created at")
+
+
 class ModelRoutingWorkflowTest(unittest.TestCase):
     """The routing policy is re-ranked by its fixed rule in the same commit as the ledger, and the bench is published."""
 
     HOURLY = (ROOT / ".github" / "workflows" / "hourly.yml").read_text(encoding="utf-8")
 
     def test_every_commit_of_the_ledger_carries_the_policy_re_ranked_by_the_rule(self):
-        self.assertEqual(self.HOURLY.count("python -m verdict_desk models --route config/model_routing.json"), 2)
+        self.assertEqual(self.HOURLY.count("python -m verdict_desk models --route config/model_routing.json --every 72"), 2)
         self.assertEqual(self.HOURLY.count("git add ledger config/model_routing.json"), 2)
         self.assertNotIn("git add ledger\n", self.HOURLY)
 

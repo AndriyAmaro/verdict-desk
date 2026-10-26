@@ -58,12 +58,16 @@ async function main() {
       hash = await wallet.writeContract(request)
       break
     } catch (err) {
+      const text = String(err.shortMessage || err.message) + ' ' + String(err.metaMessages || '')
+      // A run that lost its push race already sent this decision (its dossier was dropped): read that send back
+      // from the chain instead of recording a failure that would make every later run retry it.
+      if (/AlreadyDone/.test(text) || err?.cause?.data?.errorName === 'AlreadyDone') return recover(pub, desk, abi, req, price)
       // the anchor shares this wallet: one retry on a nonce clash, nothing else is retried
-      if (attempt === 0 && /nonce/i.test(String(err.shortMessage || err.message))) continue
+      if (attempt === 0 && /nonce/i.test(text)) continue
       throw err
     }
   }
-  const receipt = await pub.waitForTransactionReceipt({ hash })
+  const receipt = await pub.waitForTransactionReceipt({ hash, timeout: 240_000 })  // inside practice.py's 300 s
   if (receipt.status !== 'success') throw new Error(`transaction reverted: ${hash}`)
   const out = { status: functionName === 'trade' ? 'executed' : 'recorded', tx: hash, block: Number(receipt.blockNumber) }
   for (const log of receipt.logs) {
@@ -78,6 +82,22 @@ async function main() {
   }
   if (price !== null) out.testnet_usdc_per_weth = Math.round(price)
   print(out)
+}
+
+async function recover(pub, desk, abi, req, price) {
+  const tip = await pub.getBlockNumber()
+  for (const eventName of ['PracticeTrade', 'PracticeRecord']) {
+    const logs = await pub.getContractEvents({ address: desk, abi, eventName, args: { decision: req.decision }, fromBlock: tip - 4000n, toBlock: tip })
+    const hit = logs.find((l) => Number(l.args.kind) === KIND[req.kind])
+    if (!hit) continue
+    const out = { status: eventName === 'PracticeTrade' ? 'executed' : 'recorded', recovered: true, tx: hit.transactionHash, block: Number(hit.blockNumber) }
+    if (eventName === 'PracticeTrade') {
+      Object.assign(out, { token_in: hit.args.tokenIn, token_out: hit.args.tokenOut, amount_in: hit.args.amountIn.toString(), amount_out: hit.args.amountOut.toString() })
+    }
+    if (price !== null) out.testnet_usdc_per_weth = Math.round(price)
+    return print(out)
+  }
+  throw new Error('the desk says this decision was already carried out, but no event for it was found in the last 4000 blocks')
 }
 
 main().catch((err) => {

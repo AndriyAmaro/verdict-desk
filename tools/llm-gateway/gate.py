@@ -29,7 +29,10 @@ from pathlib import Path
 ENV = Path.home() / ".config" / "verdict-desk" / "llm-proxy.env"
 POLICY_URL = "https://raw.githubusercontent.com/AndriyAmaro/verdict-desk/main/config/model_routing.json"
 MAX_BODY = 400_000
-TIMEOUT = 280
+# The bot's client waits 90 s for a whole call: each model gets at most ATTEMPT_TIMEOUT, and no new model is tried
+# once BUDGET is spent, so a fallback can still answer before the client gives up.
+ATTEMPT_TIMEOUT = 45
+BUDGET = 80
 MAX_ATTEMPTS = 4
 LAST_RESORT = "auto"
 FALLBACK_ON = {404, 413, 429, 502, 503}  # model missing, request too large for it, rate-limited, upstream down
@@ -88,7 +91,10 @@ def route(payload: dict, order: list[str], forward) -> tuple[int, bytes, str, li
     if LAST_RESORT not in candidates:
         candidates.append(LAST_RESORT)
     attempts, last = [], (502, b'{"error":"no model tried"}', "application/json")
+    began = time.monotonic()
     for model in candidates:
+        if attempts and time.monotonic() - began >= BUDGET:
+            break  # the client would give up before another model answered
         started = time.monotonic()
         code, data, ctype = forward(json.dumps({**payload, "model": model}).encode())
         ms = int((time.monotonic() - started) * 1000)
@@ -127,7 +133,10 @@ class Gate(BaseHTTPRequestHandler):
         auth = self.headers.get("Authorization", "")
         if not hmac.compare_digest(auth.encode(), f"Bearer {settings['PROXY_TOKEN']}".encode()):
             return self._reply(401, b'{"error":"unauthorized"}')
-        size = int(self.headers.get("Content-Length") or 0)
+        try:
+            size = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return self._reply(400, b'{"error":"bad Content-Length"}')
         if size <= 0 or size > MAX_BODY:
             return self._reply(413, b'{"error":"body too large or empty"}')
         try:
@@ -147,7 +156,7 @@ class Gate(BaseHTTPRequestHandler):
         req = urllib.request.Request(f"{upstream}/v1/chat/completions", data=body, method="POST",
                                      headers={"Authorization": f"Bearer {settings['FREELLMAPI_KEY']}", "Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            with urllib.request.urlopen(req, timeout=ATTEMPT_TIMEOUT) as resp:
                 return resp.status, resp.read(), resp.headers.get("Content-Type", "application/json")
         except urllib.error.HTTPError as err:
             with err:
@@ -160,6 +169,9 @@ class Gate(BaseHTTPRequestHandler):
 
 
 def make_server(settings: dict, port: int = 3002) -> ThreadingHTTPServer:
+    for name in ("PROXY_TOKEN", "FREELLMAPI_KEY"):
+        if not str(settings.get(name) or "").strip():
+            raise ValueError(f"{name} is not set in {ENV}: refusing to start (an empty token would let anyone in)")
     server = ThreadingHTTPServer(("127.0.0.1", port), Gate)
     server.settings = settings
     server.policy = Policy(settings.get("POLICY_URL") or POLICY_URL)

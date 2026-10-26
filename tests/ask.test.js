@@ -189,7 +189,7 @@ test("sources, voices and the Sepolia execution are answered from the record, an
   }
   assert.match(textOf(ask.answer(EXECUTED, "executed")), /Sepolia/);
   assert.ok(ask.answer(EXECUTED, "executed").cites.some((c) => c.ref === "execution.tx"));
-  assert.match(textOf(ask.answer(OLD, "executed")), /before|simulated|nothing was sent/i);
+  assert.match(textOf(ask.answer(OLD, "executed")), /before|simulated|no new trade was sent/i);
   const NO_VOICES = LEDGER.find((d) => !d.evidence.narrative);
   assert.match(textOf(ask.answer(NO_VOICES, "voices")), /no market voices/i);
   assert.ok(ask.check(ask.answer(NO_VOICES, "saw")).ok);
@@ -221,6 +221,25 @@ test("which model wrote this: the route the gateway took, or what an older recor
   const old = LEDGER.find((d) => d.llm && d.llm.bull && d.llm.bull.served_by && !d.llm.bull.route);
   assert.match(textOf(ask.answer(old, "model")), /before the gateway logged its route/);
   assert.match(textOf(ask.answer(OLD, "model")), /no AI analyst layer/);
+});
+
+test("edge cases found in review: no 'undefined' in text, failed sends, close-only records, missing amounts, v6 without LLM", () => {
+  for (const d of LEDGER) for (const intent of ask.INTENTS) assert.doesNotMatch(textOf(ask.answer(d, intent, { later: [] })), /undefined|NaN|\[object Object\]/, `#${d.seq} ${intent}`);
+  const failed = { ...POSITION, execution: { status: "failed", error: "nonce too low", label: "the Sepolia send failed; this position stays simulated" } };
+  const f = ask.answer(failed, "executed");
+  assert.match(textOf(f), /failed/);
+  assert.doesNotMatch(textOf(f), /Transaction|holds the transaction/);
+  assert.ok(ask.check(f).ok);
+  const closeOnly = { ...DECLINED, execution: undefined, executions_closed: [{ opened_seq: 379, status: "executed", tx: "0x" + "ef".repeat(32), label: "practice position closed on Sepolia testnet" }] };
+  const c = ask.answer(closeOnly, "executed");
+  assert.match(textOf(c), /record 379/);
+  assert.ok(ask.check(c).ok, JSON.stringify(ask.check(c)));
+  const noOut = { ...POSITION, execution: { status: "executed", tx: "0x" + "ab".repeat(32), block: 1, label: "practice trade executed on Sepolia testnet", amount_in: 5, token_in: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14" } };
+  assert.doesNotThrow(() => ask.answer(noOut, "executed"));
+  const v6NoLlm = { ...POSITION, llm: undefined };
+  assert.doesNotMatch(textOf(ask.answer(v6NoLlm, "judge")), /before the judge existed \(rules v6\)/);
+  const routed = { ...POSITION, llm: { bull: { served_by: "m", route: [{ model: "m", status: 200, ms: 5 }], routing_policy: { sha256: "ab".repeat(32), as_of_seq: 383 } } } };
+  for (const cite of ask.answer(routed, "model").cites) assert.doesNotMatch(cite.source, / 12$/);
 });
 
 test("every answer names the chart marks its citations point at", () => {

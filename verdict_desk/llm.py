@@ -78,9 +78,10 @@ def _remember_route(headers) -> None:
     try:
         attempts = json.loads(headers.get("X-Verdict-Route") or "null") if headers is not None else None
         sha, _, as_of = (headers.get("X-Verdict-Policy") or "").partition(" as_of=")
-        if (isinstance(attempts, list) and attempts and all(isinstance(a, dict) and "model" in a for a in attempts)
-                and len(sha) == 64 and as_of.isdigit()):
-            route = {"attempts": attempts, "policy": {"sha256": sha, "as_of_seq": int(as_of)}}
+        if isinstance(attempts, list) and attempts and all(isinstance(a, dict) and "model" in a for a in attempts):
+            # no policy loaded on the gateway (it then falls back to its own router): the attempts still matter
+            policy = {"sha256": sha, "as_of_seq": int(as_of)} if len(sha) == 64 and as_of.isdigit() else None
+            route = {"attempts": attempts, "policy": policy}
     except (ValueError, AttributeError, TypeError):
         route = None
     _served.route = route

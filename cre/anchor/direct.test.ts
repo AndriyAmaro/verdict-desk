@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { decodeFunctionData, type Hex } from 'viem'
-import { DIRECT_WORKFLOW_NAME, FORWARDER_ABI, forwarderCall, forwarderMetadata, readWorkflowName } from './direct'
+import { ANCHORED_TOPIC, anchoredInReceipt, DIRECT_WORKFLOW_NAME, FORWARDER_ABI, forwarderCall, forwarderMetadata, readWorkflowName } from './direct'
 import { encodeAnchorReport } from './logic'
 
 // The rawReport of a real anchor sent by `cre workflow simulate --broadcast` (Sepolia tx 0x9c40cf9f…, seq 365).
@@ -37,6 +37,22 @@ describe('forwarder metadata', () => {
 		expect(() => forwarderMetadata({ ...ok, executionId: '0x00' })).toThrow()
 		expect(() => forwarderMetadata({ ...ok, owner: '0x00' })).toThrow()
 		expect(() => forwarderMetadata({ ...ok, timestamp: 2 ** 32 })).toThrow()
+	})
+})
+
+describe('confirming the anchor from the receipt', () => {
+	const receiver = '0x50443D51Db71A61E131B147B1d36aF21d48CDdF7' as Hex
+	const seqTopic = (n: number) => `0x${n.toString(16).padStart(64, '0')}` as Hex
+	const log = (address: Hex, topics: Hex[]) => ({ address, topics })
+
+	test('the Anchored event of the contract for that seq is the proof, read from the same block as the transaction', () => {
+		expect(anchoredInReceipt([log(receiver.toLowerCase() as Hex, [ANCHORED_TOPIC, seqTopic(386), `0x${'cd'.repeat(32)}`])], receiver, 386)).toBe(true)
+	})
+
+	test('no event, another seq or another contract is not an anchor (the mock forwarder does not revert when the receiver does)', () => {
+		expect(anchoredInReceipt([], receiver, 386)).toBe(false)
+		expect(anchoredInReceipt([log(receiver, [ANCHORED_TOPIC, seqTopic(385)])], receiver, 386)).toBe(false)
+		expect(anchoredInReceipt([log(`0x${'11'.repeat(20)}`, [ANCHORED_TOPIC, seqTopic(386)])], receiver, 386)).toBe(false)
 	})
 })
 

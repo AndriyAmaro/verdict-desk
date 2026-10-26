@@ -22,6 +22,13 @@ HORIZONS = (1, 4, 24)
 STATES = ("LONG", "SHORT", "FLAT", "WATCH_REVERSAL", "REDUCE_EXPOSURE", "BLOCKED_STALE")
 
 
+
+def _money(value) -> str:
+    """4499.9997 -> '+$4,500' (the simulated result on $10,000, to the dollar)."""
+    if not isinstance(value, (int, float)):
+        return str(value)
+    return f"{'+' if value >= 0 else '-'}${abs(value):,.0f}"
+
 def _price_map(ledger: list[dict]) -> dict[str, dict[int, float]]:
     """Todos os candles publicados por simbolo. Dossies mais novos completam os antigos."""
     prices: dict[str, dict[int, float]] = {}
@@ -126,8 +133,8 @@ def render(result: dict, portfolio_summary: dict | None = None) -> str:
                 f"{html.escape(str(portfolio_summary.get('open')))} open), "
                 f"win rate <b>{html.escape(str(portfolio_summary.get('win_rate_pct')))}%</b>, "
                 f"max drawdown <b>{html.escape(str(portfolio_summary.get('max_drawdown_pct')))}%</b>. "
-                f"Realized <b>{html.escape(str(portfolio_summary.get('realized_pnl')))}</b> before fees and "
-                f"<b>{html.escape(str(portfolio_summary.get('realized_net')))}</b> after a "
+                f"Realized <b>{html.escape(_money(portfolio_summary.get('realized_pnl')))}</b> before fees and "
+                f"<b>{html.escape(_money(portfolio_summary.get('realized_net')))}</b> after a "
                 f"{html.escape(str(portfolio_summary.get('fee_pct_per_side')))}% taker fee per side on the entry and exit notional "
                 "(the Binance USD-M futures base rate; slippage excluded). Positions are marked against later candles.</p>")
     return f"""<!doctype html>

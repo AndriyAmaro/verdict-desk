@@ -100,6 +100,9 @@ jobs:
             echo "no new evidence"
           else
             git commit -m "cre: anchor evidence $(date -u +%Y-%m-%dT%H:%MZ)"
-            git pull --rebase --autostash -q origin "${GITHUB_REF_NAME}"
-            git push -q origin "HEAD:${GITHUB_REF_NAME}"
+            # the hourly bot pushes the ledger at the same minutes: retry, or the proof of a real anchor is lost
+            for attempt in 1 2 3 4; do
+              git pull --rebase --autostash -q origin "${GITHUB_REF_NAME}" && git push -q origin "HEAD:${GITHUB_REF_NAME}" && break
+              sleep $((attempt * 10))
+            done
           fi

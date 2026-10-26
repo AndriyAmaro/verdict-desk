@@ -11,8 +11,10 @@ hit rate limits, so a call can be routed to another model; this module makes tha
   The gateway reads that file and tries the models in its order.
 """
 
+import json
 import math
 from collections import Counter
+from pathlib import Path
 
 MIN_CLAIMS = 20
 MIN_WILSON_LOW = 0.85
@@ -24,13 +26,9 @@ RULE = (f"Rank the models that answered by the Wilson lower bound (95%) of the s
         f"under observation, by calls answered; a model whose lower bound is under {MIN_WILSON_LOW} is dropped. "
         f"Computed from the ledger up to as_of_seq only; not re-ranked from {FROZEN[0][:10]} to {FROZEN[1][:10]}.")
 
-# The name the gateway asks for, and the names providers answer with (recorded as served_by).
-ALIASES = {
-    "gpt-oss-120b": ["openai/gpt-oss-120b", "gpt-oss-120b"],
-    "agnes-3.0-flash": ["agnes-3.0-flash"],
-    "dots3-note-preview": ["dots-studio/dots-3-note-preview:free", "dots3-note-preview"],
-    "nemotron-3-ultra-550b": ["nvidia/nemotron-3-ultra-550b-a55b", "nemotron-3-ultra-550b"],
-}
+# The name the gateway asks for, and the names providers answer with: data, kept in config (no model name in code).
+ALIASES_FILE = Path(__file__).resolve().parents[1] / "config" / "model_aliases.json"
+ALIASES: dict[str, list[str]] = json.loads(ALIASES_FILE.read_text(encoding="utf-8"))["aliases"] if ALIASES_FILE.exists() else {}
 _ROUTING_NAME = {served: name for name, served_names in ALIASES.items() for served in served_names}
 
 

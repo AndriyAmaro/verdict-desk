@@ -152,7 +152,9 @@ jobs:
           # Commit first: git rebase refuses to run on a dirty tree, so the old order
           # (pull --rebase before commit) died whenever a human pushed while the bot was
           # recording (run 39653930760, 2026-10-21: dossiers lost).
-          git add ledger
+          # The LLM gateway follows config/model_routing.json; re-ranked by its fixed rule once a day, never by hand.
+          python -m verdict_desk models --route config/model_routing.json
+          git add ledger config/model_routing.json
           if git diff --cached --quiet; then
             echo "nothing recorded this hour"
             exit 0
@@ -175,7 +177,8 @@ jobs:
             python -m verdict_desk decide-v6 BTCUSDT ETHUSDT SOLUSDT --config config/voices.json || true
             python -m verdict_desk verify
             python -m verdict_desk head --out ledger/head.json
-            git add ledger
+            python -m verdict_desk models --route config/model_routing.json
+            git add ledger config/model_routing.json
             if git diff --cached --quiet; then
               echo "the freshest head already has this hour's decisions"
               exit 0
@@ -215,6 +218,7 @@ jobs:
           python -m verdict_desk witnesses --out site/witnesses.json
           python -m verdict_desk series --out site/series.json
           python -m verdict_desk market --out site/market.json
+          python -m verdict_desk models --out site/models.json
           python -m verdict_desk battery --trials 1500 --out site/battery.json || echo "battery skipped this hour"
       - uses: actions/upload-pages-artifact@v3
         with:

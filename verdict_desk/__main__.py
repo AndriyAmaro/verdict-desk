@@ -1,6 +1,7 @@
 """CLI: python -m verdict_desk decide|replay|verify."""
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -224,6 +225,35 @@ def cmd_market(opts) -> int:
     series = portfolio.market_series(dossier.read_ledger(opts.ledger))
     Path(opts.out).write_text(json.dumps(series, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"wrote {opts.out}: " + ", ".join(f"{s} {len(e['candles'])} candles" for s, e in series.items()))
+    return 0
+
+
+def cmd_models(opts) -> int:
+    """The model bench, and the routing policy the gateway follows (re-ranked by the fixed rule, never by hand)."""
+    from datetime import datetime, timezone
+    from . import models
+    ledger = dossier.read_ledger(opts.ledger)
+    if opts.route:
+        path = Path(opts.route)
+        current = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+        now = datetime.now(timezone.utc).isoformat()
+        if current and models.frozen(now):
+            print(f"routing policy frozen until {models.FROZEN[1][:10]}: kept as of #{current['as_of_seq']}")
+        elif current and ledger[-1]["seq"] - current["as_of_seq"] < opts.every:
+            print(f"routing policy as of #{current['as_of_seq']} is recent enough (re-ranked every {opts.every} dossiers)")
+        else:
+            fresh = models.policy(ledger)
+            path.write_text(json.dumps(fresh, indent=1) + "\n", encoding="utf-8")
+            print(f"wrote {path}: order {', '.join(fresh['order'])} (as of #{fresh['as_of_seq']})")
+    if opts.out:
+        out = models.bench(ledger)
+        policy_path = Path(opts.policy)
+        if policy_path.exists():
+            raw = policy_path.read_bytes()
+            out["policy"] = json.loads(raw)
+            out["policy_sha256"] = hashlib.sha256(raw).hexdigest()
+        Path(opts.out).write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
+        print(f"wrote {opts.out}: {len(out['models'])} models")
     return 0
 
 
@@ -753,6 +783,12 @@ def main() -> int:
     p.add_argument("--stamps", metavar="DIR", help="directory with the timestamped heads (default: <ledger dir>/timestamps)")
     p.add_argument("--out", metavar="FILE", help="also write the full result as JSON")
     p.set_defaults(func=cmd_battery)
+    p = sub.add_parser("models", help="the model bench and the routing policy the LLM gateway follows")
+    p.add_argument("--out", metavar="FILE", help="write the bench, with the policy in force, as JSON (read by judge.html)")
+    p.add_argument("--route", metavar="FILE", help="re-rank the routing policy by its fixed rule when it is due")
+    p.add_argument("--every", type=int, default=24, help="re-rank at most once every N dossiers (default 24)")
+    p.add_argument("--policy", default="config/model_routing.json", help="the policy file to publish with --out")
+    p.set_defaults(func=cmd_models)
     p = sub.add_parser("market", help="every candle the ledger froze, per symbol, as JSON (read by ask.html)")
     p.add_argument("--out", metavar="FILE", required=True)
     p.set_defaults(func=cmd_market)

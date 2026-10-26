@@ -55,3 +55,32 @@ class FeesTest(unittest.TestCase):
         s = portfolio.summarize([dossier(1, "LONG", 0, [c(0, 99, 101, 100)])])
         self.assertEqual(s["fees"], 0)
         self.assertEqual(s["realized_net"], s["realized_pnl"])
+
+
+class MarketSeriesTest(unittest.TestCase):
+    """The candles Ask the record replays "what happened next" on: every candle the ledger froze, per symbol, the
+    first recorded version of each, so a position resolves on them exactly as portfolio.resolve does."""
+
+    def test_each_candle_appears_once_in_its_first_recorded_version(self):
+        ledger = [dossier(1, "FLAT", 0, [c(0, 99, 101, 100), c(1, 99, 102, 101)]),
+                  dossier(2, "FLAT", 0, [c(1, 90, 110, 100), c(2, 99, 103, 102)])]
+        series = portfolio.market_series(ledger)
+        self.assertEqual([x["t"] for x in series["BTCUSDT"]["candles"]], [0, 1, 2])
+        self.assertEqual(series["BTCUSDT"]["candles"][1]["l"], 99)
+        self.assertEqual(series["BTCUSDT"]["records"], [1, 2])
+
+    def test_every_position_of_the_real_ledger_resolves_the_same_on_the_series(self):
+        from pathlib import Path
+
+        from verdict_desk import dossier as ledger_io
+        ledger = ledger_io.read_ledger(Path(__file__).resolve().parents[1] / "ledger" / "ledger.jsonl")
+        series = portfolio.market_series(ledger)
+        checked = 0
+        for i, d in enumerate(ledger):
+            if d["verdict"]["action"] not in portfolio.POSITION_ACTIONS:
+                continue
+            t = d["evidence"]["market"]["candles"][-1]["t"]
+            later = [x for x in series[d["evidence"]["symbol"]]["candles"] if x["t"] > t]
+            self.assertEqual(portfolio.resolve(d, later), portfolio.resolve(d, portfolio._later_candles(ledger, i)), d["seq"])
+            checked += 1
+        self.assertGreater(checked, 150)

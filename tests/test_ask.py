@@ -34,11 +34,49 @@ console.log(JSON.stringify({ dossiers: rows.length, answers, failures: failures.
 """
 
 
+OUTCOMES = """
+const fs = require("node:fs");
+const ask = require(process.argv[1]);
+const rows = fs.readFileSync(process.argv[2], "utf8").split("\\n").filter(Boolean).map((l) => JSON.parse(l));
+const market = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const out = [];
+for (const d of rows) {
+  const t = d.evidence.market.candles.at(-1).t;
+  const o = ask.outcome(d, market[d.evidence.symbol].candles.filter((c) => c.t > t));
+  if (o) { delete o.candle; out.push(o); }
+}
+console.log(JSON.stringify(out));
+"""
+
+
 @unittest.skipUnless(NODE, "node is not installed")
 class AskTest(unittest.TestCase):
     def test_the_javascript_unit_tests_pass(self):
         out = subprocess.run([NODE, "--test", str(ROOT / "tests" / "ask.test.js")], capture_output=True, text=True, timeout=180)
         self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+
+    def test_the_chart_unit_tests_pass(self):
+        out = subprocess.run([NODE, "--test", str(ROOT / "tests" / "chart.test.js")], capture_output=True, text=True, timeout=180)
+        self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+
+    def test_what_happened_next_matches_the_scoreboard_for_every_position(self):
+        """The page resolves a position on market.json in the browser; it must agree with portfolio.resolve, field for field."""
+        import json
+        import tempfile
+
+        from verdict_desk import dossier, portfolio
+        ledger = dossier.read_ledger(ROOT / "ledger" / "ledger.jsonl")
+        with tempfile.TemporaryDirectory() as tmp:
+            market = Path(tmp) / "market.json"
+            market.write_text(json.dumps(portfolio.market_series(ledger)), encoding="utf-8")
+            out = subprocess.run([NODE, "-e", OUTCOMES, str(ROOT / "web" / "ask.js"), str(ROOT / "ledger" / "ledger.jsonl"), str(market)],
+                                 capture_output=True, text=True, timeout=300)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        js = {o["seq"]: o for o in json.loads(out.stdout)}
+        expected = {p["seq"]: p for p in portfolio.summarize(ledger)["positions"]}
+        self.assertEqual(set(js), set(expected))
+        for seq, p in expected.items():
+            self.assertEqual({k: js[seq][k] for k in p}, p, seq)
 
     def test_every_answer_on_the_whole_ledger_passes_its_own_number_check(self):
         import json

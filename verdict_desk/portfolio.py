@@ -32,6 +32,20 @@ def _later_candles(ledger: list[dict], index: int) -> list[dict]:
     return sorted(out, key=lambda c: c["t"])
 
 
+def market_series(ledger: list[dict]) -> dict:
+    """Every candle the ledger froze, per symbol, once, in the version first recorded (what _later_candles keeps).
+
+    Ask the record replays "what happened next" on it in the browser: the candles after a dossier's last one are
+    exactly the ones _later_candles would collect, so the position resolves the same as here."""
+    out: dict[str, dict] = {}
+    for d in ledger:
+        entry = out.setdefault(d["evidence"]["symbol"], {"candles": {}, "records": []})
+        entry["records"].append(d["seq"])
+        for c in d["evidence"]["market"]["candles"]:
+            entry["candles"].setdefault(c["t"], c)
+    return {s: {"records": e["records"], "candles": [e["candles"][t] for t in sorted(e["candles"])]} for s, e in out.items()}
+
+
 def resolve(dossier: dict, candles: list[dict]) -> dict:
     v = dossier["verdict"]
     direction = 1 if v["action"] == "LONG" else -1

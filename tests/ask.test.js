@@ -129,3 +129,73 @@ test("records without an LLM layer or a sensitivity table answer plainly instead
   assert.match(textOf(ask.answer(NO_SENSITIVITY, "why")), /predates/i);
   for (const intent of ask.INTENTS) assert.ok(ask.check(ask.answer(OLD, intent, { recomputedHash: OLD.hash })).ok, intent);
 });
+
+// ---------------------------------------------------------------- phase 2: the chart, what happened next, sources, voices
+const EXECUTED = latest((d) => d.execution);
+const VOICED = latest((d) => d.evidence.narrative && (d.evidence.narrative.convergence || []).length);
+const later = (d, rows) => rows.map((r, k) => ({ t: d.evidence.market.candles.at(-1).t + (k + 1) * 3600000, o: r[2], h: r[0], l: r[1], c: r[2], v: 1 }));
+
+test("the new questions are routed too", () => {
+  const cases = {
+    "What happened next?": "outcome", "did it work?": "outcome", "o que aconteceu depois?": "outcome",
+    "What does the chart show?": "chart", "explain the chart": "chart", "o gráfico": "chart",
+    "What did you see?": "saw", "where does the data come from?": "saw",
+    "What did the voices say?": "voices", "what were people saying on telegram?": "voices",
+    "Was it executed on-chain?": "executed", "is there a sepolia transaction?": "executed",
+  };
+  for (const [q, intent] of Object.entries(cases)) assert.equal(ask.route(q), intent, q);
+});
+
+test("outcome resolves a position like portfolio.resolve: the stop wins a candle that touches both", () => {
+  const v = POSITION.verdict;
+  const dir = v.action === "LONG" ? 1 : -1;
+  const both = later(POSITION, [[Math.max(v.stop, v.take_profit) + 1, Math.min(v.stop, v.take_profit) - 1, v.entry]]);
+  const o = ask.outcome(POSITION, both);
+  assert.equal(o.status, "STOP");
+  assert.equal(o.exit, v.stop);
+  assert.equal(o.bars, 1);
+  assert.equal(o.pnl, Math.round((v.stop - v.entry) * dir * v.size * 1e4) / 1e4);
+  assert.equal(ask.outcome(POSITION, []).status, "OPEN");
+  assert.equal(ask.outcome(DECLINED, both), null);
+});
+
+test("what happened next is answered, cited and checked, with or without later candles", () => {
+  const v = POSITION.verdict;
+  const hit = later(POSITION, [[v.entry, v.entry, v.entry], v.action === "LONG" ? [v.take_profit + 1, v.entry, v.take_profit] : [v.entry, v.take_profit - 1, v.take_profit]]);
+  const a = ask.answer(POSITION, "outcome", { later: hit });
+  assert.match(textOf(a), /target/);
+  assert.ok(ask.check(a).ok, JSON.stringify(ask.check(a)));
+  assert.ok(a.marks.includes("exit"));
+  const none = ask.answer(POSITION, "outcome", { later: [] });
+  assert.match(textOf(none), /no later candle|still open/i);
+  assert.ok(ask.check(none).ok);
+  assert.match(textOf(ask.answer(DECLINED, "outcome", { later: hit })), /no position/i);
+});
+
+test("the chart answer reads the record's own indicators and lights them", () => {
+  const a = ask.answer(POSITION, "chart");
+  assert.ok(ask.check(a).ok, JSON.stringify(ask.check(a)));
+  assert.ok(a.cites.some((c) => c.ref === "features.last_close"));
+  assert.ok(a.marks.includes("ema_fast") && a.marks.includes("range_high_24"));
+});
+
+test("sources, voices and the Sepolia execution are answered from the record, and old records say what they lack", () => {
+  for (const intent of ["saw", "voices", "executed"]) {
+    for (const d of [POSITION, DECLINED, OLD, VOICED, EXECUTED]) {
+      const a = ask.answer(d, intent);
+      assert.ok(a.parts.length > 0, `${intent} #${d.seq}`);
+      assert.ok(ask.check(a).ok, `${intent} #${d.seq} ${JSON.stringify(ask.check(a))}`);
+    }
+  }
+  assert.match(textOf(ask.answer(EXECUTED, "executed")), /Sepolia/);
+  assert.ok(ask.answer(EXECUTED, "executed").cites.some((c) => c.ref === "execution.tx"));
+  assert.match(textOf(ask.answer(OLD, "executed")), /before|simulated|nothing was sent/i);
+  const NO_VOICES = LEDGER.find((d) => !d.evidence.narrative);
+  assert.match(textOf(ask.answer(NO_VOICES, "voices")), /no market voices/i);
+  assert.ok(ask.check(ask.answer(NO_VOICES, "saw")).ok);
+});
+
+test("every answer names the chart marks its citations point at", () => {
+  const a = ask.answer(POSITION, "risk");
+  assert.ok(a.marks.includes("stop") && a.marks.includes("entry") && a.marks.includes("take_profit"));
+});

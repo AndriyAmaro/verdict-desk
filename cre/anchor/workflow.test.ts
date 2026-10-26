@@ -5,6 +5,7 @@ import { bytesToHex, type Address } from 'viem'
 import { newAggregatorV3Mock } from '../contracts/evm/ts/generated/AggregatorV3_mock'
 import { newLedgerAnchorMock } from '../contracts/evm/ts/generated/LedgerAnchor_mock'
 import { decodeAnchorReport } from './logic'
+import { dossierHash } from './verdict'
 import { anchorLedger, type Config, initWorkflow, onCronTrigger } from './workflow'
 
 const enc = (s: string) => new TextEncoder().encode(s)
@@ -19,6 +20,8 @@ const config: Config = {
 	schedule: '0 0 0 * * *',
 	headUrl: 'https://example.invalid/head.json',
 	headUrlMirror: 'https://mirror.invalid/head.json',
+	headDossierUrl: 'https://example.invalid/head-dossier.json',
+	headDossierUrlMirror: 'https://mirror.invalid/head-dossier.json',
 	chainSelectorName: 'ethereum-testnet-sepolia',
 	priceFeedAddress: FEED,
 	anchorAddress: ANCHOR,
@@ -94,8 +97,21 @@ describe('initWorkflow', () => {
 	})
 })
 
+// The real last dossier of the published ledger: the workflow must re-derive its verdict before anchoring it.
+const LAST = JSON.parse((await Bun.file(`${import.meta.dir}/../../ledger/ledger.jsonl`).text()).trim().split('\n').pop() as string)
+const REAL_HEAD = { seq: LAST.seq, hash: LAST.hash, symbol: LAST.evidence.symbol }
+
 describe('two independent sources for the ledger head', () => {
 	const bodyOf = (head: object) => enc(JSON.stringify(head))
+	const HEAD = REAL_HEAD
+	const DOSSIER = enc(JSON.stringify(LAST))
+	const both = (extra: Record<string, { statusCode: number; body: Uint8Array }> = {}) => ({
+		[config.headUrl]: { statusCode: 200, body: bodyOf(HEAD) },
+		[config.headUrlMirror]: { statusCode: 200, body: bodyOf(HEAD) },
+		[config.headDossierUrl]: { statusCode: 200, body: DOSSIER },
+		[config.headDossierUrlMirror]: { statusCode: 200, body: DOSSIER },
+		...extra,
+	})
 	function http(replies: Record<string, { statusCode: number; body: Uint8Array }>) {
 		const asked: string[] = []
 		HttpActionsMock.testInstance().sendRequest = (input) => {
@@ -106,24 +122,43 @@ describe('two independent sources for the ledger head', () => {
 	}
 	const fire = () => onCronTrigger(newTestRuntime(null, undefined, config), { scheduledExecutionTime: { seconds: 1n, nanos: 0 } } as any)
 
-	test('asks both sources and anchors when they publish the same head', () => {
+	test('asks both sources for the head and its dossier, replays the verdict, then anchors', () => {
 		const seen = mocks()
-		const asked = http({
-			[config.headUrl]: { statusCode: 200, body: bodyOf(HEAD) },
-			[config.headUrlMirror]: { statusCode: 200, body: bodyOf(HEAD) },
-		})
+		const asked = http(both())
 		const summary = JSON.parse(fire())
-		expect(asked.sort()).toEqual([config.headUrl, config.headUrlMirror].sort())
-		expect(summary).toMatchObject({ seq: 12, head: HASH })
+		expect(asked.sort()).toEqual([config.headUrl, config.headUrlMirror, config.headDossierUrl, config.headDossierUrlMirror].sort())
+		expect(summary).toMatchObject({ seq: HEAD.seq, head: HEAD.hash, replayed: { action: LAST.verdict.action, edge: LAST.verdict.edge } })
 		expect(seen).toHaveLength(1)
+	})
+
+	test('writes nothing when the head dossier does not replay to its recorded verdict', () => {
+		const seen = mocks()
+		const forged = JSON.parse(JSON.stringify(LAST))
+		forged.verdict.action = forged.verdict.action === 'LONG' ? 'SHORT' : 'LONG'
+		forged.hash = dossierHash(forged)
+		const head = { ...HEAD, hash: forged.hash }
+		http({
+			[config.headUrl]: { statusCode: 200, body: bodyOf(head) },
+			[config.headUrlMirror]: { statusCode: 200, body: bodyOf(head) },
+			[config.headDossierUrl]: { statusCode: 200, body: enc(JSON.stringify(forged)) },
+			[config.headDossierUrlMirror]: { statusCode: 200, body: enc(JSON.stringify(forged)) },
+		})
+		expect(() => fire()).toThrow('does not replay')
+		expect(seen).toHaveLength(0)
+	})
+
+	test('writes nothing when a published dossier is not the head', () => {
+		const seen = mocks()
+		const other = JSON.parse(JSON.stringify(LAST))
+		other.evidence.symbol = 'XRPUSDT'
+		http(both({ [config.headDossierUrlMirror]: { statusCode: 200, body: enc(JSON.stringify(other)) } }))
+		expect(() => fire()).toThrow('does not hash to the published head')
+		expect(seen).toHaveLength(0)
 	})
 
 	test('fails closed and writes nothing when the sources disagree', () => {
 		const seen = mocks()
-		http({
-			[config.headUrl]: { statusCode: 200, body: bodyOf(HEAD) },
-			[config.headUrlMirror]: { statusCode: 200, body: bodyOf({ ...HEAD, seq: 11 }) },
-		})
+		http(both({ [config.headUrlMirror]: { statusCode: 200, body: bodyOf({ ...HEAD, seq: HEAD.seq - 1 }) } }))
 		expect(() => fire()).toThrow('sources disagree')
 		expect(seen).toHaveLength(0)
 	})

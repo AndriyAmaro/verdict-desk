@@ -38,12 +38,23 @@ def publish_head(ledger_path: Path) -> None:
     A run that appends dossiers outside the hourly workflow (a person, a local agent) used to leave a
     stale head behind: on 2026-10-20 the published head sat at seq 53 while the chain had reached 68.
     """
+    ledger = dossier.read_ledger(ledger_path)
     try:
-        head = dossier.head(dossier.read_ledger(ledger_path))
+        head = dossier.head(ledger)
     except ValueError as err:
         print(f"head.json not refreshed: {err}", file=sys.stderr)
         return
     (ledger_path.parent / "head.json").write_text(json.dumps(head, separators=(",", ":")) + "\n", encoding="utf-8")
+    write_head_dossier(ledger_path.parent, ledger)
+
+
+def write_head_dossier(folder: Path, ledger: list[dict]) -> None:
+    """The whole last dossier, next to head.json: the CRE workflow re-derives its verdict before it anchors.
+
+    head.json carries only seq, hash and symbol; the workflow fetches this file from the two publications,
+    checks that it hashes to that head, and replays the verdict from its frozen evidence.
+    """
+    (folder / "head-dossier.json").write_text(json.dumps(ledger[-1], ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
 
 
 def cmd_decide(opts) -> int:
@@ -367,8 +378,9 @@ def cmd_verify(opts) -> int:
 
 
 def cmd_head(opts) -> int:
+    ledger = dossier.read_ledger(opts.ledger)
     try:
-        head = dossier.head(dossier.read_ledger(opts.ledger))
+        head = dossier.head(ledger)
     except ValueError as err:
         print(err, file=sys.stderr)
         return 1
@@ -376,6 +388,7 @@ def cmd_head(opts) -> int:
     if opts.out:
         opts.out.parent.mkdir(parents=True, exist_ok=True)
         opts.out.write_text(text + "\n", encoding="utf-8")
+        write_head_dossier(opts.out.parent, ledger)
     print(text)
     return 0
 

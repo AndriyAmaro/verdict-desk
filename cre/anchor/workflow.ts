@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { AggregatorV3 } from '../contracts/evm/ts/generated/AggregatorV3'
 import { LedgerAnchor } from '../contracts/evm/ts/generated/LedgerAnchor'
 import { agreeOnHead, encodeAnchorReport, formatPrice, type LedgerHead, parseHead } from './logic'
+import { verifyHeadDossier } from './verdict'
 
 export const configSchema = z.object({
 	// 6-field cron (seconds first), e.g. "0 0 0 * * *" for daily at 00:00 UTC
@@ -21,6 +22,9 @@ export const configSchema = z.object({
 	headUrl: z.string(),
 	// A second, independent publication of the same head (the GitHub Pages site, not the raw repository file)
 	headUrlMirror: z.string(),
+	// The whole last dossier, published next to each head; its verdict is re-derived before anything is anchored
+	headDossierUrl: z.string(),
+	headDossierUrlMirror: z.string(),
 	chainSelectorName: z.string(),
 	priceFeedAddress: z.string(),
 	anchorAddress: z.string(),
@@ -29,20 +33,37 @@ export const configSchema = z.object({
 
 export type Config = z.infer<typeof configSchema>
 
-const fetchOne = (sendRequester: HTTPSendRequester, url: string): LedgerHead => {
+/** A head both sources agree on, whose dossier hashes to it and re-derives its own recorded verdict. */
+export interface VerifiedHead extends LedgerHead {
+	rulesVersion: string
+	action: string
+	edge: number
+}
+
+const fetchText = (sendRequester: HTTPSendRequester, url: string, what: string): string => {
 	const response = sendRequester.sendRequest({ method: 'GET', url }).result()
 	if (response.statusCode !== 200) {
-		throw new Error(`ledger head request to ${url} failed with status ${response.statusCode}`)
+		throw new Error(`${what} request to ${url} failed with status ${response.statusCode}`)
 	}
-	return parseHead(Buffer.from(response.body).toString('utf-8'))
+	return Buffer.from(response.body).toString('utf-8')
 }
 
 /**
- * Every node fetches the head from TWO independent publications and requires them to agree; consensus then
- * requires all nodes to have seen the same result. If either source is down or they differ, nothing is anchored.
+ * Every node fetches the head from TWO independent publications and requires them to agree, then fetches the
+ * dossier behind it from both, checks that each hashes to that head, and re-derives the verdict from the frozen
+ * evidence (verdict.ts, the same rules as the Python judge). Consensus then requires all nodes to reach the same
+ * result. A source down, a disagreement, a dossier that is not the head, or a verdict its evidence does not
+ * support: nothing is anchored.
  */
-const fetchHead = (sendRequester: HTTPSendRequester, config: Config): LedgerHead =>
-	agreeOnHead(fetchOne(sendRequester, config.headUrl), fetchOne(sendRequester, config.headUrlMirror))
+const fetchHead = (sendRequester: HTTPSendRequester, config: Config): VerifiedHead => {
+	const head = agreeOnHead(
+		parseHead(fetchText(sendRequester, config.headUrl, 'ledger head')),
+		parseHead(fetchText(sendRequester, config.headUrlMirror, 'ledger head')),
+	)
+	let replay = verifyHeadDossier(fetchText(sendRequester, config.headDossierUrl, 'head dossier'), head)
+	replay = verifyHeadDossier(fetchText(sendRequester, config.headDossierUrlMirror, 'head dossier'), head)
+	return { ...head, rulesVersion: replay.rulesVersion, action: replay.action, edge: replay.edge }
+}
 
 function evmClientFor(config: Config) {
 	const network = getNetwork({ chainFamily: 'evm', chainSelectorName: config.chainSelectorName, isTestnet: true })
@@ -51,7 +72,7 @@ function evmClientFor(config: Config) {
 }
 
 /** Reads the Data Feed price and writes (ledger head, price) to LedgerAnchor through a CRE report. */
-export function anchorLedger(runtime: Runtime<Config>, head: LedgerHead): string {
+export function anchorLedger(runtime: Runtime<Config>, head: LedgerHead | VerifiedHead): string {
 	const config = runtime.config
 	const evmClient = evmClientFor(config)
 
@@ -69,15 +90,17 @@ export function anchorLedger(runtime: Runtime<Config>, head: LedgerHead): string
 	}
 	const txHash = response.txHash ? bytesToHex(response.txHash) : '0x'
 	runtime.log(`Anchored seq ${head.seq} head ${head.hash} at tx ${txHash}`)
-	return JSON.stringify({ seq: head.seq, head: head.hash, symbol: head.symbol, feed: pair, price: formatPrice(answer, decimals), txHash })
+	const replayed = 'action' in head ? { rules: head.rulesVersion, action: head.action, edge: head.edge } : undefined
+	return JSON.stringify({ seq: head.seq, head: head.hash, symbol: head.symbol, replayed, feed: pair, price: formatPrice(answer, decimals), txHash })
 }
 
 export const onCronTrigger = (runtime: Runtime<Config>, payload: CronPayload): string => {
 	if (!payload.scheduledExecutionTime) throw new Error('scheduled execution time is required')
 	runtime.log(`Anchoring ledger head from ${runtime.config.headUrl} and ${runtime.config.headUrlMirror}`)
 	const head = new cre.capabilities.HTTPClient()
-		.sendRequest(runtime, fetchHead, consensusIdenticalAggregation<LedgerHead>())(runtime.config)
+		.sendRequest(runtime, fetchHead, consensusIdenticalAggregation<VerifiedHead>())(runtime.config)
 		.result()
+	runtime.log(`Replayed dossier #${head.seq} under rules ${head.rulesVersion}: ${head.action} edge ${head.edge}, the same as recorded; anchoring it`)
 	return anchorLedger(runtime, head)
 }
 

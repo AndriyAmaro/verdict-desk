@@ -1,15 +1,19 @@
 # Chainlink CRE anchor for the Verdict Desk ledger
 
-A Chainlink Runtime Environment (CRE) workflow that makes the decision ledger tamper-evident beyond the operator's word. Once a day it:
+A Chainlink Runtime Environment (CRE) workflow that makes the decision ledger tamper-evident beyond the operator's word, and checks the decision itself before vouching for it. Every hour (a scheduler on the operator's machine runs `cre workflow simulate --broadcast`) it:
 
 1. fetches the published ledger head (`seq`, SHA-256 `hash`, `symbol`) over HTTP from **two independent publications** (the raw repository file and the GitHub Pages site); each node requires both to be identical, and the nodes must then agree with each other (identical consensus). If either source is down or they differ, nothing is anchored;
-2. reads a Chainlink **Data Feed** price (BTC/USD on Sepolia) as independent cross-check evidence;
-3. writes both to the `LedgerAnchor` contract on Sepolia through a CRE report.
+2. fetches the **whole dossier behind that head** (`ledger/head-dossier.json`) from the same two publications, recomputes its SHA-256 over the canonical JSON and requires it to equal the head, then **re-derives the verdict from the frozen evidence** inside the workflow ([`anchor/verdict.ts`](anchor/verdict.ts): the features, the argument rules of v2 to v6, the multi-KOL convergence and the v6 LLM judge check). If the recomputed action or edge differs from the recorded one, nothing is anchored;
+3. reads a Chainlink **Data Feed** price (BTC/USD on Sepolia) as independent cross-check evidence;
+4. writes the head and the price to the `LedgerAnchor` contract on Sepolia through a CRE report.
+
+So an anchor on Sepolia now means two things: this exact record existed at that block, and an independent re-computation in the CRE runtime reached the same decision from the same evidence. `anchor/verdict.test.ts` runs the TypeScript replay over every v2+ dossier of the published ledger and fails on the first one whose features, action or edge differ from the Python's.
 
 `LedgerAnchor` only accepts reports from the CRE forwarder and only with a sequence number higher than the last one, so an anchored head can never be overwritten or rolled back. A judge compares `isAnchored(seq, hash)` on-chain with the head they recompute from the public ledger in their own browser (`../web/index.html`).
 
 ```
 ledger/head.json (raw file + Pages copy, must be identical) --HTTP, identical consensus--> CRE workflow --report--> Forwarder --> LedgerAnchor (Sepolia)
+ledger/head-dossier.json (both copies) --hash = head? verdict replays?--------^
 Chainlink Data Feed BTC/USD ------EVM read------------^
 ```
 
@@ -18,7 +22,8 @@ Chainlink Data Feed BTC/USD ------EVM read------------^
 | Piece | Status | How |
 |---|---|---|
 | Head format shared by Python and the workflow | Verified | `python -m verdict_desk head`, parsed by `anchor/logic.ts` |
-| Workflow logic (HTTP head parsing, Data Feed read, report encoding, failure paths) | Verified with the SDK's test mocks | `cd anchor && bun test` (10 tests), `bunx tsc --noEmit` |
+| Workflow logic (HTTP head parsing, Data Feed read, report encoding, failure paths) | Verified with the SDK's test mocks | `cd anchor && bun test`, `bunx tsc --noEmit` |
+| Verdict replay in the workflow (`anchor/verdict.ts`) | Verified against the Python on every v2+ dossier of the ledger, and in the CRE WASM simulator: the real head replays, a forged head with a consistent hash is refused | `cd anchor && bun test verdict.test.ts`; [`evidence/simulate-verdict-replay.txt`](evidence/simulate-verdict-replay.txt), [`evidence/simulate-verdict-replay-forged.txt`](evidence/simulate-verdict-replay-forged.txt) (both served the published files from a local copy; the forged one changed the action and re-hashed it) |
 | `LedgerAnchor.sol` | Verified in a real in-memory EVM | `cd contracts/evm && npm install && python -m unittest discover -s test` (6 tests: forwarder-only, append-only, owner check, ERC165, exact custom errors) |
 | Deploy script against Sepolia | Dry run done (forwarder code check, gas estimate: about 0.0000006 ETH) | `cd contracts && node scripts/deploy.mjs --dry-run` |
 | `cre workflow simulate` | **Run on 2026-10-21** (dry run and `--broadcast`, CRE login session) | [`DEPLOY_SEPOLIA.md`](DEPLOY_SEPOLIA.md) |

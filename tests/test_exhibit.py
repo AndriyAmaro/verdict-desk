@@ -93,6 +93,15 @@ class RenderTest(unittest.TestCase):
         self.assertIn("never enough to open a position", text)
         self.assertIn("B1 holds.", page)
 
+    def test_the_model_that_really_answered_is_named(self):
+        row = self.synthetic(rules_version="v6")
+        row["llm"] = {"bull": {"accepted": [], "rejected": [], "served_by": "qwen/qwen3.8-27b"},
+                      "bear": {"accepted": [], "rejected": []},
+                      "judge": {"ruling": None, "accepted": False, "weight": 0.0, "rejected_because": "x", "served_by": "glm-5.2"}}
+        page = exhibit.render(row)
+        self.assertIn("answered by qwen/qwen3.8-27b", page)
+        self.assertIn("answered by glm-5.2", page)
+
     def test_a_voided_judge_says_it_added_nothing_and_why(self):
         page = self.judged({"ruling": {"lean": "bull", "conviction": "high", "relied_on": ["S4"], "reason": "x"},
                             "accepted": False, "weight": 0.0, "rejected_because": "unknown claim id: 'S4'"})

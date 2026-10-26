@@ -20,6 +20,8 @@ from html import unescape
 import urllib.request
 import xml.etree.ElementTree as ET
 
+from . import llm as llm_mod
+
 TOKENS = {"BTC": ("bitcoin", "btc"), "ETH": ("ethereum", "ether", "eth"), "SOL": ("solana", "sol"), "BNB": ("bnb", "binance coin")}
 BULL = ("surge", "rally", "record", "adopt", "approve", "inflow", "breakout")
 BEAR = ("crash", "hack", "ban", "lawsuit", "outflow", "plunge", "exploit")
@@ -280,23 +282,29 @@ def extract(voices: list[dict], ask) -> dict:
     ids = list(labeled)
     chunks = [ids[start : start + CHUNK] for start in range(0, len(ids), CHUNK)]
 
-    def one(chunk: list[str]) -> list[dict]:
+    def one(chunk: list[str]) -> tuple[list[dict], str | None]:
         user = "\n".join(f"{vid}: {labeled[vid]['title']}" for vid in chunk)
-        return parse_extractions(ask(SYSTEM, user))
+        text = ask(SYSTEM, user)
+        return parse_extractions(text), llm_mod.served_by()  # the worker thread's own last reply
 
     items: list[dict] = []
     errors: list[str] = []
+    served: set[str] = set()
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         futures = [pool.submit(one, chunk) for chunk in chunks]
         for n, future in enumerate(futures, 1):  # na ordem dos lotes, para o resultado ser estavel
             try:
-                items += future.result()
+                got, model = future.result()
+                items += got
+                if model:
+                    served.add(model)
             except (OSError, ValueError, KeyError) as err:
                 errors.append(f"batch {n} of {len(chunks)}: {err}")
     if chunks and len(errors) == len(chunks):
         raise ValueError("; ".join(errors))
     result = validate_extractions(items, labeled)
     result["chunk_errors"] = errors
+    result["served_by"] = sorted(served)
     return result
 
 
@@ -376,6 +384,8 @@ def build(voices: list[dict], ask=None, model: str = "") -> dict:
         "convergence": converge_extractions(result["accepted"]),
     }
     block["rejected_candidates"] = rejected_candidates(block["extractions"], block["convergence"])
+    if result.get("served_by"):
+        block["served_by"] = result["served_by"]  # the models a router really used for the batches
     if result["chunk_errors"]:
         block["partial"] = True
         block["chunk_errors"] = result["chunk_errors"]

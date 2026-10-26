@@ -198,6 +198,24 @@ class PublishedHeadTest(unittest.TestCase):
         self.assertEqual(written, dossier.head(dossier.read_ledger(path)))
         self.assertEqual(written["seq"], 2)
 
+    def test_the_whole_head_dossier_is_published_next_to_the_head_for_the_cre_replay(self):
+        path = Path(tempfile.mkdtemp()) / "ledger" / "ledger.jsonl"
+        dossier.append(packet(0.004), path)
+        dossier.append(packet(-0.004), path)
+        cli.publish_head(path)
+        published = json.loads((path.parent / "head-dossier.json").read_text())
+        self.assertEqual(published, dossier.read_ledger(path)[-1])
+        self.assertEqual(published["hash"], json.loads((path.parent / "head.json").read_text())["hash"])
+
+    def test_the_head_command_also_writes_the_head_dossier_beside_its_output(self):
+        path = Path(tempfile.mkdtemp()) / "ledger.jsonl"
+        dossier.append(packet(0.004), path)
+        out = path.parent / "pub" / "head.json"
+        argv = ["verdict_desk", "--ledger", str(path), "head", "--out", str(out)]
+        with mock.patch("sys.argv", argv), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(), 0)
+        self.assertEqual(json.loads((out.parent / "head-dossier.json").read_text())["seq"], 1)
+
     def test_publish_head_leaves_the_old_head_alone_when_the_chain_is_broken(self):
         path = Path(tempfile.mkdtemp()) / "ledger.jsonl"
         dossier.append(packet(0.004), path)

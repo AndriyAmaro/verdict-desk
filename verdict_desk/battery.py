@@ -131,7 +131,10 @@ def witness_index(stamps: Path, deployment: Path, rekor: Path | None = None) -> 
         data = json.loads(Path(deployment).read_text(encoding="utf-8"))
         anchor = {"address": data["contract"], "chain_id": data["chainId"], "network": data["network"],
                   "rpc": "https://ethereum-sepolia-rpc.publicnode.com", "explorer": data.get("explorer", {}).get("contract"),
-                  "deploy_block": data.get("deployBlock")}
+                  "deploy_block": data.get("deployBlock"),
+                  # publicnode keeps only recent blocks (eth_getLogs over older ones answers "pruned history
+                  # unavailable", seen 26 Oct); the anchor history is read from a node that keeps it all.
+                  "history_rpc": "https://sepolia.gateway.tenderly.co"}
     except (OSError, ValueError, KeyError):
         pass
     return {"heads": heads, "anchor": anchor, "rekor": rekor_heads(rekor, stamps) if rekor else []}

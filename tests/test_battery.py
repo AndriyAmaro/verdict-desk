@@ -125,6 +125,13 @@ class WitnessIndexTest(unittest.TestCase):
         self.assertRegex(anchor["address"], r"^0x[0-9a-fA-F]{40}$")
         self.assertEqual(anchor["chain_id"], 11155111)
 
+    def test_the_anchor_history_is_read_from_a_node_that_keeps_old_blocks(self):
+        """publicnode answers eth_getLogs over the contract's history with "pruned history unavailable" (26 Oct)."""
+        anchor = battery.witness_index(STAMPS, ROOT / "cre" / "deployment.sepolia.json")["anchor"]
+        self.assertEqual(anchor["deploy_block"], 11963992)
+        self.assertTrue(anchor["history_rpc"].startswith("https://"))
+        self.assertNotIn("publicnode", anchor["history_rpc"])
+
     def test_a_missing_deployment_file_leaves_the_anchor_out_instead_of_inventing_one(self):
         index = battery.witness_index(STAMPS, ROOT / "cre" / "nope.json")
         self.assertIsNone(index["anchor"])

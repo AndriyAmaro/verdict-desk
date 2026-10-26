@@ -185,26 +185,49 @@ button[disabled]{opacity:.5;cursor:default}
         `<p class="${same ? "ok" : "bad"}">${same ? `✓ the ledger's dossier #${latest} has exactly that hash` : `✗ the ledger's dossier #${latest} does NOT have that hash`}</p>` +
         `<p class="${gap > 24 ? "warn" : "mut"}">The ledger is ${gap} dossier${gap === 1 ? "" : "s"} past that anchor.</p>`;
       // Anchor history from the contract's Anchored events, so the cadence is read on-chain, not from our logs.
-      const ANCHORED = "0x43fd32c7e0eebd332a0c60efbf6c8c8a64b80609ef27f6262bf060b938a26f6c";
-      const logs = (await (await fetch(a.rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{ address: a.address, fromBlock: "0x" + (a.deploy_block || 0).toString(16), toBlock: "latest", topics: [ANCHORED] }] }) })).json()).result || [];
+      anchorHistory(a, rpc, word).catch((e) => { $("ethhist").innerHTML = `<p class="mut">The anchor history could not be read here (${esc(e.message || e)}); every anchor is on <a href="${esc(a.explorer || "https://sepolia.etherscan.io")}">the explorer</a>.</p>`; });
+    } catch (e) { $("eth").innerHTML = `<span class="mut">Could not reach a public Sepolia node from here (${esc(e.message || e)}). The contract is in <code>cre/deployment.sepolia.json</code>.</span>`; }
+  }).catch((e) => { $("agree").innerHTML = `<span class="bad">Could not load the ledger or the witness list here: ${esc(e.message || e)}. Open this page from the deployed site.</span>`; });
+
+  // The anchor history, read from the contract's own Anchored events. The whole history comes from a node that keeps
+  // old blocks; if it cannot be reached, the last ~17 hours come from the node above (which prunes older ones), and the
+  // page says so. A failure here never hides the latest anchor shown above.
+  async function anchorHistory(a, rpc, word) {
+    const ANCHORED = "0x43fd32c7e0eebd332a0c60efbf6c8c8a64b80609ef27f6262bf060b938a26f6c";
+    const call = async (url, method, params) => {
+      const r = await (await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) })).json();
+      if (r.error) throw new Error(r.error.message || "node error");
+      return r.result;
+    };
+    let url = a.history_rpc || a.rpc, logs, partial = false;
+    try {
+      logs = await call(url, "eth_getLogs", [{ address: a.address, fromBlock: "0x" + (a.deploy_block || 0).toString(16), toBlock: "latest", topics: [ANCHORED] }]);
+    } catch (e) {
+      url = a.rpc; partial = true;
+      const tip = parseInt(await call(url, "eth_blockNumber", []), 16);
+      logs = await call(url, "eth_getLogs", [{ address: a.address, fromBlock: "0x" + Math.max(0, tip - 5000).toString(16), toBlock: "latest", topics: [ANCHORED] }]);
+    }
+    try {
       const recent = logs.slice(-12).reverse();
       const rows = [];
       for (const l of recent) {
         const seq = parseInt(l.topics[1], 16);
         const at = parseInt(word(await rpc("0xfa210653" + seq.toString(16).padStart(64, "0")), 4), 16);
         // The route is read from the transaction itself: the workflow name in the report header (rawReport bytes 77..87).
-        const input = (await (await fetch(a.rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionByHash", params: [l.transactionHash] }) })).json()).result.input.slice(10);
+        const input = (await call(url, "eth_getTransactionByHash", [l.transactionHash])).input.slice(10);
         const raw = input.slice(parseInt(word(input, 1), 16) * 2 + 64);
         const name = raw.slice(154, 174).match(/../g).map((h) => String.fromCharCode(parseInt(h, 16))).join("");
         rows.push({ seq, at, tx: l.transactionHash, route: name === "gh-actions" ? "GitHub Actions, direct (not the CRE runtime)" : "CRE workflow, operator's machine" });
       }
       const day = Date.now() / 1000 - 86400;
       const lastDay = rows.filter((r) => r.at >= day).length;
-      $("ethhist").innerHTML = `<p class="mut">${logs.length} anchors on this contract so far; ${lastDay} of the last 12 fall in the past 24 hours.</p>` +
+      $("ethhist").innerHTML = (partial
+          ? `<p class="mut">The node that keeps the full history could not be reached, so these are the anchors of the last ~17 hours only (${logs.length}).</p>`
+          : `<p class="mut">${logs.length} anchors on this contract so far; ${lastDay} of the last 12 fall in the past 24 hours.</p>`) +
         `<table><thead><tr><th>Record</th><th>Anchored (UTC)</th><th>Route</th><th>Transaction</th></tr></thead><tbody>` +
         rows.map((r) => `<tr><td>#${r.seq}</td><td>${utc(r.at)}</td><td>${esc(r.route)}</td><td><a href="https://sepolia.etherscan.io/tx/${esc(r.tx)}"><code>${esc(r.tx.slice(0, 18))}…</code></a></td></tr>`).join("") + `</tbody></table>`;
-    } catch (e) { $("eth").innerHTML = `<span class="mut">Could not reach a public Sepolia node from here (${esc(e.message || e)}). The contract is in <code>cre/deployment.sepolia.json</code>.</span>`; }
-  }).catch((e) => { $("agree").innerHTML = `<span class="bad">Could not load the ledger or the witness list here: ${esc(e.message || e)}. Open this page from the deployed site.</span>`; });
+    } catch (e) { $("ethhist").innerHTML = `<p class="mut">The anchor history could not be read here (${esc(e.message || e)}); every anchor is on <a href="${esc(a.explorer || "https://sepolia.etherscan.io")}">the explorer</a>.</p>`; }
+  }
 
 
   // 4. Sigstore transparency log

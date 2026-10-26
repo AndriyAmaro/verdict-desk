@@ -243,6 +243,40 @@ def parse_claims(text: str) -> list[dict]:
     return [c for c in data if isinstance(c, dict)]
 
 
+def parse_ruling(text: str) -> dict:
+    """Extrai o objeto JSON do veredito do juiz; texto invalido vira dict vazio (o validador anula)."""
+    if not isinstance(text, str):
+        return {}
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end < start:
+        return {}
+    try:
+        data = json.loads(text[start : end + 1])
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def rule(labels: dict[str, dict], evidence_items: dict[str, str], ask=chat) -> dict:
+    """Pede ao juiz LLM um lado, lendo SO as afirmacoes validadas (rotulos B1.., S1..)."""
+    system = (
+        "You are the judge in a market debate. You see only the analyst claims that passed a citation check: "
+        "bull claims are labelled B1, B2, ... and bear claims S1, S2, .... Decide which side the evidence favors "
+        "for the next few hours, or say neutral when the cases balance. "
+        'Reply ONLY with a JSON object {"lean": "bull" | "bear" | "neutral", "conviction": "low" | "medium" | "high", '
+        '"relied_on": [claim labels], "reason": str}. '
+        "relied_on lists the claim labels your ruling rests on; a bull or bear lean must rest on at least one claim "
+        "of that side. Use only the labels shown. Do not invent numbers: any number in reason must be copied exactly "
+        "from the evidence of the claims you rely on. Keep reason to one or two sentences."
+    )
+    lines = []
+    for label, claim in labels.items():
+        cites = [c for c in claim.get("cites") or [] if isinstance(c, str)]
+        lines.append(f"{label}: {claim.get('claim', '')}")
+        lines.extend(f"    {c}: {evidence_items[c]}" for c in cites if c in evidence_items)
+    return parse_ruling(ask(system, "\n".join(lines)))
+
+
 STANCE = {
     "bull": "the strongest honest case for opening a LONG position now",
     "bear": "the strongest honest case against a long entry, or for a SHORT position",

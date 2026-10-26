@@ -36,12 +36,17 @@ class Rules(NamedTuple):
     # v5: o peso de cada voz da convergencia vem da habilidade medida dela (trust.py), congelada
     # no proprio dossier. Sem historico a voz vale 1.0, o mesmo da v4.
     trust_weighted: bool = False
+    # v6: um juiz LLM le so as afirmacoes que passaram no validador de citacao e inclina para um lado.
+    # A inclinacao vira um argumento com peso de tabela (teto 1.0, abaixo da faixa de entrada), entao o
+    # LLM desempata mas nunca abre posicao sozinho. O peso e recalculado do veredito congelado no replay.
+    llm_judge: bool = False
 
 
 V2 = Rules()
 V3 = Rules(version="v3", rich_states=True)
 V4 = Rules(version="v4", rich_states=True, narrative_signal=True)
 V5 = Rules(version="v5", rich_states=True, narrative_signal=True, trust_weighted=True)
+V6 = Rules(version="v6", rich_states=True, narrative_signal=True, trust_weighted=True, llm_judge=True)
 DEFAULT = V2
 
 
@@ -87,6 +92,29 @@ def convergence_args(narrative, symbol, trust_weighted: bool = False) -> tuple[l
                "value": voices, "weight": weight}
         (bull_args if c.get("bias") == "bullish" else bear_args).append(arg)
     return bull_args, bear_args
+
+
+def llm_judge_args(layer) -> tuple[list[dict], list[dict]]:
+    """Veredito do juiz LLM -> no maximo um argumento, so se ele se apoia em afirmacoes validadas.
+
+    O peso sai de `citations.validate_ruling` sobre o que o dossier congelou (afirmacoes aceitas,
+    indice de evidencia, veredito bruto), nunca de um campo gravado: editar o peso nao muda nada,
+    editar o veredito muda a decisao e o replay acusa.
+    """
+    from . import citations
+
+    if not isinstance(layer, dict) or not isinstance(layer.get("judge"), dict):
+        return [], []
+    ruling = layer["judge"].get("ruling")
+    bull_ok = (layer.get("bull") or {}).get("accepted") or []
+    bear_ok = (layer.get("bear") or {}).get("accepted") or []
+    check = citations.validate_ruling(ruling, bull_ok, bear_ok, layer.get("evidence_index") or {})
+    if not check["accepted"] or check["weight"] <= 0:
+        return [], []
+    relied = list(ruling["relied_on"])
+    arg = {"claim": f"LLM judge leans {ruling['lean']} ({ruling['conviction']} conviction) on validated claims {', '.join(relied)}",
+           "evidence_ref": "llm.judge", "value": relied, "weight": check["weight"]}
+    return ([arg], []) if ruling["lean"] == "bull" else ([], [arg])
 
 
 def with_risk_pct(rules: Rules, pct) -> Rules:
@@ -268,8 +296,8 @@ def policy(rules: Rules) -> dict:
     regra muda o hash — e a ancora (Sepolia + Bitcoin) denuncia a troca. E por ser legivel,
     quem audita nao precisa confiar em um hash opaco: le os numeros.
     """
-    from . import evidence
-    return {
+    from . import citations, evidence
+    out = {
         "entry_threshold": rules.entry_threshold,
         "stop_atr": rules.stop_atr,
         "take_atr": rules.take_atr,
@@ -280,6 +308,9 @@ def policy(rules: Rules) -> dict:
         "market_window_minutes": evidence.MARKET_WINDOW_MINUTES,
         "slow_window_minutes": evidence.SLOW_WINDOW_MINUTES,
     }
+    if rules.llm_judge:  # so a v6 grava a tabela: os vereditos v2 a v5 ficam identicos ao que sempre foram
+        out["llm_judge_weights"] = dict(citations.JUDGE_WEIGHT)
+    return out
 
 
 def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float = 10_000.0, rules: Rules = V2) -> dict:
@@ -348,13 +379,17 @@ def judge(f: dict, bull_args: list[dict], bear_args: list[dict], capital: float 
     return verdict
 
 
-def decide(f: dict, rules: Rules = V2, narrative: dict | None = None, symbol: str | None = None) -> dict:
+def decide(f: dict, rules: Rules = V2, narrative: dict | None = None, symbol: str | None = None, llm: dict | None = None) -> dict:
     bull_args = bull(f)
     bear_args = bear(f)
     if rules.narrative_signal:
         cb, cs = convergence_args(narrative, symbol, rules.trust_weighted)
         bull_args.extend(cb)
         bear_args.extend(cs)
+    if rules.llm_judge:
+        jb, js = llm_judge_args(llm)
+        bull_args.extend(jb)
+        bear_args.extend(js)
     return {
         "bull": bull_args,
         "bear": bear_args,

@@ -195,6 +195,15 @@ test("sources, voices and the Sepolia execution are answered from the record, an
   assert.ok(ask.check(ask.answer(NO_VOICES, "saw")).ok);
 });
 
+test("an executed swap is told in token units, with the raw on-chain amounts cited", () => {
+  const swap = latest((d) => d.execution && d.execution.status === "executed");
+  if (!swap) return;
+  const a = ask.answer(swap, "executed");
+  assert.match(textOf(a), /sent \d+(\.\d+)? WETH and received \d+(\.\d+)? USDC|sent \d+(\.\d+)? USDC and received \d+(\.\d+)? WETH/);
+  assert.ok(ask.check(a).ok, JSON.stringify(ask.check(a)));
+  assert.ok(a.cites.find((c) => c.ref === "execution.amounts").source.includes(String(swap.execution.amount_in)));
+});
+
 test("every answer names the chart marks its citations point at", () => {
   const a = ask.answer(POSITION, "risk");
   assert.ok(a.marks.includes("stop") && a.marks.includes("entry") && a.marks.includes("take_profit"));

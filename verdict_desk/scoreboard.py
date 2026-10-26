@@ -76,10 +76,11 @@ def _sepolia(root: Path, ledger: list[dict], tx: str | None):
     found = []
     for path in sorted((root / "cre" / "evidence").glob("*.txt")):
         for m in SEPOLIA_LINE.finditer(path.read_text(encoding="utf-8", errors="replace")):
-            found.append((int(m.group(1)), m.group(2), m.group(3)))
-    for seq, head, hash_tx in sorted(found, reverse=True):
+            # direct-*.txt is written by cre/anchor/direct.ts on GitHub Actions: same checks, not the CRE runtime.
+            found.append((int(m.group(1)), m.group(2), m.group(3), "direct" if path.name.startswith("direct-") else "cre"))
+    for seq, head, hash_tx, route in sorted(found, reverse=True):
         if (tx is None or tx == hash_tx) and 0 < seq <= len(ledger) and ledger[seq - 1]["hash"] == head:
-            return {"seq": seq, "tx": hash_tx, "url": f"https://sepolia.etherscan.io/tx/{hash_tx}"}
+            return {"seq": seq, "tx": hash_tx, "url": f"https://sepolia.etherscan.io/tx/{hash_tx}", "route": route}
     return None
 
 
@@ -148,7 +149,9 @@ def render(data: dict) -> str:
     else:
         lines.append("- Sigstore transparency log: no signed head yet.")
     if a["sepolia"]:
-        lines.append(f"- Ethereum Sepolia (Chainlink CRE): dossier #{a['sepolia']['seq']} anchored, hash equal to the ledger's. Transaction: {a['sepolia']['url']}")
+        via = ("GitHub Actions, the CRE workflow's checks outside the CRE runtime" if a["sepolia"].get("route") == "direct"
+               else "Chainlink CRE workflow")
+        lines.append(f"- Ethereum Sepolia ({via}): dossier #{a['sepolia']['seq']} anchored, hash equal to the ledger's. Transaction: {a['sepolia']['url']}")
     else:
         lines.append("- Ethereum Sepolia (Chainlink CRE): no anchor matching this ledger yet.")
     lines += ["", "JUDGE PATH IN 60 SECONDS (three clicks, nothing to install):",

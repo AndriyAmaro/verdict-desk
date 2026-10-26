@@ -117,6 +117,18 @@ class AnchorsTest(unittest.TestCase):
         self.assertEqual(scoreboard.render(scoreboard.compute(LEDGER, AS_OF, empty, tests=1)).lower().count(" yet"), 3)
 
 
+    def test_an_anchor_from_the_github_route_is_never_called_a_cre_run(self):
+        d = LEDGER[AS_OF - 1]
+        for name, route, label in (("direct-x.txt", "direct", "outside the CRE runtime"), ("anchor-x.txt", "cre", "Chainlink CRE workflow")):
+            root = Path(tempfile.mkdtemp())
+            (root / "cre" / "evidence").mkdir(parents=True)
+            (root / "cre" / "evidence" / name).write_text(f"Anchored seq {d['seq']} head {d['hash']} at tx 0x{'ab' * 32} (block 1)\n", encoding="utf-8")
+            data = scoreboard.compute(LEDGER, AS_OF, root, tests=1)
+            self.assertEqual(data["anchors"]["sepolia"]["route"], route)
+            line = next(x for x in scoreboard.render(data).splitlines() if "Ethereum Sepolia" in x)
+            self.assertIn(label, line)
+
+
 class RenderAndCheckTest(unittest.TestCase):
     def setUp(self):
         self.data = build()

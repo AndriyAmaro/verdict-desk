@@ -5,3 +5,6 @@ staging-settings:
   rpcs:
     - chain-name: ethereum-testnet-sepolia
       url: https://ethereum-sepolia-rpc.publicnode.com
+    # read-only: the BTC/USD Data Feed on Ethereum mainnet, compared with the Sepolia reading before anchoring
+    - chain-name: ethereum-mainnet
+      url: https://ethereum-rpc.publicnode.com

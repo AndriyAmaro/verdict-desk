@@ -12,7 +12,7 @@ import type { Address } from 'viem'
 import { z } from 'zod'
 import { AggregatorV3 } from '../contracts/evm/ts/generated/AggregatorV3'
 import { LedgerAnchor } from '../contracts/evm/ts/generated/LedgerAnchor'
-import { agreeOnHead, encodeAnchorReport, formatPrice, type LedgerHead, parseHead } from './logic'
+import { agreeOnHead, crossCheck, encodeAnchorReport, formatPrice, type LedgerHead, parseHead } from './logic'
 import { verifyHeadDossier } from './verdict'
 
 export const configSchema = z.object({
@@ -29,6 +29,11 @@ export const configSchema = z.object({
 	priceFeedAddress: z.string(),
 	anchorAddress: z.string(),
 	gasLimit: z.string(),
+	// The same Data Feed pair read on a second chain (Ethereum mainnet) and compared with the Sepolia reading
+	mainnetChainSelectorName: z.string(),
+	mainnetPriceFeedAddress: z.string(),
+	// Above this gap (basis points) between the two chains, nothing is anchored
+	maxFeedDeviationBps: z.number().int().positive(),
 })
 
 export type Config = z.infer<typeof configSchema>
@@ -65,22 +70,33 @@ const fetchHead = (sendRequester: HTTPSendRequester, config: Config): VerifiedHe
 	return { ...head, rulesVersion: replay.rulesVersion, action: replay.action, edge: replay.edge }
 }
 
-function evmClientFor(config: Config) {
-	const network = getNetwork({ chainFamily: 'evm', chainSelectorName: config.chainSelectorName, isTestnet: true })
-	if (!network) throw new Error(`network not found for chain selector name: ${config.chainSelectorName}`)
+function evmClientFor(chainSelectorName: string, isTestnet: boolean) {
+	const network = getNetwork({ chainFamily: 'evm', chainSelectorName, isTestnet })
+	if (!network) throw new Error(`network not found for chain selector name: ${chainSelectorName}`)
 	return new cre.capabilities.EVMClient(network.chainSelector.selector)
 }
 
-/** Reads the Data Feed price and writes (ledger head, price) to LedgerAnchor through a CRE report. */
-export function anchorLedger(runtime: Runtime<Config>, head: LedgerHead | VerifiedHead): string {
-	const config = runtime.config
-	const evmClient = evmClientFor(config)
-
-	const feed = new AggregatorV3(evmClient, config.priceFeedAddress as Address)
+function readFeed(runtime: Runtime<Config>, evmClient: InstanceType<typeof cre.capabilities.EVMClient>, address: string) {
+	const feed = new AggregatorV3(evmClient, address as Address)
 	const pair = feed.description(runtime)
 	const decimals = feed.decimals(runtime)
 	const [, answer, , updatedAt] = feed.latestRoundData(runtime)
+	return { pair, answer, decimals, updatedAt }
+}
+
+/**
+ * Reads the Data Feed on Sepolia and the same pair on Ethereum mainnet, refuses if the two chains disagree beyond
+ * the limit, and writes (ledger head, Sepolia price) to LedgerAnchor through a CRE report.
+ */
+export function anchorLedger(runtime: Runtime<Config>, head: LedgerHead | VerifiedHead): string {
+	const config = runtime.config
+	const evmClient = evmClientFor(config.chainSelectorName, true)
+
+	const { pair, answer, decimals, updatedAt } = readFeed(runtime, evmClient, config.priceFeedAddress)
 	runtime.log(`Data Feed ${pair} ${config.priceFeedAddress}: ${formatPrice(answer, decimals)} (updatedAt ${updatedAt})`)
+	const main = readFeed(runtime, evmClientFor(config.mainnetChainSelectorName, false), config.mainnetPriceFeedAddress)
+	const cross = crossCheck({ answer, decimals, updatedAt }, { answer: main.answer, decimals: main.decimals, updatedAt: main.updatedAt }, config.maxFeedDeviationBps)
+	runtime.log(`Cross-chain check: ${pair} on Sepolia ${cross.sepolia}, ${main.pair} on ${config.mainnetChainSelectorName} ${cross.mainnet}, gap ${cross.deviationBps} bps (limit ${config.maxFeedDeviationBps})`)
 
 	const report = encodeAnchorReport(head, { answer, decimals, updatedAt })
 	const anchor = new LedgerAnchor(evmClient, config.anchorAddress as Address)
@@ -91,7 +107,7 @@ export function anchorLedger(runtime: Runtime<Config>, head: LedgerHead | Verifi
 	const txHash = response.txHash ? bytesToHex(response.txHash) : '0x'
 	runtime.log(`Anchored seq ${head.seq} head ${head.hash} at tx ${txHash}`)
 	const replayed = 'action' in head ? { rules: head.rulesVersion, action: head.action, edge: head.edge } : undefined
-	return JSON.stringify({ seq: head.seq, head: head.hash, symbol: head.symbol, replayed, feed: pair, price: formatPrice(answer, decimals), txHash })
+	return JSON.stringify({ seq: head.seq, head: head.hash, symbol: head.symbol, replayed, feed: pair, price: formatPrice(answer, decimals), crossChain: cross, txHash })
 }
 
 export const onCronTrigger = (runtime: Runtime<Config>, payload: CronPayload): string => {

@@ -24,7 +24,27 @@ export interface Replay {
 	recordedAction: string
 	recordedEdge: number
 	featuresMatch: boolean
+	/** bull and bear scores, and for a position its entry, stop, target and size, equal the record */
+	numbersMatch: boolean
 	matches: boolean
+}
+
+const CAPITAL = 10_000.0
+const STOP_ATR = 1.5
+const TAKE_ATR = 3.0
+
+/** agents_v2.judge's sizing: entry at the last close, ATR stop and target, size from the recorded risk limit. */
+function sizing(f: Obj, action: string, riskPct: number) {
+	if (action !== 'LONG' && action !== 'SHORT') return null
+	const entry = f.last_close
+	const stopDistance = f.atr_14 * STOP_ATR
+	const direction = action === 'LONG' ? 1 : -1
+	return {
+		entry,
+		stop: pyRound(entry - direction * stopDistance, 6),
+		take_profit: pyRound(entry + direction * f.atr_14 * TAKE_ATR, 6),
+		size: pyRound((CAPITAL * riskPct) / 100 / stopDistance, 8),
+	}
 }
 
 // ---------- the same canonical JSON and SHA-256 as verdict_desk/canonical.py and web/canonical.js ----------
@@ -376,7 +396,14 @@ export function replayDossier(dossier: Obj): Replay {
 	const f = computeFeatures(evidence)
 	const featuresMatch = canonical(f as Json) === canonical(dossier.features as Json)
 	const out = decide(f, rules, evidence.narrative, evidence.symbol, dossier.llm)
-	const matches = featuresMatch && out.action === recorded.action && out.edge === recorded.edge
+	const bullScore = sum(out.bull.map((a) => a.weight))
+	const bearScore = sum(out.bear.map((a) => a.weight))
+	let numbersMatch = bullScore === recorded.bull_score && bearScore === recorded.bear_score
+	const pos = sizing(f, out.action, recorded.risk_pct ?? 1.0)
+	if (pos && out.action === recorded.action) {
+		numbersMatch &&= pos.entry === recorded.entry && pos.stop === recorded.stop && pos.take_profit === recorded.take_profit && pos.size === recorded.size
+	}
+	const matches = featuresMatch && numbersMatch && out.action === recorded.action && out.edge === recorded.edge
 	return {
 		seq: dossier.seq,
 		hash: dossier.hash,
@@ -386,6 +413,7 @@ export function replayDossier(dossier: Obj): Replay {
 		recordedAction: recorded.action,
 		recordedEdge: recorded.edge,
 		featuresMatch,
+		numbersMatch,
 		matches,
 	}
 }
@@ -408,7 +436,8 @@ export function verifyHeadDossier(text: string, head: { seq: number; hash: strin
 	if (!replay.matches) {
 		throw new Error(
 			`head dossier #${head.seq} does not replay: recomputed ${replay.action} edge ${replay.edge}, recorded ${replay.recordedAction} edge ${replay.recordedEdge}` +
-				(replay.featuresMatch ? '' : ' (features differ)'),
+				(replay.featuresMatch ? '' : ' (features differ)') +
+				(replay.numbersMatch ? '' : ' (scores or position numbers differ)'),
 		)
 	}
 	return replay

@@ -1,5 +1,5 @@
 import { describe, expect } from 'bun:test'
-import { TxStatus } from '@chainlink/cre-sdk'
+import { getNetwork, TxStatus } from '@chainlink/cre-sdk'
 import { EvmMock, HttpActionsMock, newTestRuntime, REPORT_METADATA_HEADER_LENGTH, test } from '@chainlink/cre-sdk/test'
 import { bytesToHex, type Address } from 'viem'
 import { newAggregatorV3Mock } from '../contracts/evm/ts/generated/AggregatorV3_mock'
@@ -12,6 +12,8 @@ const enc = (s: string) => new TextEncoder().encode(s)
 
 const SEPOLIA_SELECTOR = 16015286601757825753n // ethereum-testnet-sepolia
 const FEED = '0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43' as Address
+const MAINNET_FEED = '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c' as Address
+const MAINNET_SELECTOR = getNetwork({ chainFamily: 'evm', chainSelectorName: 'ethereum-mainnet', isTestnet: false })!.chainSelector.selector
 const ANCHOR = '0x00000000000000000000000000000000000a11c0' as Address
 const HASH = 'ab'.repeat(32)
 const HEAD = { seq: 12, hash: HASH, symbol: 'BTCUSDT' }
@@ -26,6 +28,17 @@ const config: Config = {
 	priceFeedAddress: FEED,
 	anchorAddress: ANCHOR,
 	gasLimit: '500000',
+	mainnetChainSelectorName: 'ethereum-mainnet',
+	mainnetPriceFeedAddress: MAINNET_FEED,
+	maxFeedDeviationBps: 500,
+}
+
+/** The same pair on Ethereum mainnet, read as a second chain next to Sepolia. */
+function mainnetFeed(answer = 6_710_000_000_000n) {
+	const feed = newAggregatorV3Mock(MAINNET_FEED, EvmMock.testInstance(MAINNET_SELECTOR))
+	feed.decimals = () => 8
+	feed.description = () => 'BTC / USD'
+	feed.latestRoundData = () => [1n, answer, 1_759_999_000n, 1_760_000_100n, 1n]
 }
 
 function mocks(txStatus: TxStatus = TxStatus.SUCCESS) {
@@ -34,6 +47,7 @@ function mocks(txStatus: TxStatus = TxStatus.SUCCESS) {
 	feed.decimals = () => 8
 	feed.description = () => 'BTC / USD'
 	feed.latestRoundData = () => [1n, 6_700_012_345_678n, 1_759_999_000n, 1_760_000_000n, 1n]
+	mainnetFeed()
 	const anchor = newLedgerAnchorMock(ANCHOR, evm)
 	const seen: Array<{ receiver: string; payload: Uint8Array; gasLimit: string }> = []
 	anchor.writeReport = (input) => {
@@ -53,7 +67,8 @@ describe('anchorLedger', () => {
 		const runtime = newTestRuntime(null, undefined, config)
 		const summary = JSON.parse(anchorLedger(runtime, HEAD))
 
-		expect(summary).toMatchObject({ seq: 12, head: HASH, symbol: 'BTCUSDT', feed: 'BTC / USD', price: '67000.12345678' })
+		expect(summary).toMatchObject({ seq: 12, head: HASH, symbol: 'BTCUSDT', feed: 'BTC / USD', price: '67000.12345678',
+			crossChain: { sepolia: '67000.12345678', mainnet: '67100', deviationBps: 14 } })
 		expect(seen).toHaveLength(1)
 		expect(seen[0].receiver.toLowerCase()).toBe(ANCHOR.toLowerCase())
 		expect(seen[0].gasLimit).toBe('500000')
@@ -64,6 +79,13 @@ describe('anchorLedger', () => {
 			decimals: 8,
 			priceUpdatedAt: 1_760_000_000n,
 		})
+	})
+
+	test('writes nothing when Sepolia and mainnet disagree by more than the limit', () => {
+		const seen = mocks()
+		mainnetFeed(9_000_000_000_000n)
+		expect(() => anchorLedger(newTestRuntime(null, undefined, config), HEAD)).toThrow('disagree by')
+		expect(seen).toHaveLength(0)
 	})
 
 	test('fails loudly when the forwarder reports a failed transaction', () => {
@@ -77,6 +99,7 @@ describe('anchorLedger', () => {
 		feed.decimals = () => 8
 		feed.description = () => 'BTC / USD'
 		feed.latestRoundData = () => [1n, 0n, 0n, 0n, 1n]
+		mainnetFeed()
 		newLedgerAnchorMock(ANCHOR, evm).writeReport = () => ({ txStatus: TxStatus.SUCCESS }) as never
 		expect(() => anchorLedger(newTestRuntime(null, undefined, config), HEAD)).toThrow('price feed answer must be positive')
 	})

@@ -4,8 +4,10 @@ A Chainlink Runtime Environment (CRE) workflow that makes the decision ledger ta
 
 1. fetches the published ledger head (`seq`, SHA-256 `hash`, `symbol`) over HTTP from **two independent publications** (the raw repository file and the GitHub Pages site); each node requires both to be identical, and the nodes must then agree with each other (identical consensus). If either source is down or they differ, nothing is anchored;
 2. fetches the **whole dossier behind that head** (`ledger/head-dossier.json`) from the same two publications, recomputes its SHA-256 over the canonical JSON and requires it to equal the head, then **re-derives the verdict from the frozen evidence** inside the workflow ([`anchor/verdict.ts`](anchor/verdict.ts): the features, the argument rules of v2 to v6, the multi-KOL convergence and the v6 LLM judge check). If the recomputed action or edge differs from the recorded one, nothing is anchored;
-3. reads a Chainlink **Data Feed** price (BTC/USD on Sepolia) as independent cross-check evidence;
+3. reads a Chainlink **Data Feed** price (BTC/USD) on **two chains**, Sepolia and Ethereum mainnet, and refuses if they disagree by more than 500 basis points (the gap is logged and returned either way);
 4. writes the head and the price to the `LedgerAnchor` contract on Sepolia through a CRE report.
+
+**Measured: attacks on that check.** `cd anchor && bun run battery.ts 3000` edits a copy of the head dossier 3,000 ways (candles, a dropped candle, funding, news, features, the verdict, the scores, the position, the v6 judge's vote) and asks the check twice. Under the head both publications agree on, every edit was refused (3,000 of 3,000). With the hash rewritten and republished as the head, every edit that changes the decision was refused (2,760 of 2,760, none got through); the other 240 changed nothing the decision is computed from (for example a candle's open price), so no replay can see them, and only the hash chain and the external witnesses can. Result: [`evidence/cre-battery.json`](evidence/cre-battery.json) (seed: the head hash, so anyone re-running gets the same attacks).
 
 So an anchor on Sepolia now means two things: this exact record existed at that block, and an independent re-computation in the CRE runtime reached the same decision from the same evidence. `anchor/verdict.test.ts` runs the TypeScript replay over every v2+ dossier of the published ledger and fails on the first one whose features, action or edge differ from the Python's.
 
@@ -14,7 +16,7 @@ So an anchor on Sepolia now means two things: this exact record existed at that 
 ```
 ledger/head.json (raw file + Pages copy, must be identical) --HTTP, identical consensus--> CRE workflow --report--> Forwarder --> LedgerAnchor (Sepolia)
 ledger/head-dossier.json (both copies) --hash = head? verdict replays?--------^
-Chainlink Data Feed BTC/USD ------EVM read------------^
+Chainlink Data Feed BTC/USD, Sepolia + Ethereum mainnet --EVM reads, gap <= 500 bps--^
 ```
 
 ## What has been verified, and what has not

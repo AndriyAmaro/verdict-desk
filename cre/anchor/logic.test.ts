@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { agreeOnHead, decodeAnchorReport, encodeAnchorReport, formatPrice, parseHead } from './logic'
+import { agreeOnHead, crossCheck, decodeAnchorReport, encodeAnchorReport, formatPrice, parseHead } from './logic'
 
 const HASH = 'ab'.repeat(32)
 
@@ -55,5 +55,25 @@ describe('agreeOnHead', () => {
 		expect(() => agreeOnHead(head, { ...head, seq: 13 })).toThrow('seq 12 vs 13')
 		expect(() => agreeOnHead(head, { ...head, hash: 'cd'.repeat(32) })).toThrow('hash')
 		expect(() => agreeOnHead(head, { ...head, symbol: 'ETHUSDT' })).toThrow('symbol')
+	})
+})
+
+describe('the price read on two chains', () => {
+	const sepolia = { answer: 8_006_991_363_197n, decimals: 8, updatedAt: 1n }
+	const mainnet = { answer: 8_041_413_000_000n, decimals: 8, updatedAt: 2n }
+
+	test('gives the gap in basis points, exactly, whatever the decimals', () => {
+		expect(crossCheck(sepolia, mainnet, 500)).toEqual({ sepolia: '80069.91363197', mainnet: '80414.13', deviationBps: 42 })
+		const mainnet18 = { answer: 80_414_130_000_000_000_000_000n, decimals: 18, updatedAt: 2n }
+		expect(crossCheck(sepolia, mainnet18, 500).deviationBps).toBe(42)
+	})
+
+	test('refuses when the two chains disagree by more than the limit', () => {
+		const far = { answer: 9_000_000_000_000n, decimals: 8, updatedAt: 2n }
+		expect(() => crossCheck(sepolia, far, 500)).toThrow('disagree by')
+	})
+
+	test('refuses a non-positive answer on either chain', () => {
+		expect(() => crossCheck(sepolia, { ...mainnet, answer: 0n }, 500)).toThrow('must be positive')
 	})
 })

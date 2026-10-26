@@ -74,3 +74,25 @@ export function formatPrice(answer: bigint, decimals: number): string {
 	const frac = (answer % base).toString().padStart(decimals, '0').replace(/0+$/, '')
 	return frac ? `${whole}.${frac}` : whole.toString()
 }
+
+export interface CrossCheck {
+	sepolia: string
+	mainnet: string
+	deviationBps: number
+}
+
+/**
+ * The same Data Feed pair read on two chains (Sepolia, where the anchor is written, and Ethereum mainnet): the gap
+ * in basis points of the mainnet price, in exact integer arithmetic. Above `maxBps` the chains disagree and nothing
+ * is anchored; the gap is reported either way.
+ */
+export function crossCheck(sepolia: PriceReading, mainnet: PriceReading, maxBps: number): CrossCheck {
+	if (sepolia.answer <= 0n || mainnet.answer <= 0n) throw new Error('price feed answer must be positive on both chains')
+	const d = Math.max(sepolia.decimals, mainnet.decimals)
+	const a = sepolia.answer * 10n ** BigInt(d - sepolia.decimals)
+	const b = mainnet.answer * 10n ** BigInt(d - mainnet.decimals)
+	const gap = a > b ? a - b : b - a
+	const deviationBps = Number((gap * 10_000n) / b)
+	if (deviationBps > maxBps) throw new Error(`the Sepolia and mainnet Data Feeds disagree by ${deviationBps} bps (limit ${maxBps})`)
+	return { sepolia: formatPrice(sepolia.answer, sepolia.decimals), mainnet: formatPrice(mainnet.answer, mainnet.decimals), deviationBps }
+}

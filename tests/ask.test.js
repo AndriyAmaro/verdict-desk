@@ -211,11 +211,13 @@ test("which model wrote this: the route the gateway took, or what an older recor
   routed.llm = routed.llm || {};
   routed.llm.bull = { accepted: [], rejected: [], served_by: "agnes-3.0-flash",
     route: [{ model: "gpt-oss-120b", status: 429, ms: 812 }, { model: "agnes-3.0-flash", status: 200, ms: 9400 }],
-    routing_policy: { sha256: "ab".repeat(32), as_of_seq: 383 } };
+    // a real policy fingerprint: digit runs inside the hash must not trip the number check
+    routing_policy: { sha256: "90eeb7083371980696a476741bb6d6df64a2b8203dfa99262610c3144c1c8783", as_of_seq: 383 } };
   const a = ask.answer(routed, "model");
   assert.match(textOf(a), /gpt-oss-120b.*429.*agnes-3\.0-flash/);
   assert.ok(ask.check(a).ok, JSON.stringify(ask.check(a)));
   assert.ok(a.cites.some((c) => c.ref === "llm.bull.routing_policy"));
+  for (const d of LEDGER.filter((x) => x.llm && x.llm.bull && x.llm.bull.route)) assert.ok(ask.check(ask.answer(d, "model")).ok, `#${d.seq}`);
   const old = LEDGER.find((d) => d.llm && d.llm.bull && d.llm.bull.served_by && !d.llm.bull.route);
   assert.match(textOf(ask.answer(old, "model")), /before the gateway logged its route/);
   assert.match(textOf(ask.answer(OLD, "model")), /no AI analyst layer/);

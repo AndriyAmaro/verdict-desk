@@ -524,7 +524,7 @@
       b.say(`The ${names[part]}: ${steps}${block.served_by ? `; the reply named ${block.served_by}` : ""}.`, refs);
     }
     if (policy) {
-      b.say(`The gateway tried the models in the order of the routing policy computed from the ledger up to record ${policy.as_of_seq} (sha256 ${policy.sha256.slice(0, 12)}...), ranked by how many of each model's claims passed the citation check; it moves on only when a model is unavailable or gives an empty answer. The judge page shows that ranking.`,
+      b.say(`The gateway tried the models in the order of the routing policy computed from the ledger up to record ${policy.as_of_seq} (sha256 ${policy.sha256}), ranked by how many of each model's claims passed the citation check; it moves on only when a model is unavailable or gives an empty answer. The judge page shows that ranking.`,
         [b.cite("routing_policy", "routing policy", `sha256 ${policy.sha256} ${policy.as_of_seq} 12`)]);
     }
     b.say("Whichever model writes the arguments, the decision rule is the same: every claim is citation-checked and the AI judge can never open a position alone.");

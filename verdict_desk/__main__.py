@@ -136,6 +136,8 @@ def _decide_flow(opts, rules_version: str) -> int:
         print(f"narrative ({block['method']}): {len(voices)} headlines from {len({v['name'] for v in voices})} voices, {len(block['convergence'])} convergences"
               + (f", {len(gaps)} voices without a message ({', '.join(sorted(gaps))})" if gaps else ""))
     rules = _rules_from_opts(opts, rules_version)
+    from . import practice
+    execute = practice.chain_executor()  # practice trades on Sepolia when the key is present; otherwise simulated as before
     recorded = 0
     for symbol in opts.symbols:
         try:
@@ -146,7 +148,7 @@ def _decide_flow(opts, rules_version: str) -> int:
         if block is not None:
             packet["narrative"] = block
         recorded += 1
-        print_record(dossier.append(packet, opts.ledger, rules_version=rules_version, rules=rules))
+        print_record(dossier.append(packet, opts.ledger, rules_version=rules_version, rules=rules, execute=execute))
     if recorded and opts.ledger == DEFAULT_LEDGER:
         publish_head(opts.ledger)
     return 0 if recorded else 1

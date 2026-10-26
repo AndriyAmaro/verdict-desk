@@ -57,6 +57,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # Practice trades on Sepolia (verdict_desk/practice.py, cre/contracts/scripts/practice.mjs): node and viem send
+      # them. Without the SEPOLIA_PRIVATE_KEY secret the run records simulated positions exactly as before.
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install the practice-trade sender
+        working-directory: cre/contracts
+        run: bun install --frozen-lockfile
       # rules v5: v3's named declined states plus the multi-voice convergence as a deterministic argument,
       # each voice weighted by the skill the ledger measured for it (verdict_desk/trust.py), frozen in the
       # dossier. Dossiers already recorded under v1 to v4 keep replaying under their own version.
@@ -76,6 +85,7 @@ jobs:
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
           LLM_KEYLESS: ${{ vars.LLM_KEYLESS }}
           MISTRAL_MIN_INTERVAL: ${{ vars.LLM_MIN_INTERVAL }}
+          SEPOLIA_PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
         run: python -m verdict_desk decide-v6 BTCUSDT ETHUSDT SOLUSDT --config config/voices.json
       - name: Verify the chain and write the head
         run: |
@@ -132,6 +142,9 @@ jobs:
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
           LLM_KEYLESS: ${{ vars.LLM_KEYLESS }}
           MISTRAL_MIN_INTERVAL: ${{ vars.LLM_MIN_INTERVAL }}
+          # A re-record after a push race sends its own practice trades; the receipts of the dropped dossiers stay
+          # on Sepolia with a digest that matches no published dossier (see cre/PRACTICE.md).
+          SEPOLIA_PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
         run: |
           set -uo pipefail
           git config user.name "verdict-desk-bot"

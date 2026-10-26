@@ -285,19 +285,23 @@ def extract(voices: list[dict], ask) -> dict:
     def one(chunk: list[str]) -> tuple[list[dict], str | None]:
         user = "\n".join(f"{vid}: {labeled[vid]['title']}" for vid in chunk)
         text = ask(SYSTEM, user)
-        return parse_extractions(text), llm_mod.served_by()  # the worker thread's own last reply
+        route = llm_mod.served_route() if hasattr(llm_mod, "served_route") else None
+        return parse_extractions(text), llm_mod.served_by(), route  # the worker thread's own last reply
 
     items: list[dict] = []
     errors: list[str] = []
     served: set[str] = set()
+    routes: list[dict] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
         futures = [pool.submit(one, chunk) for chunk in chunks]
         for n, future in enumerate(futures, 1):  # na ordem dos lotes, para o resultado ser estavel
             try:
-                got, model = future.result()
+                got, model, route = future.result()
                 items += got
                 if model:
                     served.add(model)
+                if route:
+                    routes.append({"batch": n, **route})
             except (OSError, ValueError, KeyError) as err:
                 errors.append(f"batch {n} of {len(chunks)}: {err}")
     if chunks and len(errors) == len(chunks):
@@ -305,6 +309,7 @@ def extract(voices: list[dict], ask) -> dict:
     result = validate_extractions(items, labeled)
     result["chunk_errors"] = errors
     result["served_by"] = sorted(served)
+    result["routes"] = routes
     return result
 
 
@@ -386,6 +391,8 @@ def build(voices: list[dict], ask=None, model: str = "") -> dict:
     block["rejected_candidates"] = rejected_candidates(block["extractions"], block["convergence"])
     if result.get("served_by"):
         block["served_by"] = result["served_by"]  # the models a router really used for the batches
+    if result.get("routes"):
+        block["routes"] = result["routes"]  # per batch: the models the gateway tried and the policy it followed
     if result["chunk_errors"]:
         block["partial"] = True
         block["chunk_errors"] = result["chunk_errors"]

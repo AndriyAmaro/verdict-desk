@@ -64,6 +64,28 @@ def served_by() -> str | None:
     return model
 
 
+def served_route() -> dict | None:
+    """The route the LLM gateway reported for the last call on this thread, read once: every model it tried (HTTP
+    status or "empty", milliseconds) and the routing policy it followed (sha256 of config/model_routing.json and its
+    as_of_seq). None when the reply did not come through the gateway (tools/llm-gateway/gate.py)."""
+    route = getattr(_served, "route", None)
+    _served.route = None
+    return route
+
+
+def _remember_route(headers) -> None:
+    route = None
+    try:
+        attempts = json.loads(headers.get("X-Verdict-Route") or "null") if headers is not None else None
+        sha, _, as_of = (headers.get("X-Verdict-Policy") or "").partition(" as_of=")
+        if (isinstance(attempts, list) and attempts and all(isinstance(a, dict) and "model" in a for a in attempts)
+                and len(sha) == 64 and as_of.isdigit()):
+            route = {"attempts": attempts, "policy": {"sha256": sha, "as_of_seq": int(as_of)}}
+    except (ValueError, AttributeError, TypeError):
+        route = None
+    _served.route = route
+
+
 def _remember_model(raw: bytes) -> None:
     try:
         model = json.loads(raw.decode("utf-8")).get("model")
@@ -225,18 +247,21 @@ def chat(system: str, user: str, timeout: int = 90, max_tokens: int | None = Non
         headers = {**({"Authorization": f"Bearer {key}"} if key else {}), "Content-Type": "application/json"}
     body = json.dumps(payload).encode("utf-8")
     _served.model = None
+    _served.route = None
     for attempt in range(MAX_RETRIES + 1):
         _wait_turn()
         request = urllib.request.Request(url, data=body, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 raw = response.read()
+                _remember_route(getattr(response, "headers", None))
             _remember_model(raw)
             if native:
                 return _anthropic_text(raw)
             choice = _first_choice(raw)
             break
         except urllib.error.HTTPError as err:
+            _remember_route(err.headers)  # a failed call still shows which models the gateway tried
             detail = _read_detail(err)
             delay = _retry_delay(err, attempt) if err.code in RETRY_STATUS and attempt < MAX_RETRIES else None
             if delay is None and keyless and attempt < MAX_RETRIES:

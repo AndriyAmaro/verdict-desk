@@ -101,7 +101,15 @@ def compute(ledger: list[dict], seq: int, root: Path, tests: int | None, anchor_
                 "stop": sum(1 for p in book["positions"] if p["status"] == "STOP"),
                 "realized": book["realized_pnl"], "fees": book["fees"], "net": book["realized_net"], "fee_pct": book["fee_pct_per_side"],
                 "drawdown": book["max_drawdown_pct"], "start": book["start_capital"]}
-    return {"seq": prefix[-1]["seq"], "hash": prefix[-1]["hash"], "dossiers": len(prefix),
+    executions = [d["execution"] for d in prefix if d.get("execution")]
+    positions = sum(1 for d in prefix if (d.get("verdict") or {}).get("action") in ("LONG", "SHORT"))
+    status = [e.get("status") for e in executions]
+    sepolia = {"executed": status.count("executed"), "recorded": status.count("recorded"),
+               "failed": len(status) - status.count("executed") - status.count("recorded"),
+               "closed": sum(1 for d in prefix for c in d.get("executions_closed") or [] if c.get("status") in ("executed", "recorded")),
+               "first_seq": next((d["seq"] for d in prefix if d.get("execution")), None)}
+    sepolia["simulated_only"] = positions - sepolia["executed"] - sepolia["recorded"]
+    return {"seq": prefix[-1]["seq"], "hash": prefix[-1]["hash"], "dossiers": len(prefix), "sepolia": sepolia,
             "claims": {"accepted": era["accepted"], "rejected": era["rejected"], "reasons": era["rejection_reasons"], "failed_calls": failed_calls},
             "replay": {"matched": matched, "total": len(prefix)}, "practice": practice, "tests": tests, "anchors": anchors}
 
@@ -122,6 +130,12 @@ def render(data: dict) -> str:
         f"- {p['closed']} practice positions closed by their own rule ({p['take']} at the target, {p['stop']} at the stop) and {p['open']} still open: simulated {result} on ${p['start']:,.0f} before fees and {net} after a {p['fee_pct']}% taker fee per side (slippage excluded), worst drawdown {p['drawdown']}%. "
         "Each decision opens its own position, so positions overlap. Proves the practice trades are recorded and settled by rule: each is marked against candles frozen in later dossiers, the stop counted first when one candle hits both.",
     ]
+    s = data["sepolia"]
+    if s["first_seq"] is not None:
+        lines.append(f"- From dossier {s['first_seq']}, new practice positions go to Sepolia testnet: {s['executed']} executed as a swap on Uniswap v3 (ETHUSDT), "
+                     f"{s['recorded']} recorded with a receipt but not executed (BTC and SOL have no testnet market), {s['failed']} failed sends, {s['closed']} closed on-chain by their stop or target; "
+                     f"{s['simulated_only']} positions, mostly from before that, stay simulated. Proves the practice trades leave the operator's hands: "
+                     "each transaction carries a digest of its decision, and the dossier records the transaction before it is sealed.")
     if data["tests"] is not None:
         lines.append(f"- {data['tests']} tests pin the ledger, the pages and the docs to each other. Proves a controlled process: a figure that stops matching the chain fails the build.")
     lines += ["", "Three witnesses outside the operator (each one proves custody and authentication of the head, and a time we do not control; none is an eIDAS qualified time stamp):"]

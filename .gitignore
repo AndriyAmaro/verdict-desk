@@ -13,3 +13,6 @@ cre/anchor/.cre_build_tmp.js
 **/.env.*
 *.key
 .sepolia.key
+
+# Local editor/agent state, never part of the project
+.claude/

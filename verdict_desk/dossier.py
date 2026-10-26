@@ -122,7 +122,8 @@ def _rules_for(m: dict, dossier_or_rules=None, rules_version: str = "v1"):
     return agent.with_risk_pct(base, pct)
 
 
-def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True, rules_version: str = "v1", rules=None) -> dict:
+def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True, rules_version: str = "v1", rules=None,
+          execute=None, closed: list | None = None) -> dict:
     m = _mods(rules_version)
     feats = m["features"].compute(packet)
     narrative = packet.get("narrative")
@@ -141,13 +142,22 @@ def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True
     }
     if layer is not None:
         body["llm"] = layer
+    # Practice trades on Sepolia (practice.py): the transaction is sent before sealing, so its hash is inside the dossier.
+    from . import practice
+    execution = practice.execute_open(seq, packet.get("symbol"), debate["verdict"], packet, execute)
+    if execution is not None:
+        body["execution"] = execution
+    if closed:
+        body["executions_closed"] = closed
     return {**body, "hash": digest(body)}
 
 
-def append(packet: dict, path: Path, ask=None, rules_version: str = "v1", rules=None) -> dict:
+def append(packet: dict, path: Path, ask=None, rules_version: str = "v1", rules=None, execute=None) -> dict:
     ledger = read_ledger(path)
     prev = ledger[-1]["hash"] if ledger else GENESIS
-    dossier = build(packet, prev, len(ledger) + 1, ask, rules_version=rules_version, rules=rules)
+    from . import practice
+    closed = practice.execute_closes(ledger, packet.get("symbol"), packet, execute)
+    dossier = build(packet, prev, len(ledger) + 1, ask, rules_version=rules_version, rules=rules, execute=execute, closed=closed)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(dossier, ensure_ascii=False) + "\n")

@@ -36,3 +36,21 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun test
       - run: bunx tsc --noEmit
+
+  contracts:
+    # LedgerAnchor and PracticeDesk in a real in-memory EVM (eth-tester + py-evm), compiled with solc-js.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cre/contracts/evm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci --no-audit --no-fund
+      - run: pip install web3 "eth-tester[py-evm]"
+      - run: python -m unittest discover -s test -p 'test_*.py' -v

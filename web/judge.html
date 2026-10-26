@@ -134,16 +134,32 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   </ul>
 </section>
 
-<h2>What is real and what is simulated</h2>
+<h2>What is real, what is testnet, and what is simulated</h2>
 <section class="crit honest">
   <ul>
-    <li><b>Real:</b> the market data, the decisions, the hash chain, the browser verification, the replay, the LLM debate with its validator, and the Sepolia anchor.</li>
-    <li><b>Simulated:</b> the money. No funds move, ever. This is a reasoning and audit trail, not a trading edge — the published backtests of these rules do not profit after fees, and the repository says so.</li>
-    <li><b>Why simulated is the stronger answer, not a cop-out:</b> the bounty asks for the practice trades an agent <i>would</i> make. A simulated decision is the legally-defensible reading — with no funds moved, nobody is ever liable for an autonomous agent's mistake, and a build that swaps real tokens (even on a testnet) has to answer for every trade it opens. The same third-party time custody is provided here without moving funds: the head is anchored on Sepolia through the CRE workflow and timestamped in Bitcoin, hourly, with no key.</li>
-    <li><b>And the verdict itself is deterministic, not an LLM's call:</b> the action (LONG/SHORT/FLAT, or a named refusal) is computed from the arguments' weights by code, so it reproduces exactly on replay. The LLM only writes the arguments — and every one is citation-validated. A build whose LLM judge proposes the action and whose code only gates the size is one step further from a repeatable trail.</li>
-    <li><b>Known limits:</b> one exchange mirror for candles, one rule set, fills at the last close with fees, and a model that writes prose which is frozen and re-validated rather than regenerated.</li>
+    <li><b>Real:</b> the market data, the decisions, the hash chain, the browser verification, the replay, the LLM debate with its validator, the AI judge's bounded vote, and the Sepolia anchor.</li>
+    <li><b>Executed on Sepolia testnet:</b> new practice trades. Each ETHUSDT position is a swap on Uniswap v3's WETH/USDC pool in the same transaction as its receipt, and its stop or target sends the reverse swap; BTC and SOL, which have no testnet market, get an on-chain receipt marked "not executed". The transaction carries a digest of the decision and the dossier records the transaction before it is sealed (<a href="https://github.com/AndriyAmaro/verdict-desk/blob/main/cre/PRACTICE.md">how it works</a>). Test tokens only: the testnet pool price is not the market price.</li>
+    <li><b>Simulated:</b> the money, and every position recorded before the Sepolia desk was switched on. Positions are marked against the market candles frozen in later dossiers, and the scoreboard shows the result before and after a declared taker fee.</li>
+    <li><b>Who decides:</b> the agent is the whole pipeline: it gathers the evidence, two analysts argue, an AI judge votes on the claims that passed the citation check, code sizes the position inside your risk limit, and the trade is sent. The judge's vote is capped below the entry band on purpose, so no single model output can open a position on its own and every verdict replays exactly.</li>
+    <li><b>Known limits:</b> one exchange mirror for candles, one rule set, slippage not modelled, and model text that is frozen and re-validated rather than regenerated.</li>
   </ul>
 </section>
+
+<h2>The judged series: which model wrote each stretch of the ledger</h2>
+<section class="crit">
+  <p class="mut">Read from the ledger itself, nothing rewritten: consecutive records with the same configured model and the same outcome form one stretch; a failure is named from the error the records carry; "answered by" counts the models that actually replied (recorded from dossier 348).</p>
+  <div id="series" class="mut">Reading the series…</div>
+</section>
+<script>
+fetch('series.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('none'); return r.json(); }).then(function (s) {
+  var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var rows = s.eras.map(function (e) {
+    var served = Object.keys(e.served_by || {}).sort(function (a, b) { return e.served_by[b] - e.served_by[a]; }).map(function (m) { return esc(m) + ' ×' + e.served_by[m]; }).join(', ');
+    return '<tr><td>#' + e.from_seq + '–#' + e.to_seq + '</td><td>' + esc((e.from_time || '').slice(0, 16).replace('T', ' ')) + ' → ' + esc((e.to_time || '').slice(0, 16).replace('T', ' ')) + '</td><td>' + esc(e.model || '—') + '</td><td>' + esc(e.status) + (e.reason ? ': ' + esc(e.reason) : '') + '</td><td>' + (served || '—') + '</td></tr>';
+  }).join('');
+  document.getElementById('series').innerHTML = '<table><thead><tr><th>Records</th><th>From → to (UTC)</th><th>Configured model</th><th>Outcome</th><th>Answered by</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}).catch(function () { document.getElementById('series').textContent = 'The series is written on each hourly run (python3 -m verdict_desk series).'; });
+</script>
 
 <h2>Run it yourself</h2>
 <table>

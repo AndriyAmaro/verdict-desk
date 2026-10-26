@@ -218,6 +218,20 @@ def cmd_witnesses(opts) -> int:
     return 0
 
 
+def cmd_series(opts) -> int:
+    """The judged series: which model wrote each stretch of the ledger, and why it changed, read from the ledger."""
+    from . import series
+    eras = series.eras(dossier.read_ledger(opts.ledger))
+    if opts.out:
+        Path(opts.out).write_text(json.dumps({"eras": eras}, indent=1) + "\n", encoding="utf-8")
+        print(f"wrote {opts.out}")
+    for e in eras:
+        served = ", ".join(f"{m} x{n}" for m, n in sorted(e["served_by"].items(), key=lambda kv: -kv[1]))
+        print(f"#{e['from_seq']}-#{e['to_seq']} ({e['records']}) {e['model'] or '-'}: {e['status']}"
+              + (f", {e['reason']}" if e["reason"] else "") + (f"; answered by {served}" if served else ""))
+    return 0
+
+
 def cmd_trust_check(opts) -> int:
     """Recompute every frozen trust table from the dossiers before it."""
     ledger = dossier.read_ledger(opts.ledger)
@@ -730,6 +744,9 @@ def main() -> int:
     p.add_argument("--stamps", metavar="DIR", help="directory with the timestamped heads (default: <ledger dir>/timestamps)")
     p.add_argument("--out", metavar="FILE", help="also write the full result as JSON")
     p.set_defaults(func=cmd_battery)
+    p = sub.add_parser("series", help="the judged series: which model wrote each stretch of the ledger and why it changed")
+    p.add_argument("--out", metavar="FILE", help="write the eras as JSON (the judge page reads series.json)")
+    p.set_defaults(func=cmd_series)
     p = sub.add_parser("witnesses", help="write the index of timestamped heads and the anchor contract that the witnesses page reads")
     p.add_argument("--stamps", metavar="DIR", help="directory with the timestamped heads (default: <ledger dir>/timestamps)")
     p.add_argument("--deployment", default="cre/deployment.sepolia.json", metavar="FILE", help="the anchor deployment record")

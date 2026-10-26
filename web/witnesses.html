@@ -46,7 +46,8 @@ button[disabled]{opacity:.5;cursor:default}
 <section>
   <h2>3. Ethereum Sepolia, through the Chainlink CRE workflow</h2>
   <div id="eth"><span class="mut">asking a public Sepolia node…</span></div>
-  <p class="mut">The contract only accepts strictly increasing sequence numbers, so an anchored head can never be overwritten. This is a <b>testnet</b> and the anchor is not hourly: the gap to the head is shown above, not hidden.</p>
+  <div id="ethhist"></div>
+  <p class="mut">The contract only accepts strictly increasing sequence numbers, so an anchored head can never be overwritten. This is a <b>testnet</b>. Each anchor runs the CRE workflow with <code>cre workflow simulate --broadcast</code> every hour from the operator's machine (the workflow re-derives the head's verdict and reads the Data Feed on two chains first), so it pauses when that machine is off; the history above, read from the contract's own events, shows the real cadence and every gap.</p>
 </section>
 
 <section>
@@ -183,6 +184,21 @@ button[disabled]{opacity:.5;cursor:default}
       $("eth").innerHTML = `<p>Contract <a href="${esc(a.explorer || "#")}"><code>${esc(a.address)}</code></a> (${esc(a.network)}) says the latest anchored record is <b>#${latest}</b>, written ${utc(anchoredAt)} with hash <code>${esc(onchainHash.slice(0, 16))}…</code>.</p>` +
         `<p class="${same ? "ok" : "bad"}">${same ? `✓ the ledger's dossier #${latest} has exactly that hash` : `✗ the ledger's dossier #${latest} does NOT have that hash`}</p>` +
         `<p class="${gap > 24 ? "warn" : "mut"}">The ledger is ${gap} dossier${gap === 1 ? "" : "s"} past that anchor.</p>`;
+      // Anchor history from the contract's Anchored events, so the cadence is read on-chain, not from our logs.
+      const ANCHORED = "0x43fd32c7e0eebd332a0c60efbf6c8c8a64b80609ef27f6262bf060b938a26f6c";
+      const logs = (await (await fetch(a.rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{ address: a.address, fromBlock: "0x" + (a.deploy_block || 0).toString(16), toBlock: "latest", topics: [ANCHORED] }] }) })).json()).result || [];
+      const recent = logs.slice(-12).reverse();
+      const rows = [];
+      for (const l of recent) {
+        const seq = parseInt(l.topics[1], 16);
+        const at = parseInt(word(await rpc("0xfa210653" + seq.toString(16).padStart(64, "0")), 4), 16);
+        rows.push({ seq, at, tx: l.transactionHash });
+      }
+      const day = Date.now() / 1000 - 86400;
+      const lastDay = rows.filter((r) => r.at >= day).length;
+      $("ethhist").innerHTML = `<p class="mut">${logs.length} anchors on this contract so far; ${lastDay} of the last 12 fall in the past 24 hours.</p>` +
+        `<table><thead><tr><th>Record</th><th>Anchored (UTC)</th><th>Transaction</th></tr></thead><tbody>` +
+        rows.map((r) => `<tr><td>#${r.seq}</td><td>${utc(r.at)}</td><td><a href="https://sepolia.etherscan.io/tx/${esc(r.tx)}"><code>${esc(r.tx.slice(0, 18))}…</code></a></td></tr>`).join("") + `</tbody></table>`;
     } catch (e) { $("eth").innerHTML = `<span class="mut">Could not reach a public Sepolia node from here (${esc(e.message || e)}). The contract is in <code>cre/deployment.sepolia.json</code>.</span>`; }
   }).catch((e) => { $("agree").innerHTML = `<span class="bad">Could not load the ledger or the witness list here: ${esc(e.message || e)}. Open this page from the deployed site.</span>`; });
 

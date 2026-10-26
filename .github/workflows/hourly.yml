@@ -214,6 +214,7 @@ jobs:
           # attacking a copy of the ledger with every mutation we know (seeded by the head hash).
           python -m verdict_desk witnesses --out site/witnesses.json
           python -m verdict_desk series --out site/series.json
+          python -m verdict_desk market --out site/market.json
           python -m verdict_desk battery --trials 1500 --out site/battery.json || echo "battery skipped this hour"
       - uses: actions/upload-pages-artifact@v3
         with:

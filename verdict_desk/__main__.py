@@ -218,6 +218,15 @@ def cmd_witnesses(opts) -> int:
     return 0
 
 
+def cmd_market(opts) -> int:
+    """Every candle the ledger froze, per symbol (Ask the record replays what happened after a decision on it)."""
+    from . import portfolio
+    series = portfolio.market_series(dossier.read_ledger(opts.ledger))
+    Path(opts.out).write_text(json.dumps(series, separators=(",", ":")) + "\n", encoding="utf-8")
+    print(f"wrote {opts.out}: " + ", ".join(f"{s} {len(e['candles'])} candles" for s, e in series.items()))
+    return 0
+
+
 def cmd_series(opts) -> int:
     """The judged series: which model wrote each stretch of the ledger, and why it changed, read from the ledger."""
     from . import series
@@ -744,6 +753,9 @@ def main() -> int:
     p.add_argument("--stamps", metavar="DIR", help="directory with the timestamped heads (default: <ledger dir>/timestamps)")
     p.add_argument("--out", metavar="FILE", help="also write the full result as JSON")
     p.set_defaults(func=cmd_battery)
+    p = sub.add_parser("market", help="every candle the ledger froze, per symbol, as JSON (read by ask.html)")
+    p.add_argument("--out", metavar="FILE", required=True)
+    p.set_defaults(func=cmd_market)
     p = sub.add_parser("series", help="the judged series: which model wrote each stretch of the ledger and why it changed")
     p.add_argument("--out", metavar="FILE", help="write the eras as JSON (the judge page reads series.json)")
     p.set_defaults(func=cmd_series)

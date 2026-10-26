@@ -10,20 +10,26 @@
  * Pure data in, pure data out. No DOM, no network.
  */
 (function (root, factory) {
-  const api = factory();
-  if (typeof module === "object" && module.exports) module.exports = api;
+  const node = typeof module === "object" && module.exports;
+  const api = factory(node ? require("./chart.js") : root.VerdictChart);
+  if (node) module.exports = api;
   else root.VerdictAsk = api;
-})(typeof self !== "undefined" ? self : this, function () {
+})(typeof self !== "undefined" ? self : this, function (chart) {
   const NUMBER = /-?\d+(?:\.\d+)?/g;
 
   const SUGGESTIONS = [
     { intent: "decision", label: "What did you decide?" },
     { intent: "why", label: "Why?" },
+    { intent: "chart", label: "What does the chart show?" },
     { intent: "flip", label: "What would change your mind?" },
     { intent: "risk", label: "How much could it lose?" },
+    { intent: "outcome", label: "What happened next?" },
     { intent: "analysts", label: "What did the AI analysts claim?" },
     { intent: "refused", label: "What did you refuse?" },
     { intent: "judge", label: "What did the AI judge think?" },
+    { intent: "voices", label: "What did the market voices say?" },
+    { intent: "saw", label: "What data did you see?" },
+    { intent: "executed", label: "Was it sent on-chain?" },
     { intent: "proof", label: "Can I trust this record?" },
     { intent: "help", label: "What can I ask?" },
   ];
@@ -35,7 +41,12 @@
     ["refused", /\b(refus|reject|discard|threw|thrown|invalid|recus|rejeit|descart)/i],
     ["judge", /\b(judge|ruling|lean|conviction|juiz|veredito do juiz)/i],
     ["analysts", /\b(analyst|claim|bull case|bear case|llm|ai said|analista|afirma)/i],
+    ["executed", /(execut|on-?chain|sepolia|transaction|\btx\b|swap|testnet|blockchain|transa[cç])/i],
     ["flip", /\b(flip|change (your|its) mind|would change|what if|without|sensitiv|removed|mudaria|mudar de ideia|virar)/i],
+    ["outcome", /\b(happen|next|afterwards|did it work|work out|result|outcome|hit the|profit|pnl|won\b|aconteceu|depois|deu certo|resultado)/i],
+    ["chart", /(chart|graph|candle|\bema\b|moving average|bollinger|band|\brsi\b|indicator|gr[aá]fico|vela)/i],
+    ["voices", /\b(voice|telegram|news|people|influencer|kol|saying|sentiment|narrative|vozes|not[ií]cia)/i],
+    ["saw", /\b(see|saw|source|data|evidence|where does|fresh|stale|gap|fonte|dados|viu)/i],
     ["risk", /\b(risk|stop|target|take profit|size|lose|loss|position|entry|risco|perd|alvo|tamanho|posi[cç])/i],
     ["proof", /\b(trust|proof|prove|verify|hash|fingerprint|tamper|changed|edited|real\b|genuine|confi|prova|verific|adulter)/i],
     ["why", /\b(why|reason|because|argument|por ?qu[eê]|motivo|raz[aã]o)/i],
@@ -82,7 +93,8 @@
       say(text, refs) { parts.push({ kind: "text", text, refs: refs || [] }); },
       quote(text, label, refs) { parts.push({ kind: "quote", text: String(text), label, refs: refs || [] }); },
       done() {
-        return { intent, title: TITLE[intent] || "", seq: d.seq, parts, cites, suggestions: SUGGESTIONS.filter((s) => s.intent !== intent) };
+        const marks = chart.marksFor(parts.flatMap((p) => p.refs || []), d);
+        return { intent, title: TITLE[intent] || "", seq: d.seq, parts, cites, marks, suggestions: SUGGESTIONS.filter((s) => s.intent !== intent) };
       },
     };
   }
@@ -304,10 +316,199 @@
   }
 
   function help(d, b) {
-    b.say("I answer only from this record: what it decided, why, what would have changed it, the risk it took, what the AI analysts claimed, what was refused, what the AI judge thought, and whether you can trust the record. Every number I give points to the field it came from, and this page checks it before showing it.");
+    b.say("I answer only from this record: what it decided, why, what the chart shows, what would have changed it, the risk it took, what happened next, what the AI analysts claimed, what was refused, what the AI judge thought, what the market voices said, what data it saw, whether it was sent to Sepolia testnet, and whether you can trust the record. Every number I give points to the field it came from, and this page checks it before showing it.");
   }
 
-  const ANSWERS = { decision, why, flip, risk, analysts, refused, judge, proof, help };
+  // ---------------------------------------------------------------- phase 2: chart, what happened next, data, voices, Sepolia
+
+  /** Python's round() (web/trust.js and cre/anchor/verdict.ts carry the same port). */
+  function pyRound(x, places) {
+    const long = x.toFixed(places + 20);
+    const dot = long.indexOf(".");
+    if (/^50*$/.test(long.slice(dot + 1 + places))) {
+      const kept = long.slice(0, dot + 1 + places);
+      if (Number(kept.replace(/[^0-9]/g, "").slice(-1)) % 2 === 0) return Number(kept);
+      return Number((Number(kept) + (x < 0 ? -1 : 1) * 10 ** -places).toFixed(places));
+    }
+    return Number(x.toFixed(places));
+  }
+
+  /** portfolio.resolve, line for line: the first later candle touching the stop or the target closes it; the stop wins a tie. */
+  function outcome(d, later) {
+    const v = d.verdict || {};
+    if (!["LONG", "SHORT"].includes(v.action) || !has(v.entry)) return null;
+    const dir = v.action === "LONG" ? 1 : -1;
+    const base = { seq: d.seq, symbol: d.evidence.symbol, action: v.action, entry: v.entry };
+    for (let i = 0; i < later.length; i++) {
+      const c = later[i];
+      const hitStop = dir === 1 ? c.l <= v.stop : c.h >= v.stop;
+      const hitTake = dir === 1 ? c.h >= v.take_profit : c.l <= v.take_profit;
+      if (hitStop || hitTake) {
+        const exit = hitStop ? v.stop : v.take_profit;
+        return { ...base, status: hitStop ? "STOP" : "TAKE", exit, pnl: pyRound((exit - v.entry) * dir * v.size, 4), bars: i + 1, candle: c };
+      }
+    }
+    if (later.length) {
+      const mark = later[later.length - 1].c;
+      return { ...base, status: "OPEN", exit: mark, pnl: pyRound((mark - v.entry) * dir * v.size, 4), bars: later.length, candle: later[later.length - 1] };
+    }
+    return { ...base, status: "OPEN", exit: v.entry, pnl: 0, bars: 0, candle: null };
+  }
+
+  const signed = (x) => (x >= 0 ? `+${x}` : String(x));
+
+  function outcome_(d, b, ctx) {
+    const v = d.verdict || {};
+    const o = outcome(d, ctx.later || []);
+    if (!o) {
+      b.say(`No position was opened (${v.action}), so there is nothing to follow.`);
+      return;
+    }
+    if (!ctx.later) {
+      b.say("The candles recorded after this decision have not been loaded on this page yet, so I cannot say.");
+      return;
+    }
+    if (o.bars === 0) {
+      b.say(`No later candle of ${d.evidence.symbol} has been recorded yet: the position is still open, at its entry.`);
+      return;
+    }
+    const levels = [b.cite("verdict.entry", "entry", v.entry), b.cite("verdict.stop", "stop", v.stop), b.cite("verdict.take_profit", "target", v.take_profit)];
+    const candle = b.cite("outcome.exit", o.status === "OPEN" ? "last later candle" : "candle that closed it",
+      `bars ${o.bars} ${when(new Date(o.candle.t).toISOString())} ${JSON.stringify(o.candle)} exit ${o.exit}`);
+    const result = b.cite("outcome.result", "simulated result, computed", `(${o.exit} - ${v.entry}) x ${v.size} ${v.action} = ${o.pnl}`);
+    const later = b.cite("outcome.later", "candles after the decision", `${ctx.later.length} later candles of ${d.evidence.symbol}, frozen in later records`);
+    if (o.status === "OPEN") {
+      b.say(`In the ${o.bars} candles recorded since, the price touched neither the stop ${v.stop} nor the target ${v.take_profit}. Marked at the last close, ${o.exit}, the open simulated result is ${signed(o.pnl)} before fees.`, [...levels, candle, result, later]);
+    } else {
+      const what = o.status === "TAKE" ? `reached the target ${v.take_profit}` : `hit the stop ${v.stop}`;
+      b.say(`${o.bars} candle${o.bars === 1 ? "" : "s"} later, on ${when(new Date(o.candle.t).toISOString())}, the price ${what}. The simulated position closed at ${o.exit}, a result of ${signed(o.pnl)} before fees.`, [...levels, candle, result, later]);
+    }
+    b.say("The candles after the decision are the ones later records froze, the same the scoreboard uses; when a candle touches both levels, the stop is counted first.");
+  }
+
+  // The constants of verdict_desk/features_v2.py, so every number the chart answer names has a source.
+  const CHART_METHOD = "EMA 12 and EMA 48 over every close; Bollinger 20 candles, 2 standard deviations, %B 0 = lower band, 1 = upper band; range of the previous 24 candles; return over 24 candles; RSI 14; ATR 14";
+
+  function chart_(d, b) {
+    const f = d.features || {};
+    const candles = d.evidence.market.candles;
+    const first = when(new Date(candles[0].t).toISOString());
+    b.say(`The chart shows the ${candles.length} candles of ${d.evidence.symbol} frozen in the record (${d.evidence.market.interval}), the last one opening on ${when(new Date(candles[candles.length - 1].t).toISOString())}.`,
+      [b.cite("evidence.market.candles", "frozen candles", `${candles.length} ${d.evidence.market.interval} ${first} ${when(new Date(candles[candles.length - 1].t).toISOString())}`),
+        b.cite("method", "how the indicators are defined", CHART_METHOD)]);
+    if (has(f.last_close)) {
+      const refs = [b.cite("features.last_close", "last close", f.last_close)];
+      let line = `Last close ${f.last_close}`;
+      if (has(f.range_high_24) && has(f.range_low_24)) {
+        refs.push(b.cite("features.range_high_24", "24-candle high", f.range_high_24), b.cite("features.range_low_24", "24-candle low", f.range_low_24));
+        line += `, inside the range of the previous 24 candles, ${f.range_low_24} to ${f.range_high_24}`;
+      }
+      b.say(line + ".", refs);
+    }
+    if (has(f.ema_fast) && has(f.ema_slow)) {
+      b.say(`The fast average (EMA 12) is at ${f.ema_fast} and the slow one (EMA 48) at ${f.ema_slow}: the short-term trend is ${f.ema_fast > f.ema_slow ? "above" : "below"} the longer one.`,
+        [b.cite("features.ema_fast", "fast average", f.ema_fast), b.cite("features.ema_slow", "slow average", f.ema_slow)]);
+    }
+    if (has(f.bb_upper) && has(f.bb_lower)) {
+      const refs = [b.cite("features.bb_upper", "upper band", f.bb_upper), b.cite("features.bb_lower", "lower band", f.bb_lower)];
+      let line = `The Bollinger bands run from ${f.bb_lower} to ${f.bb_upper}`;
+      if (has(f.bb_pct_b)) { refs.push(b.cite("features.bb_pct_b", "position in the bands", f.bb_pct_b)); line += `; the close sits at ${f.bb_pct_b} of that width (0 is the lower band, 1 the upper)`; }
+      b.say(line + ".", refs);
+    }
+    const extra = [];
+    const refs = [];
+    if (has(f.rsi_14)) { extra.push(`RSI ${f.rsi_14}`); refs.push(b.cite("features.rsi_14", "RSI", f.rsi_14)); }
+    if (has(f.atr_14)) { extra.push(`average true range ${f.atr_14}`); refs.push(b.cite("features.atr_14", "ATR", f.atr_14)); }
+    if (has(f.return_24)) { extra.push(`${f.return_24}% over 24 candles`); refs.push(b.cite("features.return_24", "24-candle return", f.return_24)); }
+    if (extra.length) b.say(`Also recorded: ${extra.join(", ")}.`, refs);
+    b.say("The averages and bands are redrawn from the candles in your browser; their last points equal the values above, which the record computed when it decided.");
+  }
+
+  function saw(d, b) {
+    const ev = d.evidence || {};
+    const m = ev.market || {};
+    b.say(`Prices: ${(m.candles || []).length} candles of ${ev.symbol} (${m.interval}) from ${m.source}.`,
+      [b.cite("evidence.market.source", "price source", `${m.source} ${(m.candles || []).length} ${m.interval}`)]);
+    const fr = ev.freshness;
+    if (fr && has(fr.newest_candle_age_minutes)) {
+      b.say(`The newest candle was ${fr.newest_candle_age_minutes} minutes old, against a limit of ${fr.window_minutes}: ${fr.ok ? "fresh enough to decide" : `too old (${fr.reason})`}.`,
+        [b.cite("evidence.freshness", "freshness check", fr)]);
+    }
+    if (ev.funding) {
+      b.say(`Funding: the perpetual funding rate ${ev.funding.rate} on ${ev.funding.instrument}, from ${ev.funding.source}.`, [b.cite("evidence.funding", "funding", ev.funding)]);
+    }
+    if (ev.news) {
+      const n = ev.news;
+      if (n.error) b.say(`News: the news source answered with an error, recorded as such (${n.error}), so no headline counted.`, [b.cite("evidence.news.error", "news error", n.error)]);
+      else b.say(`News: ${(n.articles || []).length} headlines from ${n.source} for "${n.query}".`, [b.cite("evidence.news", "news", `${(n.articles || []).length} ${n.source} ${n.query}`)]);
+    }
+    const nar = ev.narrative;
+    if (nar && Array.isArray(nar.voices)) {
+      b.say(`Market voices: ${nar.voices.length} recent posts and articles were read (ask about the voices for what they said).`, [b.cite("evidence.narrative.voices", "voices read", `${nar.voices.length}`)]);
+    }
+    const gaps = nar && nar.config && nar.config.gaps;
+    if (gaps && Object.keys(gaps).length) b.say(`Gaps recorded: ${Object.keys(gaps).join(", ")}.`, [b.cite("evidence.narrative.config.gaps", "gaps", gaps)]);
+    b.say(`All of it was collected on ${when(ev.collected_at)} and frozen in the record before the decision.`, [b.cite("evidence.collected_at", "when it looked", String(ev.collected_at))]);
+  }
+
+  function voices(d, b) {
+    const nar = d.evidence && d.evidence.narrative;
+    if (!nar || !Array.isArray(nar.voices)) {
+      b.say("This record has no market voices: it was written before the desk read news and Telegram channels.");
+      return;
+    }
+    b.say(`${nar.voices.length} posts and articles from news sites and Telegram channels were read${nar.method ? ` (read by ${nar.method === "llm" ? "a language model, with its extractions checked" : nar.method})` : ""}.`,
+      [b.cite("evidence.narrative.voices", "voices read", `${nar.voices.length}`)]);
+    const conv = nar.convergence || [];
+    if (!conv.length) {
+      b.say("No token drew the same view from several independent voices, so the voices added no argument.");
+    }
+    const trust = (nar.trust && nar.trust.voices) || {};
+    for (const c of conv.slice(0, 4)) {
+      const names = c.voices || [];
+      const weighed = names.filter((n) => trust[n]).map((n) => `${n} ${trust[n].hits}/${trust[n].n}`);
+      const refs = [b.cite(`convergence:${c.token}:${c.bias}`, `${c.token} ${c.bias}`, `${names.length} voices ${JSON.stringify(c)}`)];
+      let line = `${c.token}: ${names.length} voices ${c.bias} (${names.join(", ")}), conviction up to ${c.max_conviction}`;
+      if (weighed.length) {
+        refs.push(b.cite(`trust:${c.token}:${c.bias}`, "their track record", weighed.join(" ")));
+        line += `; their past calls that came true: ${weighed.join(", ")}`;
+      }
+      b.say(line + ".", refs);
+    }
+    const rejected = (nar.rejected || []).length;
+    if (rejected) b.say(`${rejected} extractions were refused because the post did not support them.`, [b.cite("evidence.narrative.rejected", "extractions refused", `${rejected}`)]);
+    if (nar.llm_error) {
+      b.say("The model that reads the voices failed for this record; its error is recorded:");
+      b.quote(nar.llm_error, "provider error, recorded");
+    }
+  }
+
+  function executed(d, b) {
+    const v = d.verdict || {};
+    const ex = d.execution;
+    if (!ex) {
+      if (!["LONG", "SHORT"].includes(v.action)) b.say(`No position was opened (${v.action}), so nothing was sent to Sepolia testnet.`);
+      else b.say("No Sepolia transaction is recorded for this position: it was decided before the Sepolia practice desk was switched on, so it stays simulated.");
+      return;
+    }
+    const refs = [b.cite("execution.label", "what was done", ex.label), b.cite("execution.tx", "Sepolia transaction", `${ex.tx} block ${ex.block}`)];
+    b.say(`This position went to Sepolia testnet: ${ex.label}. Transaction ${ex.tx}, block ${ex.block}.`, refs);
+    if (ex.status === "executed" && has(ex.amount_in)) {
+      b.say(`The swap sent ${ex.amount_in} ${ex.token_in} and received ${ex.amount_out} ${ex.token_out} on the Uniswap v3 test pool, whose price is not the market price.`,
+        [b.cite("execution.amounts", "swap amounts", `${ex.amount_in} ${ex.token_in} ${ex.amount_out} ${ex.token_out}`)]);
+    }
+    if (ex.decision_digest) {
+      b.say(`The transaction carries a digest of this decision, ${ex.decision_digest}, and the record holds the transaction: it was written into the record before the record was sealed.`,
+        [b.cite("execution.decision_digest", "decision digest", ex.decision_digest)]);
+    }
+    for (const c of d.executions_closed || []) {
+      b.say(`In this record the desk also closed an earlier on-chain position (record ${c.opened_seq}): ${c.label || c.status}, transaction ${c.tx}.`,
+        [b.cite(`closed:${c.opened_seq}`, "on-chain close", `${c.opened_seq} ${c.tx} ${c.label || c.status}`)]);
+    }
+    b.say("Test tokens only: no real money moved.");
+  }
+
+  const ANSWERS = { decision, why, chart: chart_, flip, risk, outcome: outcome_, analysts, refused, judge, voices, saw, executed, proof, help };
 
   function answer(dossier, intent, ctx) {
     if (!intent || !ANSWERS[intent]) {
@@ -322,5 +523,5 @@
     return b.done();
   }
 
-  return { route, answer, check, INTENTS, SUGGESTIONS };
+  return { route, answer, check, outcome, INTENTS, SUGGESTIONS };
 });

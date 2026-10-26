@@ -130,6 +130,12 @@ class AnchorRouteTest(unittest.TestCase):
     def test_it_runs_twice_an_hour_so_one_dropped_schedule_does_not_open_a_gap(self):
         self.assertIn('cron: "7,37 * * * *"', self.FLOW)
 
+    def test_the_run_that_publishes_a_head_also_asks_for_it_to_be_anchored(self):
+        """GitHub dropped the :07 and :37 schedules in the first hour; the deploy dispatches the anchor like the Sigstore witness."""
+        hourly = (ROOT / ".github" / "workflows" / "hourly.yml").read_text(encoding="utf-8")
+        self.assertIn('gh workflow run anchor --repo "$GITHUB_REPOSITORY" --ref main', hourly)
+        self.assertIn("workflow_dispatch", self.FLOW.split("jobs:")[0])
+
     def test_the_direct_route_runs_the_checked_script_and_keeps_evidence_only_for_real_anchors(self):
         step = self.FLOW.split("(direct, same checks, same forwarder)")[1].split("- name:")[0]
         self.assertIn("bun run direct.ts", step)

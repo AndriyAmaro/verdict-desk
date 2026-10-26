@@ -227,3 +227,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run rekor-witness --repo "$GITHUB_REPOSITORY" --ref main || echo "::warning::could not dispatch the witness this hour"
+      # The anchor's own :07/:37 schedule is dropped too (none fired in the first hour after it was set, 26 Oct), so
+      # the run that publishes a head also asks for it to be anchored; an already anchored head is skipped there.
+      - name: Ask for the new head to be anchored on Sepolia
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run anchor --repo "$GITHUB_REPOSITORY" --ref main || echo "::warning::could not dispatch the anchor this hour"

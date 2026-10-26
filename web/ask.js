@@ -483,6 +483,17 @@
     }
   }
 
+  // The test tokens of cre/practice.sepolia.json: an on-chain amount is an integer count of the token's smallest unit.
+  const TOKENS = { "0xfff9976782d46cc05630d1f6ebab18b2324d6b14": ["WETH", 18], "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238": ["USDC", 6] };
+  function units(raw, token) {
+    const known = TOKENS[String(token).toLowerCase()];
+    if (!known) return { text: `${raw} (raw units of ${token})`, source: `${raw} ${token}` };
+    const [sym, dec] = known;
+    const digits = BigInt(raw).toString().padStart(dec + 1, "0");
+    const value = `${digits.slice(0, -dec)}.${digits.slice(-dec)}`.replace(/\.?0+$/, "");
+    return { text: `${value} ${sym}`, source: `${raw} ${token} = ${value} ${sym} (${dec} decimals)` };
+  }
+
   function executed(d, b) {
     const v = d.verdict || {};
     const ex = d.execution;
@@ -494,8 +505,9 @@
     const refs = [b.cite("execution.label", "what was done", ex.label), b.cite("execution.tx", "Sepolia transaction", `${ex.tx} block ${ex.block}`)];
     b.say(`This position went to Sepolia testnet: ${ex.label}. Transaction ${ex.tx}, block ${ex.block}.`, refs);
     if (ex.status === "executed" && has(ex.amount_in)) {
-      b.say(`The swap sent ${ex.amount_in} ${ex.token_in} and received ${ex.amount_out} ${ex.token_out} on the Uniswap v3 test pool, whose price is not the market price.`,
-        [b.cite("execution.amounts", "swap amounts", `${ex.amount_in} ${ex.token_in} ${ex.amount_out} ${ex.token_out}`)]);
+      const sent = units(ex.amount_in, ex.token_in), got = units(ex.amount_out, ex.token_out);
+      b.say(`The swap sent ${sent.text} and received ${got.text} on the Uniswap v3 test pool, whose price is not the market price.`,
+        [b.cite("execution.amounts", "swap amounts, raw on-chain units", `${sent.source}; ${got.source}`)]);
     }
     if (ex.decision_digest) {
       b.say(`The transaction carries a digest of this decision, ${ex.decision_digest}, and the record holds the transaction: it was written into the record before the record was sealed.`,

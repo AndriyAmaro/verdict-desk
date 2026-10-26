@@ -99,7 +99,8 @@ def compute(ledger: list[dict], seq: int, root: Path, tests: int | None, anchor_
     practice = {"closed": book["closed"], "open": book["open"],
                 "take": sum(1 for p in book["positions"] if p["status"] == "TAKE"),
                 "stop": sum(1 for p in book["positions"] if p["status"] == "STOP"),
-                "realized": book["realized_pnl"], "drawdown": book["max_drawdown_pct"], "start": book["start_capital"]}
+                "realized": book["realized_pnl"], "fees": book["fees"], "net": book["realized_net"], "fee_pct": book["fee_pct_per_side"],
+                "drawdown": book["max_drawdown_pct"], "start": book["start_capital"]}
     return {"seq": prefix[-1]["seq"], "hash": prefix[-1]["hash"], "dossiers": len(prefix),
             "claims": {"accepted": era["accepted"], "rejected": era["rejected"], "reasons": era["rejection_reasons"], "failed_calls": failed_calls},
             "replay": {"matched": matched, "total": len(prefix)}, "practice": practice, "tests": tests, "anchors": anchors}
@@ -107,7 +108,8 @@ def compute(ledger: list[dict], seq: int, root: Path, tests: int | None, anchor_
 
 def render(data: dict) -> str:
     c, r, a, p = data["claims"], data["replay"], data["anchors"], data["practice"]
-    result = f"{'+' if p['realized'] >= 0 else '-'}${abs(p['realized']):,.0f}"
+    signed = lambda x: f"{'+' if x >= 0 else '-'}${abs(x):,.0f}"
+    result, net = signed(p["realized"]), signed(p["net"])
     reasons = "; ".join(f"{n} {reason}" for reason, n in sorted(c["reasons"].items(), key=lambda kv: (-kv[1], kv[0]))) or "none"
     lines = [
         f"LIVE SCOREBOARD: every number below is counted from the raw ledger, as of dossier {data['seq']} (head {data['hash'][:16]}).",
@@ -117,7 +119,7 @@ def render(data: dict) -> str:
         f"- {c['accepted']} analyst claims accepted and {c['rejected']} refused by the citation validator ({reasons}); {c['failed_calls']} analyst calls failed (provider outages, recorded in each dossier). "
         "Proves an audit trail: a refused claim is kept with its reason, so the record shows what was rejected and not only what survived.",
         f"- {r['matched']} of {r['total']} dossiers re-derive to the same verdict from their own frozen evidence. Proves repeatability: anyone can run the replay and get the same answer.",
-        f"- {p['closed']} practice positions closed by their own rule ({p['take']} at the target, {p['stop']} at the stop) and {p['open']} still open: simulated {result} on ${p['start']:,.0f} before fees, worst drawdown {p['drawdown']}%. "
+        f"- {p['closed']} practice positions closed by their own rule ({p['take']} at the target, {p['stop']} at the stop) and {p['open']} still open: simulated {result} on ${p['start']:,.0f} before fees and {net} after a {p['fee_pct']}% taker fee per side (slippage excluded), worst drawdown {p['drawdown']}%. "
         "Each decision opens its own position, so positions overlap. Proves the practice trades are recorded and settled by rule: each is marked against candles frozen in later dossiers, the stop counted first when one candle hits both.",
     ]
     if data["tests"] is not None:

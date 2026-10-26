@@ -65,6 +65,17 @@ class NumbersTest(unittest.TestCase):
         later = build(seq=201)["practice"]
         self.assertGreaterEqual(later["closed"], data["closed"])
 
+    def test_the_net_result_is_the_gross_minus_the_declared_fees(self):
+        data = build(seq=200)["practice"]
+        self.assertGreater(data["fees"], 0)
+        self.assertAlmostEqual(data["net"], data["realized"] - data["fees"], places=2)
+
+    def test_the_practice_line_declares_the_fee_model(self):
+        text = scoreboard.render(build(seq=200))
+        line = next(l for l in text.splitlines() if "practice positions" in l)
+        self.assertIn("after a 0.05% taker fee per side", line)
+        self.assertIn("slippage excluded", line)
+
     def test_the_practice_result_is_the_sum_of_the_settled_positions(self):
         data = build(seq=200)["practice"]
         self.assertAlmostEqual(data["realized"], data["take"] * 200.0 - data["stop"] * 100.0, places=2)

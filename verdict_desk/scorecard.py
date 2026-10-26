@@ -126,7 +126,10 @@ def render(result: dict, portfolio_summary: dict | None = None) -> str:
                 f"{html.escape(str(portfolio_summary.get('open')))} open), "
                 f"win rate <b>{html.escape(str(portfolio_summary.get('win_rate_pct')))}%</b>, "
                 f"max drawdown <b>{html.escape(str(portfolio_summary.get('max_drawdown_pct')))}%</b>. "
-                "Positions are marked against later candles with no fees.</p>")
+                f"Realized <b>{html.escape(str(portfolio_summary.get('realized_pnl')))}</b> before fees and "
+                f"<b>{html.escape(str(portfolio_summary.get('realized_net')))}</b> after a "
+                f"{html.escape(str(portfolio_summary.get('fee_pct_per_side')))}% taker fee per side on the entry and exit notional "
+                "(the Binance USD-M futures base rate; slippage excluded). Positions are marked against later candles.</p>")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Verdict Desk — scorecard</title>

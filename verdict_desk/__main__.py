@@ -248,7 +248,8 @@ def print_record(record: dict) -> None:
         for side in ("bull", "bear"):
             for c in layer[side]["accepted"]:
                 print(f"  [llm {side}] {c['claim']} cites {c['cites']}")
-            print(f"  [llm {side}] {len(layer[side]['rejected'])} claims rejected by the citation validator")
+            print(f"  [llm {side}] {len(layer[side]['rejected'])} claims rejected by the citation validator"
+                  + (f" (answered by {layer[side]['served_by']})" if layer[side].get("served_by") else ""))
         judge = layer.get("judge")
         if isinstance(judge, dict):
             ruling = judge.get("ruling") or {}

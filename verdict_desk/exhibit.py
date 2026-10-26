@@ -183,7 +183,8 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
             block = llm.get(side) or {}
             accepted = block.get("accepted") or []
             rejected = block.get("rejected") or []
-            rows.append(f"<h3>{_e(side.capitalize())} analyst — {len(accepted)} kept, {len(rejected)} refused</h3>")
+            who = f" · answered by {block['served_by']}" if block.get("served_by") else ""
+            rows.append(f"<h3>{_e(side.capitalize())} analyst — {len(accepted)} kept, {len(rejected)} refused{_e(who)}</h3>")
             if accepted:
                 rows.append("<table><thead><tr><th>Claim</th><th>Evidence it cites</th></tr></thead><tbody>")
                 for c in accepted:
@@ -210,7 +211,8 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
             ruling = judge.get("ruling") if isinstance(judge.get("ruling"), dict) else {}
             status = (f"counts {judge.get('weight')}" if judge.get("accepted") and judge.get("weight")
                       else "balanced, adds nothing" if judge.get("accepted") else "voided, adds nothing")
-            rows.append(f"<h3>AI judge (rules v6) — {_e(status)}</h3>")
+            who = f" · answered by {judge['served_by']}" if judge.get("served_by") else ""
+            rows.append(f"<h3>AI judge (rules v6) — {_e(status)}{_e(who)}</h3>")
             rows.append("<p class=\"small\">The judge reads only the claims kept above. Its lean counts only if it rests on at least "
                         "one kept claim of that side and every number in its reason is in that evidence; the weight comes from a fixed "
                         "table capped below the entry band, so it can tip a close call but never open a position alone.</p>")

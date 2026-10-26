@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,7 +80,8 @@ class TimestampTest(unittest.TestCase):
         DIGEST = re.compile(r"File sha256 hash: ([0-9a-f]{64})")
         PENDING = re.compile(r"PendingAttestation\('(https?://[^']+)'\)")
         CALENDARS = ("eternitywall.com", "opentimestamps.org", "catallaxy.com")
-        latest = max(ledger())
+        rows = ledger()
+        latest = max(rows)
         confirmed, pending = [], []
         for proof in self.proofs():
             snapshot = proof.with_suffix("")
@@ -110,9 +112,13 @@ class TimestampTest(unittest.TestCase):
         for name, blocks in confirmed:
             for height, _root in blocks:
                 self.assertGreater(int(height), 800_000, f"{name} names an implausible block height")
+        # Age in hours, not in records: runs fired by hand add records faster than Bitcoin confirms (one to three
+        # hours), so a count of records flagged healthy proofs on 2026-10-26. Eight hours still catches a stopped upgrade.
+        stamp = lambda seq: datetime.fromisoformat(rows[seq]["evidence"]["collected_at"].replace("Z", "+00:00"))
         for name, seq in pending:
-            self.assertLessEqual(latest - seq, 12,
-                                 f"{name} is {latest - seq} records old and still pending; "
+            hours = (stamp(latest) - stamp(seq)).total_seconds() / 3600
+            self.assertLessEqual(hours, 8,
+                                 f"{name} is {hours:.1f} h older than the head and still pending; "
                                  "the OpenTimestamps upgrade step has stopped")
 
 

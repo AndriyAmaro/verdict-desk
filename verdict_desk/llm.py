@@ -46,10 +46,30 @@ MAX_WAIT = 60.0
 
 _gate = threading.Lock()
 _next_start = 0.0
+_served = threading.local()  # the model the provider named in its last reply, per thread (parallel batches too)
 
 
 class LLMError(OSError):
     """Falha da chamada ao LLM. Herda de OSError para cair nos `except OSError` que ja existem."""
+
+
+def served_by() -> str | None:
+    """The model the provider said answered the last call made on this thread, read once.
+
+    A router such as FreeLLMAPI's "auto" picks a different model per call, so the configured name says little;
+    the dossier records this one next to each analyst, the judge and the narrative batches. None if unnamed.
+    """
+    model = getattr(_served, "model", None)
+    _served.model = None
+    return model
+
+
+def _remember_model(raw: bytes) -> None:
+    try:
+        model = json.loads(raw.decode("utf-8")).get("model")
+    except (ValueError, AttributeError, UnicodeDecodeError):
+        model = None
+    _served.model = model if isinstance(model, str) and model else None
 
 
 def _pause(seconds: float) -> None:
@@ -204,12 +224,14 @@ def chat(system: str, user: str, timeout: int = 90, max_tokens: int | None = Non
         url = f"{BASE_URL}/chat/completions"
         headers = {**({"Authorization": f"Bearer {key}"} if key else {}), "Content-Type": "application/json"}
     body = json.dumps(payload).encode("utf-8")
+    _served.model = None
     for attempt in range(MAX_RETRIES + 1):
         _wait_turn()
         request = urllib.request.Request(url, data=body, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 raw = response.read()
+            _remember_model(raw)
             if native:
                 return _anthropic_text(raw)
             choice = _first_choice(raw)

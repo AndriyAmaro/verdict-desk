@@ -62,11 +62,20 @@ def analyst_layer(packet: dict, ask=None, feats: dict | None = None, rules_versi
             claims = m["llm"].argue(side, items, **({"ask": ask} if ask else {}))
         except (OSError, ValueError, KeyError) as err:
             layer[side] = {"accepted": [], "rejected": [], "error": str(err)}
+            _served(m, layer[side])
             continue
         layer[side] = m["citations"].validate(claims, items)
+        _served(m, layer[side])
     if getattr(m["agents"], "USES_LLM_JUDGE", False):
         layer["judge"] = _judge_layer(m, layer, items, ask)
     return layer
+
+
+def _served(m: dict, block: dict) -> None:
+    """Records the model that really answered (a router names it in its reply); a stub or an unnamed reply adds nothing."""
+    model = m["llm"].served_by() if hasattr(m["llm"], "served_by") else None
+    if model:
+        block["served_by"] = model
 
 
 def _judge_layer(m: dict, layer: dict, items: dict, ask=None) -> dict:
@@ -80,8 +89,11 @@ def _judge_layer(m: dict, layer: dict, items: dict, ask=None) -> dict:
     try:
         ruling = m["llm"].rule(labels, items, **({"ask": ask} if ask else {}))
     except (OSError, ValueError, KeyError) as err:
-        return {"ruling": None, "accepted": False, "weight": 0.0, "error": str(err)}
-    return {"ruling": ruling, **cit.validate_ruling(ruling, bull_ok, bear_ok, items)}
+        out = {"ruling": None, "accepted": False, "weight": 0.0, "error": str(err)}
+    else:
+        out = {"ruling": ruling, **cit.validate_ruling(ruling, bull_ok, bear_ok, items)}
+    _served(m, out)
+    return out
 
 
 def _decide(m: dict, feats: dict, rules, narrative, symbol, layer):

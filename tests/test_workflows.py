@@ -144,6 +144,20 @@ class AnchorRouteTest(unittest.TestCase):
         self.assertNotIn("CRE_API_KEY", step)
 
 
+class ModelRoutingWorkflowTest(unittest.TestCase):
+    """The routing policy is re-ranked by its fixed rule in the same commit as the ledger, and the bench is published."""
+
+    HOURLY = (ROOT / ".github" / "workflows" / "hourly.yml").read_text(encoding="utf-8")
+
+    def test_every_commit_of_the_ledger_carries_the_policy_re_ranked_by_the_rule(self):
+        self.assertEqual(self.HOURLY.count("python -m verdict_desk models --route config/model_routing.json"), 2)
+        self.assertEqual(self.HOURLY.count("git add ledger config/model_routing.json"), 2)
+        self.assertNotIn("git add ledger\n", self.HOURLY)
+
+    def test_the_site_publishes_the_bench(self):
+        self.assertIn("python -m verdict_desk models --out site/models.json", self.HOURLY)
+
+
 class PacemakerTest(unittest.TestCase):
     """GitHub drops scheduled runs (none fired for 6 hours on 25 Oct, four triggers an hour or not), so the
     ledger cannot depend on the schedule alone. A second workflow starts when a run of the hourly one ends,

@@ -127,6 +127,43 @@ class GatewayTest(unittest.TestCase):
         self.assertEqual(Upstream.seen, [])
 
 
+class HardeningTest(unittest.TestCase):
+    def test_it_refuses_to_start_without_a_token_or_an_upstream_key(self):
+        for settings in ({"PROXY_TOKEN": "", "FREELLMAPI_KEY": "k"}, {"PROXY_TOKEN": "t"}, {"PROXY_TOKEN": "  ", "FREELLMAPI_KEY": "k"}):
+            with self.assertRaises(ValueError):
+                gate.make_server(settings, port=0)
+
+    def test_a_bad_content_length_is_a_400_not_a_crash(self):
+        import http.client
+        srv = start(gate.make_server({"PROXY_TOKEN": TOKEN, "FREELLMAPI_KEY": "k", "UPSTREAM": "http://127.0.0.1:9"}, port=0))
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", srv.server_port, timeout=5)
+            conn.putrequest("POST", "/v1/chat/completions")
+            conn.putheader("Authorization", f"Bearer {TOKEN}")
+            conn.putheader("Content-Length", "abc")
+            conn.endheaders()
+            self.assertEqual(conn.getresponse().status, 400)
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
+    def test_the_route_stops_trying_when_the_client_would_have_given_up(self):
+        clock = iter([0, 0, 50, 50, 100, 100, 150, 150, 200, 200])
+        calls = []
+
+        def slow(body):
+            calls.append(json.loads(body)["model"])
+            return 503, b"{}", "application/json"
+
+        original = gate.time.monotonic
+        gate.time.monotonic = lambda: next(clock)
+        try:
+            _, _, _, attempts = gate.route({"model": "x"}, ["a", "b", "c", "d"], slow)
+        finally:
+            gate.time.monotonic = original
+        self.assertLess(len(attempts), 4)
+
+
 class PolicyLoadTest(unittest.TestCase):
     def test_a_broken_policy_keeps_the_last_good_one(self):
         with tempfile.TemporaryDirectory() as tmp:

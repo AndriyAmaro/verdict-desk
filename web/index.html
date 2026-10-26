@@ -152,7 +152,9 @@ function renderHero(dossiers, broken, e, nar, p) {
   const grid = $("hero-stats");
   if (!grid) return;
   const card = (k, v, sub) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="s">${sub}</div>` : ""}</div>`;
-  const accepted = e ? e.accepted : 0, rejected = e ? e.rejected : 0;
+  // the whole ledger, so the card matches the scoreboard (the era stats below start at the first working LLM dossier)
+  const all = VerdictStats.llmEra(dossiers, 1);
+  const accepted = all.accepted, rejected = all.rejected;
   const winRate = (p && p.win_rate_pct !== null && p.win_rate_pct !== undefined) ? p.win_rate_pct + "%" : "—";
   const dd = p ? p.max_drawdown_pct + "%" : "—";
   const committed = dossiers.filter((d) => d.verdict.action === "LONG" || d.verdict.action === "SHORT").length;

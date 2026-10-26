@@ -32,7 +32,12 @@ jobs:
     outputs:
       run: ${{ steps.due.outputs.run }}
     steps:
+      # The tip of the branch, not the commit the event was created at: a run that waited in the "ledger" queue
+      # must see the dossiers the run before it pushed, or the 50-minute gate reads a stale ledger and decides
+      # again (run 40417413031, 26 Oct: a second #386, stopped by the Sepolia check before it was published).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -53,7 +58,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The tip of the branch, not the commit the event was created at: a run that waited in the "ledger" queue
+      # must see the dossiers the run before it pushed, or the 50-minute gate reads a stale ledger and decides
+      # again (run 40417413031, 26 Oct: a second #386, stopped by the Sepolia check before it was published).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -152,8 +162,9 @@ jobs:
           # Commit first: git rebase refuses to run on a dirty tree, so the old order
           # (pull --rebase before commit) died whenever a human pushed while the bot was
           # recording (run 39653930760, 2026-10-21: dossiers lost).
-          # The LLM gateway follows config/model_routing.json; re-ranked by its fixed rule once a day, never by hand.
-          python -m verdict_desk models --route config/model_routing.json
+          # The LLM gateway follows config/model_routing.json; re-ranked by its fixed rule once a day (72 dossiers,
+          # three per run), never by hand.
+          python -m verdict_desk models --route config/model_routing.json --every 72
           git add ledger config/model_routing.json
           if git diff --cached --quiet; then
             echo "nothing recorded this hour"
@@ -175,9 +186,9 @@ jobs:
             git rebase --abort 2>/dev/null || true
             git reset --hard "origin/${{ github.ref_name }}"
             python -m verdict_desk decide-v6 BTCUSDT ETHUSDT SOLUSDT --config config/voices.json || true
-            python -m verdict_desk verify
+            python -m verdict_desk verify || exit 1
             python -m verdict_desk head --out ledger/head.json
-            python -m verdict_desk models --route config/model_routing.json
+            python -m verdict_desk models --route config/model_routing.json --every 72
             git add ledger config/model_routing.json
             if git diff --cached --quiet; then
               echo "the freshest head already has this hour's decisions"

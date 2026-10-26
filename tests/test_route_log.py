@@ -72,6 +72,11 @@ class ClientRouteTest(unittest.TestCase):
                 llm.chat("s", "u")
         self.assertEqual(llm.served_route()["attempts"], down)
 
+    def test_a_route_without_a_loaded_policy_keeps_its_attempts(self):
+        with mock.patch("urllib.request.urlopen", return_value=ok(hdrs=headers(policy=" as_of=None"))):
+            llm.chat("s", "u")
+        self.assertEqual(llm.served_route(), {"attempts": ROUTE, "policy": None})
+
     def test_malformed_headers_are_ignored_instead_of_breaking_the_call(self):
         bad = Message()
         bad["X-Verdict-Route"] = "not json"

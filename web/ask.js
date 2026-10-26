@@ -270,8 +270,13 @@
     const v = d.verdict || {};
     const j = d.llm && d.llm.judge;
     if (!j) {
-      b.say(`This record has no AI judge: it was decided under rules ${v.rules_version}, before the judge existed (rules v6), so the fixed rules decided alone.`,
-        [b.cite("verdict.rules_version", "rules", `${v.rules_version} v6`)]);
+      if (v.rules_version === "v6") {
+        b.say("This record has no AI judge ruling: the AI layer was off or failed for it, so the fixed rules decided alone.",
+          [b.cite("verdict.rules_version", "rules", String(v.rules_version))]);
+      } else {
+        b.say(`This record has no AI judge: it was decided under rules ${v.rules_version}, before the judge existed (rules v6), so the fixed rules decided alone.`,
+          [b.cite("verdict.rules_version", "rules", `${v.rules_version} v6`)]);
+      }
       return;
     }
     const weights = (v.policy || {}).llm_judge_weights;
@@ -470,7 +475,7 @@
       const names = c.voices || [];
       const weighed = names.filter((n) => trust[n]).map((n) => `${n} ${trust[n].hits}/${trust[n].n}`);
       const refs = [b.cite(`convergence:${c.token}:${c.bias}`, `${c.token} ${c.bias}`, `${names.length} voices ${JSON.stringify(c)}`)];
-      let line = `${c.token}: ${names.length} voices ${c.bias} (${names.join(", ")}), conviction up to ${c.max_conviction}`;
+      let line = `${c.token}: ${names.length} voices ${c.bias} (${names.join(", ")})${c.max_conviction ? `, conviction up to ${c.max_conviction}` : ""}`;
       if (weighed.length) {
         refs.push(b.cite(`trust:${c.token}:${c.bias}`, "their track record", weighed.join(" ")));
         line += `; their past calls that came true: ${weighed.join(", ")}`;
@@ -524,8 +529,8 @@
       b.say(`The ${names[part]}: ${steps}${block.served_by ? `; the reply named ${block.served_by}` : ""}.`, refs);
     }
     if (policy) {
-      b.say(`The gateway tried the models in the order of the routing policy computed from the ledger up to record ${policy.as_of_seq} (sha256 ${policy.sha256}), ranked by how many of each model's claims passed the citation check; it moves on only when a model is unavailable or gives an empty answer. The judge page shows that ranking.`,
-        [b.cite("routing_policy", "routing policy", `sha256 ${policy.sha256} ${policy.as_of_seq} 12`)]);
+      b.say(`The gateway tried the models in the order of the routing policy computed from the ledger up to record ${policy.as_of_seq} (sha256 ${policy.sha256}), ranked by the lower confidence bound of the share of each model's claims that passed the citation check; it moves on only when a model is unavailable or gives an empty answer. The judge page shows that ranking.`,
+        [b.cite("routing_policy", "routing policy", `sha256 ${policy.sha256} as_of_seq ${policy.as_of_seq}`)]);
     }
     b.say("Whichever model writes the arguments, the decision rule is the same: every claim is citation-checked and the AI judge can never open a position alone.");
   }
@@ -533,25 +538,29 @@
   function executed(d, b) {
     const v = d.verdict || {};
     const ex = d.execution;
+    const closes = d.executions_closed || [];
     if (!ex) {
-      if (!["LONG", "SHORT"].includes(v.action)) b.say(`No position was opened (${v.action}), so nothing was sent to Sepolia testnet.`);
+      if (!["LONG", "SHORT"].includes(v.action)) b.say(`No position was opened (${v.action}), so no new trade was sent to Sepolia testnet.`);
       else b.say("No Sepolia transaction is recorded for this position: it was decided before the Sepolia practice desk was switched on, so it stays simulated.");
-      return;
+    } else if (ex.status === "failed" || !ex.tx) {
+      b.say(`The send of this position to Sepolia testnet failed, so it stays simulated: ${ex.label || "the send failed"}.`, [b.cite("execution.label", "what happened", ex.label || "failed")]);
+      if (ex.error) b.quote(ex.error, "error, recorded");
+    } else {
+      b.say(`This position went to Sepolia testnet: ${ex.label}. Transaction ${ex.tx}${has(ex.block) ? `, block ${ex.block}` : ""}.`,
+        [b.cite("execution.label", "what was done", ex.label), b.cite("execution.tx", "Sepolia transaction", `${ex.tx} block ${ex.block}`)]);
     }
-    const refs = [b.cite("execution.label", "what was done", ex.label), b.cite("execution.tx", "Sepolia transaction", `${ex.tx} block ${ex.block}`)];
-    b.say(`This position went to Sepolia testnet: ${ex.label}. Transaction ${ex.tx}, block ${ex.block}.`, refs);
-    if (ex.status === "executed" && has(ex.amount_in)) {
+    if (ex && ex.tx && ex.status === "executed" && has(ex.amount_in) && has(ex.amount_out)) {
       const sent = units(ex.amount_in, ex.token_in), got = units(ex.amount_out, ex.token_out);
       b.say(`The swap sent ${sent.text} and received ${got.text} on the Uniswap v3 test pool, whose price is not the market price.`,
         [b.cite("execution.amounts", "swap amounts, raw on-chain units", `${sent.source}; ${got.source}`)]);
     }
-    if (ex.decision_digest) {
+    if (ex && ex.tx && ex.status !== "failed" && ex.decision_digest) {
       b.say(`The transaction carries a digest of this decision, ${ex.decision_digest}, and the record holds the transaction: it was written into the record before the record was sealed.`,
         [b.cite("execution.decision_digest", "decision digest", ex.decision_digest)]);
     }
-    for (const c of d.executions_closed || []) {
-      b.say(`In this record the desk also closed an earlier on-chain position (record ${c.opened_seq}): ${c.label || c.status}, transaction ${c.tx}.`,
-        [b.cite(`closed:${c.opened_seq}`, "on-chain close", `${c.opened_seq} ${c.tx} ${c.label || c.status}`)]);
+    for (const c of closes) {
+      b.say(`In this record the desk also ${c.tx ? "closed" : "tried to close"} an earlier on-chain position (record ${c.opened_seq}): ${c.label || c.status}${c.tx ? `, transaction ${c.tx}` : ""}.`,
+        [b.cite(`closed:${c.opened_seq}`, "on-chain close", `${c.opened_seq} ${c.tx || ""} ${c.label || c.status}`)]);
     }
     b.say("Test tokens only: no real money moved.");
   }

@@ -34,6 +34,8 @@ import { verifyHeadDossier } from './verdict'
 import type { Config } from './workflow'
 
 export const DIRECT_WORKFLOW_NAME = 'gh-actions'
+// keccak256("Anchored(uint64,bytes32,int256,uint8,uint256)"), the event LedgerAnchor emits for each accepted head
+export const ANCHORED_TOPIC = '0x43fd32c7e0eebd332a0c60efbf6c8c8a64b80609ef27f6262bf060b938a26f6c'
 export const FORWARDER_ABI = parseAbi(['function report(address receiver, bytes rawReport, bytes reportContext, bytes[] signatures)'])
 const ANCHOR_ABI = parseAbi([
 	'function latestSeq() view returns (uint64)',
@@ -94,8 +96,20 @@ export function forwarderCall(a: { receiver: Address; head: LedgerHead; price: P
 	return encodeFunctionData({ abi: FORWARDER_ABI, functionName: 'report', args: [a.receiver, rawReport, '0x', []] })
 }
 
+/**
+ * True when the transaction's own logs hold LedgerAnchor's Anchored event for `seq`. Read from the receipt, not from
+ * a later eth_call: a load-balanced public node can answer the call from a node that has not seen the block yet
+ * (run 26 Oct 23:09: the anchor landed, the read said it had not). The mock forwarder does not revert when the
+ * receiver does, so a successful transaction alone proves nothing.
+ */
+export function anchoredInReceipt(logs: { address: string; topics: readonly string[] }[], receiver: string, seq: number): boolean {
+	const seqTopic = `0x${seq.toString(16).padStart(64, '0')}`
+	return logs.some((l) => l.address.toLowerCase() === receiver.toLowerCase() && l.topics[0] === ANCHORED_TOPIC && l.topics[1] === seqTopic)
+}
+
 const getText = async (url: string, what: string): Promise<string> => {
-	const response = await fetch(url, { cache: 'no-store' })
+	// a query string bypasses the CDN copies of raw.githubusercontent.com and GitHub Pages (minutes old otherwise)
+	const response = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' })
 	if (response.status !== 200) throw new Error(`${what} request to ${url} failed with status ${response.status}`)
 	return response.text()
 }
@@ -152,11 +166,24 @@ async function run(dryRun: boolean): Promise<void> {
 		return
 	}
 	const wallet = createWalletClient({ account, chain: sepolia, transport: http(process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com') })
-	const tx = await wallet.sendTransaction({ to: forwarder, data, gas: BigInt(config.gasLimit) })
+	// The practice desk sends from the same wallet: one retry if both picked the same nonce.
+	const send = () => wallet.sendTransaction({ to: forwarder, data, gas: BigInt(config.gasLimit) })
+	const tx = await send().catch((e: Error) => {
+		if (!/nonce/i.test(e.message)) throw e
+		return new Promise((r) => setTimeout(r, 15_000)).then(send)
+	})
 	const receipt = await sep.waitForTransactionReceipt({ hash: tx, timeout: 180_000 })
 	if (receipt.status !== 'success') throw new Error(`anchor transaction ${tx} reverted`)
-	const anchored = await sep.readContract({ address: receiver, abi: ANCHOR_ABI, functionName: 'isAnchored', args: [BigInt(head.seq), `0x${head.hash}`] })
-	if (!anchored) throw new Error(`transaction ${tx} succeeded but the contract does not hold seq ${head.seq}`)
+	if (!anchoredInReceipt(receipt.logs, receiver, head.seq)) {
+		// The contract refused the report inside the forwarder: another anchor got this seq first. Not an error.
+		const now = await sep.readContract({ address: receiver, abi: ANCHOR_ABI, functionName: 'latestSeq', blockNumber: receipt.blockNumber })
+		if (now >= BigInt(head.seq)) {
+			log(`Skipped: seq ${head.seq} was anchored by another run first (transaction ${tx} carried a stale report)`)
+			console.log(JSON.stringify({ status: 'skipped', seq: head.seq, latestSeq: Number(now), tx }))
+			return
+		}
+		throw new Error(`transaction ${tx} succeeded but LedgerAnchor emitted no Anchored event for seq ${head.seq}`)
+	}
 	log(`Anchored seq ${head.seq} head ${head.hash} at tx ${tx} (block ${receipt.blockNumber})`)
 	console.log(JSON.stringify({
 		status: 'anchored', via: 'gh-actions', seq: head.seq, head: head.hash, symbol: head.symbol,

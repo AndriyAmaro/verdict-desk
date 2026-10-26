@@ -79,7 +79,8 @@ def _served(m: dict, block: dict) -> None:
     route = m["llm"].served_route() if hasattr(m["llm"], "served_route") else None
     if route:  # which models the gateway tried and why it moved on, and the routing policy it followed
         block["route"] = route["attempts"]
-        block["routing_policy"] = route["policy"]
+        if route.get("policy"):
+            block["routing_policy"] = route["policy"]
 
 
 def _judge_layer(m: dict, layer: dict, items: dict, ask=None) -> dict:

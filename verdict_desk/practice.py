@@ -60,6 +60,10 @@ def _record(request: dict, result: dict) -> dict:
     if request.get("weth") is not None:
         out["scale"] = SCALE
     out["label"] = _label(out.get("status", "failed"), request["symbol"])
+    if result.get("recovered"):
+        # The contract had this decision already: a run that lost its push race sent it, and its dossier was
+        # dropped. The transaction recorded here is that earlier one, read back from the chain.
+        out["label"] += " (sent by an earlier attempt whose dossier lost a push race; transaction read back from the chain)"
     return out
 
 
@@ -134,7 +138,7 @@ def chain_executor():
         return None
 
     def execute(request: dict) -> dict:
-        out = subprocess.run(["node", str(SCRIPT), json.dumps(request)], capture_output=True, text=True, timeout=180, cwd=SCRIPT.parent)
+        out = subprocess.run(["node", str(SCRIPT), json.dumps(request)], capture_output=True, text=True, timeout=300, cwd=SCRIPT.parent)
         try:
             return json.loads(out.stdout.strip().splitlines()[-1])
         except (ValueError, IndexError):

@@ -113,6 +113,25 @@ class RenderTest(unittest.TestCase):
         self.assertIn("answered by agnes-3.0-flash after gpt-oss-120b returned 429", page)
         self.assertIn("answered by openai/gpt-oss-120b, first in the routing policy", page)
 
+    def test_a_practice_trade_sent_to_sepolia_is_shown_with_its_transaction(self):
+        row = self.synthetic(rules_version="v6")
+        row["execution"] = {"network": "ethereum-testnet-sepolia", "kind": "open", "side": "short", "status": "executed",
+                            "tx": "0x" + "ab" * 32, "block": 12000563, "decision_digest": "0x" + "cd" * 32,
+                            "label": "practice trade executed on Sepolia testnet", "amount_in": 1895000000000000,
+                            "token_in": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14", "amount_out": 86146055,
+                            "token_out": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"}
+        page = exhibit.render(row)
+        self.assertIn("practice trade executed on Sepolia testnet", page)
+        self.assertIn("https://sepolia.etherscan.io/tx/0x" + "ab" * 32, page)
+        self.assertIn("0.001895 WETH", page)
+        self.assertIn("86.146055 USDC", page)
+
+    def test_no_page_claims_nothing_is_signed_now_that_practice_trades_go_to_sepolia(self):
+        page = exhibit.render(self.synthetic(rules_version="v6"))
+        self.assertNotIn("signs nothing", page)
+        self.assertNotIn("No order is placed, signed or transmitted", page)
+        self.assertIn("no real-money order", page)
+
     def test_a_voided_judge_says_it_added_nothing_and_why(self):
         page = self.judged({"ruling": {"lean": "bull", "conviction": "high", "relied_on": ["S4"], "reason": "x"},
                             "accepted": False, "weight": 0.0, "rejected_because": "unknown claim id: 'S4'"})

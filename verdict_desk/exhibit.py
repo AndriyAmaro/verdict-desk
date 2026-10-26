@@ -82,10 +82,26 @@ def _plain_summary(dossier: dict, integrity_ok: bool) -> list[str]:
         kept = sum(len(b.get("accepted") or []) for b in sides)
         refused = sum(len(b.get("rejected") or []) for b in sides)
         out.append(f"AI analysts wrote {kept + refused} claims; {kept} passed the check that every number must appear in the evidence it cites and {refused} {'was' if refused == 1 else 'were'} refused.")
+    judge = llm.get("judge") if llm else None
+    if isinstance(judge, dict):
+        out.append(_judge_sentence(judge))
 
     out.append("Checked just now: this record matches its saved fingerprint, so nobody has changed it since it was written."
                if integrity_ok else "Checked just now: this record does NOT match its saved fingerprint, so it was changed after it was written. Do not rely on it.")
     return out
+
+
+def _judge_sentence(judge: dict) -> str:
+    """One sentence on the rules-v6 AI judge, filled from the frozen ruling and its check."""
+    ruling = judge.get("ruling") if isinstance(judge.get("ruling"), dict) else {}
+    if judge.get("accepted") and judge.get("weight"):
+        return (f"An AI judge then read only the claims that passed and leaned {ruling.get('lean')} with {ruling.get('conviction')} conviction, "
+                f"relying on {', '.join(ruling.get('relied_on') or [])}. That adds {judge['weight']} to that side, "
+                "never enough to open a position on its own.")
+    if judge.get("accepted"):
+        return "An AI judge read the claims that passed, found the two cases balanced, and added nothing."
+    why = judge.get("rejected_because") or judge.get("error") or "it did not hold"
+    return f"An AI judge was asked to rule, but its ruling was voided ({why}), so it added nothing."
 
 
 def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None, pack_href: str | None = None) -> str:
@@ -189,6 +205,22 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
                     reasons = [r.get("rejected_because") or r.get("reason") or "no valid citation"]
                     rows.append(f"<tr><td>{_e(r.get('claim'))}</td><td class=\"small\">{_e('; '.join(reasons))}</td></tr>")
                 rows.append("</tbody></table>")
+        judge = llm.get("judge")
+        if isinstance(judge, dict):
+            ruling = judge.get("ruling") if isinstance(judge.get("ruling"), dict) else {}
+            status = (f"counts {judge.get('weight')}" if judge.get("accepted") and judge.get("weight")
+                      else "balanced, adds nothing" if judge.get("accepted") else "voided, adds nothing")
+            rows.append(f"<h3>AI judge (rules v6) — {_e(status)}</h3>")
+            rows.append("<p class=\"small\">The judge reads only the claims kept above. Its lean counts only if it rests on at least "
+                        "one kept claim of that side and every number in its reason is in that evidence; the weight comes from a fixed "
+                        "table capped below the entry band, so it can tip a close call but never open a position alone.</p>")
+            if ruling:
+                rows.append("<table><tbody>"
+                            f"<tr><th>Lean</th><td>{_e(ruling.get('lean'))} ({_e(ruling.get('conviction'))} conviction)</td></tr>"
+                            f"<tr><th>Relies on</th><td>{_e(', '.join(map(str, ruling.get('relied_on') or [])) or 'nothing')}</td></tr>"
+                            f"<tr><th>Reason</th><td>{_e(ruling.get('reason'))}</td></tr></tbody></table>")
+            if not judge.get("accepted"):
+                rows.append(f"<p class=\"small\">Voided: {_e(judge.get('rejected_because') or judge.get('error') or 'no ruling')}</p>")
 
     # --- 3. attribution ----------------------------------------------------------
     rows.append("<h2 id=\"attribution\">3. Which argument decided it</h2>")

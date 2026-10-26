@@ -62,9 +62,10 @@ class WorkflowCallsTest(unittest.TestCase):
 
     def test_the_hourly_decision_uses_the_current_rules_and_the_users_config(self):
         hourly = (ROOT / ".github" / "workflows" / "hourly.yml").read_text(encoding="utf-8")
-        self.assertIn("decide-v5", hourly)
+        self.assertIn("decide-v6", hourly)
         self.assertIn("--config config/voices.json", hourly)
-        self.assertNotIn("decide-v4", hourly, "the hourly run moved to rules v5")
+        for old in ("decide-v4", "decide-v5"):
+            self.assertNotIn(old, hourly, "the hourly run moved to rules v6")
 
 
 if __name__ == "__main__":

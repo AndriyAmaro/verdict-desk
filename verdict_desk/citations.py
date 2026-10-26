@@ -79,6 +79,53 @@ def validate(claims: list[dict], evidence_items: dict[str, str]) -> dict:
     return {"accepted": accepted, "rejected": rejected}
 
 
+# Regras v6: peso do juiz LLM por conviccao. O teto (1.0) fica abaixo da faixa de entrada (1.5), entao o
+# juiz sozinho nunca abre posicao: so desempata quando as regras de mercado ja apontam para o mesmo lado.
+JUDGE_WEIGHT = {"low": 0.5, "medium": 0.75, "high": 1.0}
+CLAIM_TOKEN = re.compile(r"\b[BSE]\d+\b")  # B1, S2, E3 no texto sao referencias, nao numeros afirmados
+
+
+def claim_labels(bull_accepted: list[dict], bear_accepted: list[dict]) -> dict[str, dict]:
+    """Rotulos estaveis das afirmacoes VALIDADAS: B1.. para o touro, S1.. para o urso, na ordem congelada."""
+    labels = {f"B{i}": c for i, c in enumerate(bull_accepted, 1)}
+    labels.update({f"S{i}": c for i, c in enumerate(bear_accepted, 1)})
+    return labels
+
+
+def validate_ruling(ruling, bull_accepted: list[dict], bear_accepted: list[dict], evidence_items: dict[str, str]) -> dict:
+    """Confere o veredito do juiz LLM so com o que o dossier congelou; devolve aceito, peso e motivo.
+
+    Um lado so ganha peso se o juiz se apoiar em pelo menos uma afirmacao validada desse lado, todo id
+    citado existir e todo numero do motivo estar na evidencia das afirmacoes em que ele se apoia.
+    """
+    def void(reason: str) -> dict:
+        return {"accepted": False, "weight": 0.0, "rejected_because": reason}
+
+    if not isinstance(ruling, dict):
+        return void("ruling is not an object")
+    lean, conviction = ruling.get("lean"), ruling.get("conviction")
+    if lean not in ("bull", "bear", "neutral"):
+        return void(f"unknown lean: {lean!r}")
+    if lean == "neutral":
+        return {"accepted": True, "weight": 0.0}
+    if conviction not in JUDGE_WEIGHT:
+        return void(f"unknown conviction: {conviction!r}")
+    relied = ruling.get("relied_on")
+    if not isinstance(relied, list) or not relied:
+        return void("no validated claim relied on")
+    labels = claim_labels(bull_accepted, bear_accepted)
+    if any(not isinstance(r, str) or r not in labels for r in relied):
+        return void(f"unknown claim id: {next(r for r in relied if not isinstance(r, str) or r not in labels)!r}")
+    if not any(r.startswith("B" if lean == "bull" else "S") for r in relied):
+        return void(f"lean not supported by its own side: {lean} rests on {', '.join(relied)}")
+    cited = " ".join(evidence_items.get(e, "") for r in relied for e in labels[r].get("cites") or [] if isinstance(e, str))
+    allowed = {_norm(n) for n in NUMBER.findall(cited)}
+    stray = [n for n in NUMBER.findall(CLAIM_TOKEN.sub(" ", str(ruling.get("reason", "")))) if _norm(n) not in allowed]
+    if stray:
+        return void(f"number not in relied-on evidence: {stray[0]}")
+    return {"accepted": True, "weight": JUDGE_WEIGHT[conviction]}
+
+
 def _norm(n: str) -> str:
     try:
         return repr(round(float(n), 6))

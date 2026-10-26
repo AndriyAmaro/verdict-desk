@@ -57,7 +57,7 @@ Choose your own voices and your own limit, then run it:
 
 ```bash
 $EDITOR config/voices.json                                    # up to 20 voices (rss or telegram) and risk.max_risk_pct
-python3 -m verdict_desk decide-v5 BTCUSDT --config config/voices.json
+python3 -m verdict_desk decide-v6 BTCUSDT --config config/voices.json
 ```
 
 An invalid file is refused with the field and the reason, and nothing is recorded. A voice that fails or has nothing about a tracked token is written into the dossier as a gap (`narrative.config.gaps`), never skipped silently.
@@ -138,6 +138,19 @@ freezes the table of the voices it read, computed only from the dossiers before 
 browser recomputes the same table from the raw ledger ([Market voices](web/narrative.html)), compared
 with the Python by a test. With no record, v5 equals v4.
 
+## Rules v6: the AI judge counts only on claims that passed the citation check
+
+In v1 to v5 the LLM analysts are recorded but never move the verdict. In v6 a third model, the judge,
+reads **only the claims that passed the citation validator** (labelled B1.. for the bull, S1.. for the
+bear; refused claims never reach it) and leans bull, bear or neutral. The lean becomes one argument on
+that side, with a weight from a fixed table: 0.5, 0.75 or 1.0 for low, medium or high conviction. The
+cap of 1.0 sits below the entry band of 1.5, so the judge can tip a close call but **never opens a
+position on its own**. The ruling is voided, and weighs zero, when it rests on no kept claim of its own
+side, names a claim id that does not exist, or puts a number in its reason that the relied-on evidence
+does not contain. The raw ruling is frozen in the dossier (`llm.judge`) and the weight is recomputed
+from it on replay, so editing the ruling flips the replay and editing the stored weight changes
+nothing. With no LLM, v6 decides exactly like v5.
+
 ## The chain of custody in one image
 
 ![Verdict Desk chain of custody](web/custody.svg)
@@ -161,8 +174,8 @@ The playground is a mirror of the judge in `web/policy.js`. A mirror that is nev
 `--risk-pct` sets the risk per practice position (default 1%). The system refuses anything above **25%** instead of silently clamping it, and every dossier freezes both numbers — so an auditor sees the limit that was declared next to the cap that governed it, and a replay reapplies the same limit rather than the default.
 
 ```bash
-python3 -m verdict_desk decide-v5 BTCUSDT --risk-pct 2
-python3 -m verdict_desk decide-v5 BTCUSDT --risk-pct 30   # refused: exceeds the system cap of 25%
+python3 -m verdict_desk decide-v6 BTCUSDT --risk-pct 2
+python3 -m verdict_desk decide-v6 BTCUSDT --risk-pct 30   # refused: exceeds the system cap of 25%
 ```
 
 ## Freshness is judged per source class, not as one number
@@ -307,7 +320,7 @@ python3 -m verdict_desk --ledger scratch.jsonl decide-v2 BTCUSDT ETHUSDT SOLUSDT
 python3 -m verdict_desk backtest BTCUSDT
 python3 -m verdict_desk research BTCUSDT ETHUSDT SOLUSDT
 python3 -m verdict_desk audit-journal path/to/agent_journal.jsonl --out audit.json   # check a third-party agent journal against public data, replay it in shadow
-python3 -m verdict_desk --ledger scratch.jsonl decide-v5 BTCUSDT ETHUSDT SOLUSDT --config config/voices.json   # what the hourly workflow runs
+python3 -m verdict_desk --ledger scratch.jsonl decide-v6 BTCUSDT ETHUSDT SOLUSDT --config config/voices.json   # what the hourly workflow runs
 python3 -m verdict_desk trust                                          # per-voice track record, skill above chance
 python3 -m verdict_desk trust-check                                    # every frozen trust table, recomputed from the dossiers before it
 python3 -m verdict_desk battery                                        # attack a copy of the ledger and count what verify misses (about a minute)

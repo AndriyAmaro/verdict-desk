@@ -29,6 +29,8 @@ def _mods(rules_version: str = "v1") -> dict:
             from . import agents_v4 as agents, citations, features_v2 as features, llm
         elif rules_version == "v5":
             from . import agents_v5 as agents, citations, features_v2 as features, llm
+        elif rules_version == "v6":
+            from . import agents_v6 as agents, citations, features_v2 as features, llm
         else:
             raise ValueError(f"unknown rules_version: {rules_version!r}")
         _MODULES[rules_version] = {"agents": agents, "features": features, "citations": citations, "llm": llm}
@@ -62,7 +64,32 @@ def analyst_layer(packet: dict, ask=None, feats: dict | None = None, rules_versi
             layer[side] = {"accepted": [], "rejected": [], "error": str(err)}
             continue
         layer[side] = m["citations"].validate(claims, items)
+    if getattr(m["agents"], "USES_LLM_JUDGE", False):
+        layer["judge"] = _judge_layer(m, layer, items, ask)
     return layer
+
+
+def _judge_layer(m: dict, layer: dict, items: dict, ask=None) -> dict:
+    """Regras v6: o juiz LLM le so as afirmacoes aceitas; o veredito bruto e a checagem ficam congelados."""
+    cit = m["citations"]
+    bull_ok = (layer.get("bull") or {}).get("accepted") or []
+    bear_ok = (layer.get("bear") or {}).get("accepted") or []
+    labels = cit.claim_labels(bull_ok, bear_ok)
+    if not labels:
+        return {"ruling": None, "accepted": False, "weight": 0.0, "rejected_because": "no validated claims to judge"}
+    try:
+        ruling = m["llm"].rule(labels, items, **({"ask": ask} if ask else {}))
+    except (OSError, ValueError, KeyError) as err:
+        return {"ruling": None, "accepted": False, "weight": 0.0, "error": str(err)}
+    return {"ruling": ruling, **cit.validate_ruling(ruling, bull_ok, bear_ok, items)}
+
+
+def _decide(m: dict, feats: dict, rules, narrative, symbol, layer):
+    """Chama o decide do modulo; so a v6 recebe a camada LLM (as versoes antigas nem conhecem o parametro)."""
+    extra = {"llm": layer} if getattr(m["agents"], "USES_LLM_JUDGE", False) else {}
+    if rules is not None:
+        return m["agents"].decide(feats, rules, narrative, symbol, **extra)
+    return m["agents"].decide(feats, narrative=narrative, symbol=symbol, **extra)
 
 
 def _rules_for(m: dict, dossier_or_rules=None, rules_version: str = "v1"):
@@ -88,9 +115,8 @@ def build(packet: dict, prev_hash: str, seq: int, ask=None, use_llm: bool = True
     feats = m["features"].compute(packet)
     narrative = packet.get("narrative")
     symbol = packet.get("symbol")
-    debate = (m["agents"].decide(feats, rules, narrative, symbol) if rules is not None
-              else m["agents"].decide(feats, narrative=narrative, symbol=symbol))
     layer = analyst_layer(packet, ask, feats, rules_version) if use_llm else None
+    debate = _decide(m, feats, rules, narrative, symbol, layer)
     body = {
         "seq": seq,
         "prev_hash": prev_hash,
@@ -126,8 +152,7 @@ def replay(dossier: dict, rules_version: str = "v1") -> dict:
     rules = _rules_for(m, dossier, rules_version)
     narrative = dossier["evidence"].get("narrative")
     symbol = dossier["evidence"].get("symbol")
-    debate = (m["agents"].decide(feats, rules, narrative, symbol) if rules is not None
-              else m["agents"].decide(feats, narrative=narrative, symbol=symbol))
+    debate = _decide(m, feats, rules, narrative, symbol, dossier.get("llm"))
     same = feats == dossier["features"] and debate["verdict"]["action"] == dossier["verdict"]["action"] and debate["verdict"]["edge"] == dossier["verdict"]["edge"]
     result = {"seq": dossier["seq"], "matches": same, "recorded": dossier["verdict"], "replayed": debate["verdict"]}
     layer = dossier.get("llm")
@@ -137,6 +162,12 @@ def replay(dossier: dict, rules_version: str = "v1") -> dict:
         recheck = all(
             m["citations"].validate(layer[side]["accepted"], items)["rejected"] == [] for side in ("bull", "bear") if side in layer
         )
+        judged = layer.get("judge")
+        if isinstance(judged, dict) and "ruling" in judged and judged.get("ruling") is not None:
+            # O peso gravado tem de ser o que o validador da hoje para o veredito congelado.
+            again = m["citations"].validate_ruling(judged["ruling"], (layer.get("bull") or {}).get("accepted") or [],
+                                                   (layer.get("bear") or {}).get("accepted") or [], items)
+            recheck = recheck and again["accepted"] == judged.get("accepted") and again["weight"] == judged.get("weight")
         result["llm_citations_valid"] = recheck and items == layer["evidence_index"]
         result["matches"] = same and result["llm_citations_valid"]
     return result

@@ -78,6 +78,27 @@ class RenderTest(unittest.TestCase):
         self.assertIn("sell", text.lower())
         self.assertIn("103", text)
 
+    def judged(self, judge):
+        row = self.synthetic(rules_version="v6")
+        row["llm"] = {"bull": {"accepted": [{"claim": "Holds at 100", "cites": ["E1"]}], "rejected": []},
+                      "bear": {"accepted": [], "rejected": []}, "judge": judge}
+        return exhibit.render(row)
+
+    def test_an_accepted_judge_lean_is_explained_with_its_weight_and_its_limit(self):
+        page = self.judged({"ruling": {"lean": "bull", "conviction": "medium", "relied_on": ["B1"], "reason": "B1 holds."},
+                            "accepted": True, "weight": 0.75})
+        text = self.plain(page)
+        self.assertIn("AI judge", text)
+        self.assertIn("0.75", text)
+        self.assertIn("never enough to open a position", text)
+        self.assertIn("B1 holds.", page)
+
+    def test_a_voided_judge_says_it_added_nothing_and_why(self):
+        page = self.judged({"ruling": {"lean": "bull", "conviction": "high", "relied_on": ["S4"], "reason": "x"},
+                            "accepted": False, "weight": 0.0, "rejected_because": "unknown claim id: 'S4'"})
+        self.assertIn("added nothing", self.plain(page))
+        self.assertIn("unknown claim id", page)
+
     def test_a_declined_entry_says_no_position_was_opened_and_why(self):
         text = self.plain(exhibit.render(self.synthetic(action="WATCH_REVERSAL", bull_score=1.0, bear_score=1.5, edge=-0.5,
                                                         rationale="one argument away from flipping", entry=None)))

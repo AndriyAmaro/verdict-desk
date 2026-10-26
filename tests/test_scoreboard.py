@@ -76,6 +76,17 @@ class NumbersTest(unittest.TestCase):
         self.assertIn("after a 0.05% taker fee per side", line)
         self.assertIn("slippage excluded", line)
 
+    def test_the_sepolia_executions_are_counted_apart_from_the_simulated_positions(self):
+        data = build(seq=LEDGER[-1]["seq"])["sepolia"]
+        rows = [d for d in LEDGER if d.get("execution")]
+        self.assertEqual(data["executed"] + data["recorded"] + data["failed"], len(rows))
+        self.assertEqual(data["first_seq"], rows[0]["seq"] if rows else None)
+        positions = [d for d in LEDGER if d["verdict"]["action"] in ("LONG", "SHORT")]
+        self.assertEqual(data["simulated_only"], len(positions) - data["executed"] - data["recorded"])
+
+    def test_before_the_desk_existed_there_is_no_sepolia_line(self):
+        self.assertNotIn("Sepolia testnet", scoreboard.render(build(seq=200)).split("Three witnesses")[0])
+
     def test_the_practice_result_is_the_sum_of_the_settled_positions(self):
         data = build(seq=200)["practice"]
         self.assertAlmostEqual(data["realized"], data["take"] * 200.0 - data["stop"] * 100.0, places=2)

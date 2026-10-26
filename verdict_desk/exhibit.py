@@ -91,6 +91,20 @@ def _plain_summary(dossier: dict, integrity_ok: bool) -> list[str]:
     return out
 
 
+def _who(block: dict) -> str:
+    """ · answered by X, and, when the gateway logged its route, which models it tried first and why it moved on."""
+    if not block.get("served_by"):
+        return ""
+    route = block.get("route") if isinstance(block.get("route"), list) else []
+    before = [a for a in route[:-1] if isinstance(a, dict)]
+    if before:
+        tried = ", ".join(f"{a.get('model')} returned {a.get('status')}" for a in before)
+        return f" · answered by {block['served_by']} after {tried}"
+    if route:
+        return f" · answered by {block['served_by']}, first in the routing policy"
+    return f" · answered by {block['served_by']}"
+
+
 def _judge_sentence(judge: dict) -> str:
     """One sentence on the rules-v6 AI judge, filled from the frozen ruling and its check."""
     ruling = judge.get("ruling") if isinstance(judge.get("ruling"), dict) else {}
@@ -183,7 +197,7 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
             block = llm.get(side) or {}
             accepted = block.get("accepted") or []
             rejected = block.get("rejected") or []
-            who = f" · answered by {block['served_by']}" if block.get("served_by") else ""
+            who = _who(block)
             rows.append(f"<h3>{_e(side.capitalize())} analyst — {len(accepted)} kept, {len(rejected)} refused{_e(who)}</h3>")
             if accepted:
                 rows.append("<table><thead><tr><th>Claim</th><th>Evidence it cites</th></tr></thead><tbody>")
@@ -211,7 +225,7 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
             ruling = judge.get("ruling") if isinstance(judge.get("ruling"), dict) else {}
             status = (f"counts {judge.get('weight')}" if judge.get("accepted") and judge.get("weight")
                       else "balanced, adds nothing" if judge.get("accepted") else "voided, adds nothing")
-            who = f" · answered by {judge['served_by']}" if judge.get("served_by") else ""
+            who = _who(judge)
             rows.append(f"<h3>AI judge (rules v6) — {_e(status)}{_e(who)}</h3>")
             rows.append("<p class=\"small\">The judge reads only the claims kept above. Its lean counts only if it rests on at least "
                         "one kept claim of that side and every number in its reason is in that evidence; the weight comes from a fixed "

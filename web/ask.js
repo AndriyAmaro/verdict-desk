@@ -27,6 +27,7 @@
     { intent: "analysts", label: "What did the AI analysts claim?" },
     { intent: "refused", label: "What did you refuse?" },
     { intent: "judge", label: "What did the AI judge think?" },
+    { intent: "model", label: "Which model wrote this, and why that one?" },
     { intent: "voices", label: "What did the market voices say?" },
     { intent: "saw", label: "What data did you see?" },
     { intent: "executed", label: "Was it sent on-chain?" },
@@ -41,6 +42,7 @@
     ["refused", /\b(refus|reject|discard|threw|thrown|invalid|recus|rejeit|descart)/i],
     ["judge", /\b(judge|ruling|lean|conviction|juiz|veredito do juiz)/i],
     ["analysts", /\b(analyst|claim|bull case|bear case|llm|ai said|analista|afirma)/i],
+    ["model", /(which model|what model|who wrote|routing|routed|\bmodel (wrote|answered)|qual modelo|que modelo)/i],
     ["executed", /(execut|on-?chain|sepolia|transaction|\btx\b|swap|testnet|blockchain|transa[cç])/i],
     ["flip", /\b(flip|change (your|its) mind|would change|what if|without|sensitiv|removed|mudaria|mudar de ideia|virar)/i],
     ["outcome", /\b(happen|next|afterwards|did it work|work out|result|outcome|hit the|profit|pnl|won\b|aconteceu|depois|deu certo|resultado)/i],
@@ -494,6 +496,40 @@
     return { text: `${value} ${sym}`, source: `${raw} ${token} = ${value} ${sym} (${dec} decimals)` };
   }
 
+  const STATUS = (s) => (s === "empty" ? "an empty answer" : s === 200 ? "an answer" : `HTTP ${s}`);
+
+  function model_(d, b) {
+    const llm = d.llm;
+    if (!llm) {
+      b.say("This record has no AI analyst layer: no model wrote any part of it, and the fixed rules decided alone.");
+      return;
+    }
+    let policy = null;
+    const names = { bull: "bull analyst", bear: "bear analyst", judge: "AI judge" };
+    for (const part of ["bull", "bear", "judge"]) {
+      const block = llm[part];
+      if (!block || (!block.served_by && !block.route)) continue;
+      const route = Array.isArray(block.route) ? block.route : null;
+      if (!route) {
+        b.say(`The ${names[part]} was answered by ${block.served_by}, recorded before the gateway logged its route, so the record does not say which models were tried first.`,
+          [b.cite(`llm.${part}.served_by`, "model that answered", block.served_by)]);
+        continue;
+      }
+      const steps = route.map((a) => `${a.model} gave ${STATUS(a.status)} in ${a.ms} ms`).join("; then ");
+      const refs = [b.cite(`llm.${part}.route`, `${names[part]} route`, route.map((a) => `${a.model} ${a.status} ${a.ms}`).join(" "))];
+      if (block.routing_policy) {
+        policy = block.routing_policy;
+        refs.push(b.cite(`llm.${part}.routing_policy`, "routing policy", `sha256 ${policy.sha256} as_of_seq ${policy.as_of_seq}`));
+      }
+      b.say(`The ${names[part]}: ${steps}${block.served_by ? `; the reply named ${block.served_by}` : ""}.`, refs);
+    }
+    if (policy) {
+      b.say(`The gateway tried the models in the order of the routing policy computed from the ledger up to record ${policy.as_of_seq} (sha256 ${policy.sha256.slice(0, 12)}...), ranked by how many of each model's claims passed the citation check; it moves on only when a model is unavailable or gives an empty answer. The judge page shows that ranking.`,
+        [b.cite("routing_policy", "routing policy", `sha256 ${policy.sha256} ${policy.as_of_seq} 12`)]);
+    }
+    b.say("Whichever model writes the arguments, the decision rule is the same: every claim is citation-checked and the AI judge can never open a position alone.");
+  }
+
   function executed(d, b) {
     const v = d.verdict || {};
     const ex = d.execution;
@@ -520,7 +556,7 @@
     b.say("Test tokens only: no real money moved.");
   }
 
-  const ANSWERS = { decision, why, chart: chart_, flip, risk, outcome: outcome_, analysts, refused, judge, voices, saw, executed, proof, help };
+  const ANSWERS = { decision, why, chart: chart_, flip, risk, outcome: outcome_, analysts, refused, judge, model: model_, voices, saw, executed, proof, help };
 
   function answer(dossier, intent, ctx) {
     if (!intent || !ANSWERS[intent]) {

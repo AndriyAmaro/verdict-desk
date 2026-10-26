@@ -102,6 +102,17 @@ class RenderTest(unittest.TestCase):
         self.assertIn("answered by qwen/qwen3.8-27b", page)
         self.assertIn("answered by glm-5.2", page)
 
+    def test_the_route_says_which_models_were_tried_before_the_one_that_answered(self):
+        row = self.synthetic(rules_version="v6")
+        route = [{"model": "gpt-oss-120b", "status": 429, "ms": 812}, {"model": "agnes-3.0-flash", "status": 200, "ms": 9400}]
+        row["llm"] = {"bull": {"accepted": [], "rejected": [], "served_by": "agnes-3.0-flash", "route": route,
+                               "routing_policy": {"sha256": "ab" * 32, "as_of_seq": 383}},
+                      "bear": {"accepted": [], "rejected": [], "served_by": "openai/gpt-oss-120b",
+                               "route": [{"model": "gpt-oss-120b", "status": 200, "ms": 3160}]}}
+        page = exhibit.render(row)
+        self.assertIn("answered by agnes-3.0-flash after gpt-oss-120b returned 429", page)
+        self.assertIn("answered by openai/gpt-oss-120b, first in the routing policy", page)
+
     def test_a_voided_judge_says_it_added_nothing_and_why(self):
         page = self.judged({"ruling": {"lean": "bull", "conviction": "high", "relied_on": ["S4"], "reason": "x"},
                             "accepted": False, "weight": 0.0, "rejected_because": "unknown claim id: 'S4'"})

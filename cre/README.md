@@ -89,7 +89,9 @@ export SEPOLIA_PRIVATE_KEY=0x...    # throwaway Sepolia key, never committed
 bash cre/scripts/anchor-existing.sh
 ```
 
-It broadcasts the report against the contract recorded in `cre/deployment.sepolia.json`. The scheduled job in `.github/workflows/anchor.yml` runs it hourly and **skips with a visible notice** when `SEPOLIA_PRIVATE_KEY` or `CRE_API_KEY` are not configured: the published ledger stays verifiable without them, only the on-chain cadence pauses.
+It broadcasts the report against the contract recorded in `cre/deployment.sepolia.json`.
+
+**The cadence without the operator's machine.** The scheduled job in `.github/workflows/anchor.yml` runs at :07 and :37 every hour on GitHub's runners. With the repository variable `ANCHOR_ROUTE=cre` and a valid `CRE_API_KEY` it runs the script above. This account cannot create a valid CRE API key (the one stored on 25 Oct is rejected as unauthorized, and `cre login` needs a browser), so by default it runs `cre/anchor/direct.ts` with `SEPOLIA_PRIVATE_KEY`: **not the CRE runtime**, but the same checks with the same code (the head must agree on two publications, its dossier must hash to it and re-derive its own verdict with `verdict.ts`, the BTC/USD Data Feed must agree on Sepolia and Ethereum mainnet within 500 bps) and the same report handed to the same `MockKeystoneForwarder`. Its report header names the workflow `gh-actions`, so every anchor on the contract says on-chain which route wrote it; the witnesses page reads that name from each transaction. `bun run direct.ts --dry-run` does every check and an `eth_call` of the transaction without sending it. A head already anchored, or a Pages copy still behind the repository, is skipped; a missing key skips with a visible notice.
 
 **If a run says `sources disagree`:** the Pages copy is published a few minutes after the repository file, at the end of the hourly deploy. A run made in that window is refused on purpose; wait for the deploy and run again.
 

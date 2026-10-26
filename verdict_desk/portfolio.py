@@ -7,6 +7,10 @@ posicao fica OPEN e nao conta no resultado realizado.
 """
 
 START_CAPITAL = 10_000.0
+# Fee model of the net result: a taker fee on the notional at entry and again at exit, the Binance USD-M futures
+# base rate (the desk reads perpetual funding, so futures fees are the coherent model; the backtest uses the same
+# rate). Slippage is not modelled.
+FEE_PCT_PER_SIDE = 0.05
 
 
 def _last_candle_time(dossier: dict) -> int:
@@ -57,6 +61,8 @@ def summarize(ledger: list[dict]) -> dict:
     closed = [p for p in positions if p["status"] != "OPEN"]
     wins = [p for p in closed if p["pnl"] > 0]
     realized = round(sum(p["pnl"] for p in closed), 4)
+    sizes = {d["seq"]: d["verdict"]["size"] for d in ledger if d["verdict"]["action"] in POSITION_ACTIONS}
+    fees = round(sum((p["entry"] + p["exit"]) * sizes[p["seq"]] * FEE_PCT_PER_SIDE / 100 for p in closed), 4)
     unrealized = round(sum(p["pnl"] for p in positions if p["status"] == "OPEN"), 4)
     equity, peak, max_dd = START_CAPITAL, START_CAPITAL, 0.0
     for p in closed:
@@ -71,6 +77,9 @@ def summarize(ledger: list[dict]) -> dict:
         "open": len(positions) - len(closed),
         "win_rate_pct": round(len(wins) / len(closed) * 100, 1) if closed else None,
         "realized_pnl": realized,
+        "fees": fees,
+        "realized_net": round(realized - fees, 4),
+        "fee_pct_per_side": FEE_PCT_PER_SIDE,
         "unrealized_pnl": unrealized,
         "max_drawdown_pct": round(max_dd, 2),
         "start_capital": START_CAPITAL,

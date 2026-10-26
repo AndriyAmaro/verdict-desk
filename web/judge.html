@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Verdict Desk — judge path</title>
+<title>Verdict Desk · judge path</title>
 <meta name="description" content="Every requirement of both bounties, each mapped to the file, command or transaction that proves it, with the live numbers recomputed from the ledger in your browser.">
-<meta property="og:title" content="Verdict Desk — what a judge can check in five minutes">
+<meta property="og:title" content="Verdict Desk: what a judge can check in five minutes">
 <meta property="og:description" content="Requirement by requirement: where to look, what to run, and what is real and what is simulated.">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f5fbf'/%3E%3Cpath d='M9 11h14M9 16h9M9 21h11' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
@@ -28,7 +28,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
 </style></head><body>
 <p class="mut" style="margin:8px 0 14px"><a href="index.html">Dashboard</a> · <a href="judge.html"><b>Judge path</b></a> · <a href="ask.html">Ask the record</a> · <a href="usecase.html">Use case</a> · <a href="lab.html">Cause and effect lab</a> · <a href="exhibit/index.html">Decision exhibits</a> · <a href="scorecard.html">Scorecard</a> · <a href="verify.html">Verify a record</a> · <a href="narrative.html">Market voices</a> · <a href="witnesses.html">Witnesses</a> · <a href="evidence.html">Evidence</a> · <a href="learn.html">Learn</a></p>
 
-<h1>Verdict Desk — what a judge can check in five minutes</h1>
+<h1>Verdict Desk: what a judge can check in five minutes</h1>
 <p class="lead">Every claim below links to the artifact that proves it. Nothing here asks you to trust this page: the numbers are recomputed from <code>ledger/ledger.jsonl</code> in your browser, and the hashes are checked the same way.</p>
 
 <div id="live">Reading the public ledger…</div>
@@ -65,14 +65,14 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <h3>1. Agents that interpret market evidence</h3>
   <p class="asks">"Build agents that interpret market evidence…"</p>
   <ul>
-    <li>Each decision freezes one evidence packet: candles, funding, news, and public voices, with the source and time of every item — <code>verdict_desk/evidence.py</code></li>
-    <li>Two LLM analysts (bull and bear) plus a deterministic indicator engine (RSI, MACD, Bollinger) read that same packet — <code>verdict_desk/agents_v2.py</code></li>
-    <li>A narrative agent extracts token, stance, conviction and urgency from up to 20 <b>user-selected voices</b> (a file you edit: <code>config/voices.json</code>, whose hash is frozen in every dossier together with the voices that returned nothing that hour; today 5 newsrooms and 8 public Telegram channels) and requires two distinct voices to agree before it reports a convergence — <code>verdict_desk/narrative.py</code>; it also freezes the tokens it <b>rejected</b> and why (one voice only, voices disagreeing, or nobody taking a side)</li>
-    <li><b>"Trusted voices converge" is measured, not asserted:</b> each voice's calls are scored against the market's move, set against the hit rate luck alone would give, and weighted by the skill that is left, <b>recomputed in your browser</b> from the raw ledger and with no lookahead (every dossier freezes the table it used, and <code>trust-check</code> recomputes it from the dossiers before it) — <a href="narrative.html">Market voices</a>, <code>verdict_desk/trust.py</code></li>
+    <li>Each decision freezes one evidence packet: candles, funding, news, and public voices, with the source and time of every item: <code>verdict_desk/evidence.py</code></li>
+    <li>Two LLM analysts (bull and bear) plus a deterministic indicator engine (RSI, MACD, Bollinger) read that same packet: <code>verdict_desk/agents_v2.py</code></li>
+    <li>A narrative agent extracts token, stance, conviction and urgency from up to 20 <b>user-selected voices</b> (a file you edit: <code>config/voices.json</code>, whose hash is frozen in every dossier together with the voices that returned nothing that hour; today 5 newsrooms and 8 public Telegram channels) and requires two distinct voices to agree before it reports a convergence: <code>verdict_desk/narrative.py</code>; it also freezes the tokens it <b>rejected</b> and why (one voice only, voices disagreeing, or nobody taking a side)</li>
+    <li><b>"Trusted voices converge" is measured, not asserted:</b> each voice's calls are scored against the market's move, set against the hit rate luck alone would give, and weighted by the skill that is left, <b>recomputed in your browser</b> from the raw ledger and with no lookahead (every dossier freezes the table it used, and <code>trust-check</code> recomputes it from the dossiers before it): <a href="narrative.html">Market voices</a>, <code>verdict_desk/trust.py</code></li>
     <li><b>Your limit, your position:</b> on the same page, tick the voices that agree, set your own risk limit and watch the practice position it produces (the formulas are the Python judge's, compared over hundreds of random inputs; a limit above the 25% ceiling is refused)</li>
-    <li>The <a href="scorecard.html">scorecard</a> scores every position against what the market did next, with the sample sizes and the caveats printed next to the numbers — the one page that asks whether the decisions were good, not whether the record is intact</li>
-    <li>Every decision can be rendered as a <a href="exhibit/index.html">printable audit exhibit</a> — a Certificate of Filing with a VERIFIED seal, and the anchored record also ships as a <a href="exhibit/exhibit-80.pdf">signed PDF</a>: evidence custody, each claim beside the evidence text it cites, the deciding argument, the recomputed hash, the on-chain anchor, and an explicit statement of what the record does <b>not</b> prove</li>
-    <li>Behaviour you can test instead of trust: <a href="lab.html">the cause-and-effect lab</a> shows which single argument decides a recorded verdict, and replays the policy on inputs you choose — checked against the Python judge on 486 input combinations</li>
+    <li>The <a href="scorecard.html">scorecard</a> scores every position against what the market did next, with the sample sizes and the caveats printed next to the numbers, the one page that asks whether the decisions were good, not whether the record is intact</li>
+    <li>Every decision can be rendered as a <a href="exhibit/index.html">printable audit exhibit</a>: a Certificate of Filing with a VERIFIED seal, and the anchored record also ships as a <a href="exhibit/exhibit-80.pdf">signed PDF</a>: evidence custody, each claim beside the evidence text it cites, the deciding argument, the recomputed hash, the on-chain anchor, and an explicit statement of what the record does <b>not</b> prove</li>
+    <li>Behaviour you can test instead of trust: <a href="lab.html">the cause-and-effect lab</a> shows which single argument decides a recorded verdict, and replays the policy on inputs you choose, checked against the Python judge on 486 input combinations</li>
   </ul>
 </section>
 
@@ -80,9 +80,9 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <h3>2. Record the practice trades they would make</h3>
   <p class="asks">"…and record the practice trades they would make."</p>
   <ul>
-    <li>Every dossier carries entry, size, stop and target, sized from a fixed risk budget — no real order is ever placed</li>
+    <li>Every dossier carries entry, size, stop and target, sized from a fixed risk budget; no real order is ever placed</li>
     <li>It commits instead of hiding behind a HOLD: as of dossier 281, 165 of them carry a sized LONG or SHORT; the other 116 are labelled FLAT (63) or WATCH_REVERSAL (53), each naming the argument or condition that would flip it. The live counts are the <b>Positions</b> card on the <a href="./index.html">dashboard</a></li>
-    <li>Positions are marked against later candles; the dashboard shows the simulated result of each one — <code>verdict_desk/portfolio.py</code></li>
+    <li>Positions are marked against later candles; the dashboard shows the simulated result of each one: <code>verdict_desk/portfolio.py</code></li>
     <li>Open any row in the <a href="./index.html">dashboard</a> to see the trade and the reasoning that produced it</li>
   </ul>
 </section>
@@ -94,7 +94,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
     <li>Every argument names the evidence item it rests on, and an LLM claim is discarded unless its numbers really appear in the item it cites</li>
     <li>Each dossier freezes a sensitivity table: what would flip the verdict to LONG or SHORT, and what each single argument is worth</li>
     <li>Stale evidence is refused instead of used: past a 2-hour window the judge returns <code>BLOCKED_STALE</code> and sizes no position, and the refusal is recorded</li>
-    <li>A declined entry is named, not hidden: <code>WATCH_REVERSAL</code> when one single argument would flip the decision (and the rationale says which), <code>REDUCE_EXPOSURE</code> when both sides are strong and volatility is high — entry decisions and sizing are unchanged from the earlier rule set</li>
+    <li>A declined entry is named, not hidden: <code>WATCH_REVERSAL</code> when one single argument would flip the decision (and the rationale says which), <code>REDUCE_EXPOSURE</code> when both sides are strong and volatility is high; entry decisions and sizing are unchanged from the earlier rule set</li>
   </ul>
 </section>
 
@@ -103,7 +103,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <p class="asks">"…and preserve a repeatable reasoning trail."</p>
   <ul>
     <li>Dossiers are hash-chained; the dashboard recomputes every SHA-256 in your browser and lets you break the chain yourself with one button</li>
-    <li><code>python3 -m verdict_desk replay</code> re-derives every verdict from its own frozen evidence — all of them match</li>
+    <li><code>python3 -m verdict_desk replay</code> re-derives every verdict from its own frozen evidence, and all of them match</li>
     <li><code>python3 -m verdict_desk export --seq N --out pack.json</code> hands one dossier to a third party as a self-verifying file</li>
     <li>The scale behind the page: 459 tests, standard library only, pin the ledger, the pages and the docs to each other - one of them re-runs <code>scripts/refresh_numbers.py --check</code>, so a figure that no longer matches the chain, a link to a renamed card, or a doc that disagrees with the ledger fails the build instead of shipping</li>
   </ul>
@@ -116,11 +116,11 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <ul>
     <li>The workflow fetches the published ledger head over HTTP from <b>two independent publications</b> (the raw repository file and the Pages site), requires them to be identical and every node to agree under DON consensus, reads the <b>BTC/USD Data Feed</b> on Sepolia, and writes both through the CRE forwarder. If either source is down, or they differ, it anchors nothing</li>
     <li>The receiver only accepts forwarder reports with a strictly increasing sequence number, so an anchored head can never be overwritten</li>
-    <li>The contract is <b>source-verified with an exact match</b> — the explorer serves the code that matches the deployed bytecode: <a href="https://sourcify.dev/#/lookup/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7">Sourcify record</a></li>
+    <li>The contract is <b>source-verified with an exact match</b>: the explorer serves the code that matches the deployed bytecode: <a href="https://sourcify.dev/#/lookup/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7">Sourcify record</a></li>
     <li>Address <code>0x50443D51Db71A61E131B147B1d36aF21d48CDdF7</code> · anchor transactions: <a href="https://sepolia.etherscan.io/tx/0x53e5a96312ff3f200f7cb1c1abc0b96313272b5fc59c4bf85a136f6a26c2694d">#80, the first (block 11964023)</a> and <a href="https://sepolia.etherscan.io/tx/0x8b355823c734026aed28493aeb45b88e3c589a7bcc56c9eb9d4e8be63f3139ca">#212, the latest (25 Oct)</a>, both SUCCESS; the contract answers <code>isAnchored(212, hash)</code> TRUE</li>
-    <li><b>The workflow is re-run against the live head, not a fixture:</b> the simulation recorded in <code>cre/evidence/simulate-live-head.txt</code> fetched <code>ledger/head.json</code> under consensus, read the Data Feed at 81,317.07 and encoded record <b>#113</b> — and a test checks that the sequence and hash it names are the ones actually published in the ledger, so the evidence cannot drift from the record</li>
+    <li><b>The workflow is re-run against the live head, not a fixture:</b> the simulation recorded in <code>cre/evidence/simulate-live-head.txt</code> fetched <code>ledger/head.json</code> under consensus, read the Data Feed at 81,317.07 and encoded record <b>#113</b>, and a test checks that the sequence and hash it names are the ones actually published in the ledger, so the evidence cannot drift from the record</li>
     <li><b>Anchoring is a script, not a ceremony:</b> <code>cre/scripts/anchor-existing.sh</code> anchors the current head against the same deployed contract (a new deployment each run would orphan the history). It refuses to run without a key rather than silently doing nothing. The hourly job is wired and reports a skip that says why; until the CRE organisation gets deployment access (needed for an API key) the anchor is sent by hand, and the Witnesses page shows how far the ledger is past the last one</li>
-    <li><b>And a clock that needs no wallet:</b> every hourly run also stamps the published head with <a href="https://opentimestamps.org">OpenTimestamps</a>, which commits the digest into a Bitcoin block through independent public calendars. Proofs are archived per record (<code>ledger/timestamps/</code>) and a test checks each snapshot equals the published hash — <code>ots verify ledger/timestamps/116.json.ots</code></li>
+    <li><b>And a clock that needs no wallet:</b> every hourly run also stamps the published head with <a href="https://opentimestamps.org">OpenTimestamps</a>, which commits the digest into a Bitcoin block through independent public calendars. Proofs are archived per record (<code>ledger/timestamps/</code>) and a test checks each snapshot equals the published hash: <code>ots verify ledger/timestamps/116.json.ots</code></li>
     <li><b>And it is monitored, not just written once:</b> <code>python3 -m verdict_desk monitor</code> reads the anchored value back from the contract and compares it with the dossier of that same sequence in the published ledger. It says MATCH, or it names the divergence. The hourly job runs it as a guard: a mismatch fails the run.</li>
   </ul>
 </section>
@@ -155,10 +155,10 @@ fetch('models.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw
   var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   var p = b.policy || { order: [], ranked: [], observing: [], dropped: [] };
   var status = function (id) { var i = p.order.indexOf(id); return i >= 0 ? (p.ranked.indexOf(id) >= 0 ? '#' + (i + 1) + ' in the order' : '#' + (i + 1) + ', under observation') : (p.dropped.indexOf(id) >= 0 ? 'dropped' : 'not routed'); };
-  var pct = function (x) { return x == null ? '—' : (x * 100).toFixed(1) + '%'; };
+  var pct = function (x) { return x == null ? '·' : (x * 100).toFixed(1) + '%'; };
   var rows = b.models.filter(function (m) { return m.calls || m.judge.rulings; }).map(function (m) {
     var bar = '<span style="display:inline-block;height:8px;width:' + Math.round((m.wilson_low || 0) * 120) + 'px;background:var(--ok,#0a7a3d);border-radius:2px;vertical-align:middle"></span>';
-    var reasons = Object.keys(m.reasons || {}).map(function (k) { return esc(k) + ' ×' + m.reasons[k]; }).join(', ') || '—';
+    var reasons = Object.keys(m.reasons || {}).map(function (k) { return esc(k) + ' ×' + m.reasons[k]; }).join(', ') || '·';
     return '<tr><td><code>' + esc(m.id) + '</code></td><td>' + esc(status(m.id)) + '</td><td>' + m.calls + ' (' + m.empty + ' empty)</td><td>' + m.passed + ' of ' + m.claims + ' (' + pct(m.pass_rate) + ')</td><td>' + bar + ' ' + pct(m.wilson_low) + '</td><td>' + m.judge.kept + ' kept, ' + m.judge.voided + ' voided</td><td>' + reasons + '</td></tr>';
   }).join('');
   var head = p.order.length ? '<p>Order in force: <b>' + p.order.map(esc).join(' → ') + '</b>, then the gateway\'s own router as the declared last resort. Computed from records up to #' + esc(p.as_of_seq) + ', policy sha256 <code>' + esc((b.policy_sha256 || '').slice(0, 16)) + '…</code>; not re-ranked from ' + esc((p.frozen || [])[0] ? p.frozen[0].slice(0, 10) : '') + ' to ' + esc((p.frozen || [])[1] ? p.frozen[1].slice(0, 10) : '') + ' (the judging days).</p>' : '';
@@ -177,7 +177,7 @@ fetch('series.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw
   var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   var rows = s.eras.map(function (e) {
     var served = Object.keys(e.served_by || {}).sort(function (a, b) { return e.served_by[b] - e.served_by[a]; }).map(function (m) { return esc(m) + ' ×' + e.served_by[m]; }).join(', ');
-    return '<tr><td>#' + e.from_seq + '–#' + e.to_seq + '</td><td>' + esc((e.from_time || '').slice(0, 16).replace('T', ' ')) + ' → ' + esc((e.to_time || '').slice(0, 16).replace('T', ' ')) + '</td><td>' + esc(e.model || '—') + '</td><td>' + esc(e.status) + (e.reason ? ': ' + esc(e.reason) : '') + '</td><td>' + (served || '—') + '</td></tr>';
+    return '<tr><td>#' + e.from_seq + '–#' + e.to_seq + '</td><td>' + esc((e.from_time || '').slice(0, 16).replace('T', ' ')) + ' → ' + esc((e.to_time || '').slice(0, 16).replace('T', ' ')) + '</td><td>' + esc(e.model || '·') + '</td><td>' + esc(e.status) + (e.reason ? ': ' + esc(e.reason) : '') + '</td><td>' + (served || '·') + '</td></tr>';
   }).join('');
   document.getElementById('series').innerHTML = '<table><thead><tr><th>Records</th><th>From → to (UTC)</th><th>Configured model</th><th>Outcome</th><th>Answered by</th></tr></thead><tbody>' + rows + '</tbody></table>';
 }).catch(function () { document.getElementById('series').textContent = 'The series is written on each hourly run (python3 -m verdict_desk series).'; });

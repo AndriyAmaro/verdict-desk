@@ -7,7 +7,7 @@ because a scorecard without its denominators is marketing.
 Method, exactly:
   * entry price is the last close in the frozen packet (the same price the judge sized at);
   * the forward price is the first candle at or after the target horizon, taken from later
-    packets in the same ledger — no external data, so the report reproduces from the ledger;
+    packets in the same ledger, with no external data, so the report reproduces from the ledger;
   * a LONG scores (forward / entry - 1), a SHORT scores the negative of that;
   * rows whose horizon has not yet elapsed are excluded, never estimated.
 
@@ -139,7 +139,7 @@ def render(result: dict, portfolio_summary: dict | None = None) -> str:
                 "(the Binance USD-M futures base rate; slippage excluded). Positions are marked against later candles.</p>")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Verdict Desk — scorecard</title>
+<title>Verdict Desk · scorecard</title>
 <style>
 :root{{--fg:#111;--mut:#555;--line:#ccc;--ok:#0a7a3d;--bad:#b3261e;--warn:#8a5300}}
 body{{font:14px/1.6 system-ui,sans-serif;color:var(--fg);background:#fff;max-width:860px;margin:0 auto;padding:26px 22px 60px}}
@@ -177,7 +177,7 @@ def render_markdown(result: dict) -> str:
     lines = ["| State | Horizon | n | Mean | Hit rate | Best | Worst |", "|---|---|---|---|---|---|---|"]
     for r in result["table"]:
         if not r.get("n"):
-            lines.append(f"| {r['state']} | +{r['hours']}h | 0 | — | — | — | — |")
+            lines.append(f"| {r['state']} | +{r['hours']}h | 0 | · | · | · | · |")
         else:
             lines.append(f"| {r['state']} | +{r['hours']}h | {r['n']} | {r['mean']:+.3f}% | "
                          f"{r['hit_rate']:.0f}% | {r['best']:+.2f}% | {r['worst']:+.2f}% |")

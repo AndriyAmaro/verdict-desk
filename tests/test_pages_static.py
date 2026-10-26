@@ -63,3 +63,13 @@ class PageTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NoEmDashTest(unittest.TestCase):
+    """House style for every text a reader sees: commas, colons, periods or a middle dot, never an em dash."""
+
+    def test_no_page_template_or_readme_carries_an_em_dash(self):
+        root = Path(__file__).resolve().parents[1]
+        files = sorted((root / "web").glob("*.html")) + [root / "README.md", root / "verdict_desk" / "exhibit.py", root / "verdict_desk" / "scorecard.py"]
+        hits = [f"{p.relative_to(root)}:{n}" for p in files for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1) if "—" in line]
+        self.assertEqual(hits, [])

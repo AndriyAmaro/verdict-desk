@@ -246,7 +246,7 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
             accepted = block.get("accepted") or []
             rejected = block.get("rejected") or []
             who = _who(block)
-            rows.append(f"<h3>{_e(side.capitalize())} analyst — {len(accepted)} kept, {len(rejected)} refused{_e(who)}</h3>")
+            rows.append(f"<h3>{_e(side.capitalize())} analyst · {len(accepted)} kept, {len(rejected)} refused{_e(who)}</h3>")
             if accepted:
                 rows.append("<table><thead><tr><th>Claim</th><th>Evidence it cites</th></tr></thead><tbody>")
                 for c in accepted:
@@ -274,7 +274,7 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
             status = (f"counts {judge.get('weight')}" if judge.get("accepted") and judge.get("weight")
                       else "balanced, adds nothing" if judge.get("accepted") else "voided, adds nothing")
             who = _who(judge)
-            rows.append(f"<h3>AI judge (rules v6) — {_e(status)}{_e(who)}</h3>")
+            rows.append(f"<h3>AI judge (rules v6) · {_e(status)}{_e(who)}</h3>")
             rows.append("<p class=\"small\">The judge reads only the claims kept above. Its lean counts only if it rests on at least "
                         "one kept claim of that side and every number in its reason is in that evidence; the weight comes from a fixed "
                         "table capped below the entry band, so it can tip a close call but never open a position alone.</p>")
@@ -347,7 +347,7 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
             "market_window_minutes": "Price freshness window",
             "slow_window_minutes": "News/voice freshness window",
         }
-        rows.append("<p class=\"small\"><b>Rules frozen in this record</b> — the exact numbers that produced this verdict, "
+        rows.append("<p class=\"small\"><b>Rules frozen in this record</b>: the exact numbers that produced this verdict, "
                     "inside the hashed body, so changing a rule later would change the hash and the anchor would no longer match.</p>")
         rows.append("<table class=\"kv\"><tbody>"
                     + "".join(f"<tr><th>{_e(labels.get(k, k))}</th><td>{_e(v)}{' min' if 'window' in k else ''}</td></tr>"
@@ -378,7 +378,7 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
     rows.append(f"<tr><th>Recorded SHA-256</th><td class=\"mono\">{_e(recorded)}</td></tr>")
     rows.append(f"<tr><th>Recomputed when this exhibit was made</th><td class=\"mono\">{_e(recomputed)}</td></tr>")
     rows.append(f"<tr><th>Verdict</th><td><b class=\"{'ok' if integrity_ok else 'bad'}\">"
-                f"{'MATCH — the record is unchanged' if integrity_ok else 'MISMATCH — this record was edited'}</b></td></tr>")
+                f"{'MATCH: the record is unchanged' if integrity_ok else 'MISMATCH: this record was edited'}</b></td></tr>")
     rows.append(f"<tr><th>Previous record</th><td class=\"mono\">{_e(prev)}"
                 f"{' (genesis)' if prev == GENESIS else ''}</td></tr>")
     if chain:
@@ -387,7 +387,7 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
     if anchor:
         state = "matches the hash written on Ethereum Sepolia" if anchor.get("matches") else "does NOT match the on-chain anchor"
         rows.append(f"<tr><th>On-chain anchor</th><td>{_e(state)}"
-                    + (f" — anchor #{_e(anchor.get('anchored_seq'))}, {_e(anchor.get('anchored_at'))}" if anchor.get("anchored_seq") else "")
+                    + (f" · anchor #{_e(anchor.get('anchored_seq'))}, {_e(anchor.get('anchored_at'))}" if anchor.get("anchored_seq") else "")
                     + "</td></tr>")
     rows.append("</tbody></table>")
     if not anchor:
@@ -415,7 +415,7 @@ def render(dossier: dict, chain: dict | None = None, anchor: dict | None = None,
                       f"<code>python3 -m verdict_desk export --seq {_e(seq)} --out pack.json</code> on a copy of the public ledger.</div>")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Decision exhibit #{_e(seq)} — {_e(symbol)}</title>
+<title>Decision exhibit #{_e(seq)} · {_e(symbol)}</title>
 <style>
 :root{{--fg:#111;--mut:#555;--line:#ccc;--ok:#0a7a3d;--bad:#b3261e;--warn:#8a5300;--accent:#1f5fbf}}
 *{{box-sizing:border-box}}
@@ -451,7 +451,7 @@ table.refused th{{background:#fdf6f5}}table.refused td{{color:#555}}
 footer{{margin-top:26px;padding-top:10px;border-top:1px solid var(--line);font-family:system-ui,sans-serif;font-size:11px;color:var(--mut)}}
 @media print{{body{{padding:0;max-width:none}}h2{{page-break-after:avoid}}table{{page-break-inside:avoid}}}}
 </style></head><body>
-<h1>Decision exhibit #{_e(seq)} — {_e(symbol)}</h1>
+<h1>Decision exhibit #{_e(seq)} · {_e(symbol)}</h1>
 <div class="cert-header"><div class="t">Certificate of Filing</div>
 <div class="s">record #{_e(seq)} · {_e(symbol)} · evidence collected {_e(seen_at)} · rules {_e(verdict.get('rules_version', 'v1'))}</div></div>
 <div class="sealwrap"><span class="seal{' bad' if not integrity_ok else ''}">{'Verified' if integrity_ok else 'Tampered'}</span></div>
@@ -497,7 +497,7 @@ def render_index(entries: list[tuple[dict, str]]) -> str:
         )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Verdict Desk — decision exhibits</title>
+<title>Verdict Desk · decision exhibits</title>
 <style>
 body{{font:14px/1.55 Georgia,serif;max-width:820px;margin:0 auto;padding:26px 22px 60px;color:#111;background:#fff}}
 h1{{font-size:21px;margin:0 0 4px}}p.sub{{font-family:system-ui,sans-serif;color:#555;font-size:12px;margin:0 0 16px}}

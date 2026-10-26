@@ -39,7 +39,7 @@ class RenderTest(unittest.TestCase):
 
     def test_integrity_line_matches_for_an_untouched_record(self):
         page = exhibit.render(self.row)
-        self.assertIn("MATCH — the record is unchanged", page)
+        self.assertIn("MATCH: the record is unchanged", page)
         self.assertIn(self.row["hash"], page)
 
     # ---- the plain-English summary: for a reader who is not a specialist ----------------------
@@ -199,7 +199,7 @@ class RenderTest(unittest.TestCase):
         tampered = json.loads(json.dumps(self.row))
         tampered["verdict"]["action"] = "LONG" if tampered["verdict"]["action"] != "LONG" else "SHORT"
         page = exhibit.render(tampered)
-        self.assertIn("MISMATCH — this record was edited", page)
+        self.assertIn("MISMATCH: this record was edited", page)
 
     def test_the_attribution_table_marks_the_deciding_argument(self):
         page = exhibit.render(self.row)

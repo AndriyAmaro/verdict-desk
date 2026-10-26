@@ -54,7 +54,7 @@ The bounty's spotlight describes an agent that monitors user-selected crypto voi
 | Explain the candidates it rejected | Every mentioned token that did not become a narrative is kept with its reason: only one voice, voices disagreeing, or neutral mentions only | `narrative.rejected_candidates`, frozen in the dossier |
 | Practice position under transparent rules and risk limits | The convergence becomes a citable evidence item; the deterministic judge sizes a simulated position inside the risk limit the user sets in the same file (`risk.max_risk_pct`, default 1%, system ceiling 25%, refused loudly above it) with an ATR stop and target | `verdict_desk/agents_v2.py`, `portfolio.py` |
 
-Example from the live ledger: BTC bullish, converging across **CoinDesk, Cointelegraph, Decrypt and The Block**, top conviction *high*, top urgency *medium* — and that convergence is one of the items the judge is allowed to cite when it rules.
+Example from the live ledger: BTC bullish, converging across **CoinDesk, Cointelegraph, Decrypt and The Block**, top conviction *high*, top urgency *medium*, and that convergence is one of the items the judge is allowed to cite when it rules.
 
 Choose your own voices and your own limit, then run it:
 
@@ -69,7 +69,7 @@ An invalid file is refused with the field and the reason, and nothing is recorde
 
 ## Verifying a record someone hands you
 
-A dossier that arrives as a file — forwarded, copied out of an email, transcribed — should not
+A dossier that arrives as a file (forwarded, copied out of an email, transcribed) should not
 require trusting the sender or this site. [`web/verify.html`](https://andriyamaro.github.io/verdict-desk/verify.html)
 takes a pasted record and runs three checks in the reader's own browser:
 
@@ -126,7 +126,7 @@ The live site publishes the last five exhibits plus the anchored record, regener
 
 The spotlight asks the agent to "create a practice position using transparent signal rules". Since
 rules v4, a narrative convergence matching the symbol becomes a **deterministic** argument whose
-weight is a stated formula — 0.5 per distinct voice (max 4) plus 0.5 when top conviction is high —
+weight is a stated formula (0.5 per distinct voice, max 4, plus 0.5 when top conviction is high),
 so the multi-KOL layer drives the position by a rule the replay reproduces, not by the LLM's
 opinion. Earlier versions (v1/v2/v3) are unchanged and keep replaying under their own version.
 
@@ -159,7 +159,7 @@ nothing. With no LLM, v6 decides exactly like v5.
 ![Verdict Desk chain of custody](web/custody.svg)
 
 Six stages, none of which can be skipped: evidence is frozen, debated with citations, validated,
-ruled on deterministically, hash-chained into a dossier, and independently anchored — on Sepolia
+ruled on deterministically, hash-chained into a dossier, and independently anchored: on Sepolia
 through the CRE workflow and in Bitcoin through OpenTimestamps. The last row of each box states
 what fails closed.
 
@@ -167,14 +167,14 @@ what fails closed.
 
 `web/lab.html` answers, in the browser, the two questions a reviewer actually asks:
 
-1. **Which single argument decided this verdict?** Pick any dossier from the published ledger and the page shows, per argument, the edge and the action that would remain if that argument were removed — with the verdict-deciding ones highlighted. This is the dossier's own recorded `sensitivity` block, not a re-run.
+1. **Which single argument decided this verdict?** Pick any dossier from the published ledger and the page shows, per argument, the edge and the action that would remain if that argument were removed, with the verdict-deciding ones highlighted. This is the dossier's own recorded `sensitivity` block, not a re-run.
 2. **What rule would fire for inputs I choose?** Move the sliders and the state is named with the exact rule that produced it: entry band, high-volatility rule, the freshness gate, and fail-closed behaviour on stale price.
 
 The playground is a mirror of the judge in `web/policy.js`. A mirror that is never compared is a second implementation waiting to lie, so `tests/test_policy_parity.py` runs it over 486 input combinations and fails when any state differs from what `verdict_desk/agents_v2.py` returns for the same numbers.
 
 ## Risk limits are the user's, inside a ceiling the system owns
 
-`--risk-pct` sets the risk per practice position (default 1%). The system refuses anything above **25%** instead of silently clamping it, and every dossier freezes both numbers — so an auditor sees the limit that was declared next to the cap that governed it, and a replay reapplies the same limit rather than the default.
+`--risk-pct` sets the risk per practice position (default 1%). The system refuses anything above **25%** instead of silently clamping it, and every dossier freezes both numbers, so an auditor sees the limit that was declared next to the cap that governed it, and a replay reapplies the same limit rather than the default.
 
 ```bash
 python3 -m verdict_desk decide-v6 BTCUSDT --risk-pct 2

@@ -204,6 +204,23 @@ test("an executed swap is told in token units, with the raw on-chain amounts cit
   assert.ok(a.cites.find((c) => c.ref === "execution.amounts").source.includes(String(swap.execution.amount_in)));
 });
 
+test("which model wrote this: the route the gateway took, or what an older record can say", () => {
+  assert.equal(ask.route("Which model wrote this, and why that one?"), "model");
+  assert.equal(ask.route("qual modelo respondeu?"), "model");
+  const routed = JSON.parse(JSON.stringify(POSITION));
+  routed.llm = routed.llm || {};
+  routed.llm.bull = { accepted: [], rejected: [], served_by: "agnes-3.0-flash",
+    route: [{ model: "gpt-oss-120b", status: 429, ms: 812 }, { model: "agnes-3.0-flash", status: 200, ms: 9400 }],
+    routing_policy: { sha256: "ab".repeat(32), as_of_seq: 383 } };
+  const a = ask.answer(routed, "model");
+  assert.match(textOf(a), /gpt-oss-120b.*429.*agnes-3\.0-flash/);
+  assert.ok(ask.check(a).ok, JSON.stringify(ask.check(a)));
+  assert.ok(a.cites.some((c) => c.ref === "llm.bull.routing_policy"));
+  const old = LEDGER.find((d) => d.llm && d.llm.bull && d.llm.bull.served_by && !d.llm.bull.route);
+  assert.match(textOf(ask.answer(old, "model")), /before the gateway logged its route/);
+  assert.match(textOf(ask.answer(OLD, "model")), /no AI analyst layer/);
+});
+
 test("every answer names the chart marks its citations point at", () => {
   const a = ask.answer(POSITION, "risk");
   assert.ok(a.marks.includes("stop") && a.marks.includes("entry") && a.marks.includes("take_profit"));

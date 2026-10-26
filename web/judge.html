@@ -145,6 +145,28 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   </ul>
 </section>
 
+<h2>Model routing, measured: which model answers, and why that one</h2>
+<section class="crit">
+  <p class="mut">The analysts and the judge run on free models behind a gateway whose code is in the repository (<a href="https://github.com/AndriyAmaro/verdict-desk/blob/main/tools/llm-gateway/gate.py">tools/llm-gateway/gate.py</a>). Free models hit rate limits, so each call is routed: the gateway tries the models in the order of a <a href="https://github.com/AndriyAmaro/verdict-desk/blob/main/config/model_routing.json">routing policy</a> computed from this ledger by a rule fixed in advance (rank by the Wilson lower bound of the share of each model's claims that passed the citation check, with at least 20 claims; fewer claims means under observation), and moves on only when a model is unavailable or gives an empty answer. A test fails if the policy file is not exactly what the rule gives, so nobody tunes the order by hand. Every new dossier records the route of each call (the models tried, their status, the milliseconds) and the fingerprint of the policy it followed. The bench measures citation precision, not market skill: with this few rulings that would be noise.</p>
+  <div id="bench" class="mut">Reading the bench…</div>
+</section>
+<script>
+fetch('models.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('none'); return r.json(); }).then(function (b) {
+  var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var p = b.policy || { order: [], ranked: [], observing: [], dropped: [] };
+  var status = function (id) { var i = p.order.indexOf(id); return i >= 0 ? (p.ranked.indexOf(id) >= 0 ? '#' + (i + 1) + ' in the order' : '#' + (i + 1) + ', under observation') : (p.dropped.indexOf(id) >= 0 ? 'dropped' : 'not routed'); };
+  var pct = function (x) { return x == null ? '—' : (x * 100).toFixed(1) + '%'; };
+  var rows = b.models.filter(function (m) { return m.calls || m.judge.rulings; }).map(function (m) {
+    var bar = '<span style="display:inline-block;height:8px;width:' + Math.round((m.wilson_low || 0) * 120) + 'px;background:var(--ok,#0a7a3d);border-radius:2px;vertical-align:middle"></span>';
+    var reasons = Object.keys(m.reasons || {}).map(function (k) { return esc(k) + ' ×' + m.reasons[k]; }).join(', ') || '—';
+    return '<tr><td><code>' + esc(m.id) + '</code></td><td>' + esc(status(m.id)) + '</td><td>' + m.calls + ' (' + m.empty + ' empty)</td><td>' + m.passed + ' of ' + m.claims + ' (' + pct(m.pass_rate) + ')</td><td>' + bar + ' ' + pct(m.wilson_low) + '</td><td>' + m.judge.kept + ' kept, ' + m.judge.voided + ' voided</td><td>' + reasons + '</td></tr>';
+  }).join('');
+  var head = p.order.length ? '<p>Order in force: <b>' + p.order.map(esc).join(' → ') + '</b>, then the gateway\'s own router as the declared last resort. Computed from records up to #' + esc(p.as_of_seq) + ', policy sha256 <code>' + esc((b.policy_sha256 || '').slice(0, 16)) + '…</code>; not re-ranked from ' + esc((p.frozen || [])[0] ? p.frozen[0].slice(0, 10) : '') + ' to ' + esc((p.frozen || [])[1] ? p.frozen[1].slice(0, 10) : '') + ' (the judging days).</p>' : '';
+  document.getElementById('bench').innerHTML = head + '<table><thead><tr><th>Model</th><th>Routing</th><th>Calls answered</th><th>Claims that passed the citation check</th><th>Lower bound (95%)</th><th>Judge rulings</th><th>Refusals</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<p class="mut">' + b.unanswered_calls + ' analyst calls since the start failed before any model answered (provider outages, recorded in each dossier and decided by the fixed rules alone).</p>';
+}).catch(function () { document.getElementById('bench').textContent = 'The bench is written on each hourly run (python3 -m verdict_desk models).'; });
+</script>
+
 <h2>The judged series: which model wrote each stretch of the ledger</h2>
 <section class="crit">
   <p class="mut">Read from the ledger itself, nothing rewritten: consecutive records with the same configured model and the same outcome form one stretch; a failure is named from the error the records carry; "answered by" counts the models that actually replied (recorded from dossier 348).</p>

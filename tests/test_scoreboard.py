@@ -56,6 +56,19 @@ class NumbersTest(unittest.TestCase):
     def test_the_test_count_is_the_one_given_never_invented(self):
         self.assertEqual(build(tests=999)["tests"], 999)
 
+    def test_the_practice_book_is_settled_from_the_cited_prefix_only(self):
+        data = build(seq=200)["practice"]
+        positions = [d for d in LEDGER[:200] if d["verdict"]["action"] in ("LONG", "SHORT")]
+        self.assertEqual(data["closed"] + data["open"], len(positions))
+        self.assertEqual(data["take"] + data["stop"], data["closed"])
+        # a position's outcome may only use candles recorded up to the cited dossier
+        later = build(seq=201)["practice"]
+        self.assertGreaterEqual(later["closed"], data["closed"])
+
+    def test_the_practice_result_is_the_sum_of_the_settled_positions(self):
+        data = build(seq=200)["practice"]
+        self.assertAlmostEqual(data["realized"], data["take"] * 200.0 - data["stop"] * 100.0, places=2)
+
 
 class AnchorsTest(unittest.TestCase):
     def test_the_bitcoin_height_is_read_from_the_proof_file(self):
@@ -88,8 +101,13 @@ class RenderAndCheckTest(unittest.TestCase):
         self.text = scoreboard.render(self.data)
 
     def test_each_number_comes_with_what_it_proves_to_a_lawyer(self):
-        for idea in ("integrity after recording", "custody", "time", "audit trail", "repeatab"):
+        for idea in ("integrity after recording", "custody", "time", "audit trail", "repeatab", "practice trades"):
             self.assertIn(idea, self.text.lower())
+
+    def test_the_practice_line_says_simulated_before_fees_and_overlapping(self):
+        line = next(l for l in self.text.splitlines() if "practice positions" in l)
+        for words in ("simulated", "before fees", "overlap", "drawdown"):
+            self.assertIn(words, line)
 
     def test_the_judge_path_is_three_steps_with_links_and_nothing_to_install(self):
         path = self.text[self.text.index("JUDGE PATH"):]

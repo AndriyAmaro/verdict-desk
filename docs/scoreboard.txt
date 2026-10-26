@@ -1,15 +1,16 @@
-LIVE SCOREBOARD: every number below is counted from the raw ledger, as of dossier 284 (head 6594f12af4346f15).
+LIVE SCOREBOARD: every number below is counted from the raw ledger, as of dossier 356 (head 4e432a6301a362e5).
 Rebuild and check it yourself: python3 -m verdict_desk scoreboard --check docs/scoreboard.txt. The check fails if any figure differs; no number here is typed by hand.
 
-- 284 dossiers, hash-chained. Proves integrity after recording: an edit, deletion or swap anywhere breaks every later hash.
-- 1900 analyst claims accepted and 202 refused by the citation validator (157 number not in cited evidence; 44 unknown evidence id; 1 no citation); 108 analyst calls failed (provider outages, recorded in each dossier). Proves an audit trail: a refused claim is kept with its reason, so the record shows what was rejected and not only what survived.
-- 284 of 284 dossiers re-derive to the same verdict from their own frozen evidence. Proves repeatability: anyone can run the replay and get the same answer.
-- 461 tests pin the ledger, the pages and the docs to each other. Proves a controlled process: a figure that stops matching the chain fails the build.
+- 356 dossiers, hash-chained. Proves integrity after recording: an edit, deletion or swap anywhere breaks every later hash.
+- 2161 analyst claims accepted and 212 refused by the citation validator (167 number not in cited evidence; 44 unknown evidence id; 1 no citation); 192 analyst calls failed (provider outages, recorded in each dossier). Proves an audit trail: a refused claim is kept with its reason, so the record shows what was rejected and not only what survived.
+- 356 of 356 dossiers re-derive to the same verdict from their own frozen evidence. Proves repeatability: anyone can run the replay and get the same answer.
+- 188 practice positions closed by their own rule (78 at the target, 110 at the stop) and 23 still open: simulated +$4,600 on $10,000 before fees, worst drawdown 16.09%. Each decision opens its own position, so positions overlap. Proves the practice trades are recorded and settled by rule: each is marked against candles frozen in later dossiers, the stop counted first when one candle hits both.
+- 491 tests pin the ledger, the pages and the docs to each other. Proves a controlled process: a figure that stops matching the chain fails the build.
 
 Three witnesses outside the operator (each one proves custody and authentication of the head, and a time we do not control; none is an eIDAS qualified time stamp):
-- Bitcoin (OpenTimestamps): head #278 stamped in block 973134. Proof: https://github.com/AndriyAmaro/verdict-desk/blob/main/ledger/timestamps/278.json.ots
-- Sigstore transparency log: head #284 signed by a GitHub workflow, log index 3471159129. Entry: https://search.sigstore.dev/?logIndex=3471159129
-- Ethereum Sepolia (Chainlink CRE): dossier #278 anchored, hash equal to the ledger's. Transaction: https://sepolia.etherscan.io/tx/0x899547433d03e0ed59a7ed2c9429aafabed7a31627a2f27c34ce965bdb7dddf1
+- Bitcoin (OpenTimestamps): head #347 stamped in block 973244. Proof: https://github.com/AndriyAmaro/verdict-desk/blob/main/ledger/timestamps/347.json.ots
+- Sigstore transparency log: head #356 signed by a GitHub workflow, log index 3489196779. Entry: https://search.sigstore.dev/?logIndex=3489196779
+- Ethereum Sepolia (Chainlink CRE): dossier #296 anchored, hash equal to the ledger's. Transaction: https://sepolia.etherscan.io/tx/0x27a2ce3c0cf38722ef05959ec4638318bd93a33fe84d08fb465527ec228dfbdf
 
 JUDGE PATH IN 60 SECONDS (three clicks, nothing to install):
 1. Verify the chain in your browser: https://andriyamaro.github.io/verdict-desk/

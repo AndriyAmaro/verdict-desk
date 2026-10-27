@@ -202,6 +202,10 @@ test("an executed swap is told in token units, with the raw on-chain amounts cit
   assert.match(textOf(a), /sent \d+(\.\d+)? WETH and received \d+(\.\d+)? USDC|sent \d+(\.\d+)? USDC and received \d+(\.\d+)? WETH/);
   assert.ok(ask.check(a).ok, JSON.stringify(ask.check(a)));
   assert.ok(a.cites.find((c) => c.ref === "execution.amounts").source.includes(String(swap.execution.amount_in)));
+  // the venue's name must not carry a number no cited field holds (dossier 394: a digest with no lone "3")
+  const plain = { ...swap, execution: { ...swap.execution, decision_digest: "0x" + "ab".repeat(32), tx: "0x" + "cd".repeat(32), block: 1 } };
+  assert.ok(ask.check(ask.answer(plain, "executed")).ok, JSON.stringify(ask.check(ask.answer(plain, "executed"))));
+  for (const d of LEDGER.filter((x) => x.execution)) assert.ok(ask.check(ask.answer(d, "executed")).ok, `#${d.seq}`);
 });
 
 test("which model wrote this: the route the gateway took, or what an older record can say", () => {
@@ -217,6 +221,10 @@ test("which model wrote this: the route the gateway took, or what an older recor
   assert.match(textOf(a), /gpt-oss-120b.*429.*agnes-3\.0-flash/);
   assert.ok(ask.check(a).ok, JSON.stringify(ask.check(a)));
   assert.ok(a.cites.some((c) => c.ref === "llm.bull.routing_policy"));
+  // the reply can name the model with digits the route alias lacks (dossier 408: "...-550b-a55b"); that name is cited too
+  routed.llm.bull.served_by = "nvidia/nemotron-3-ultra-550b-a55b";
+  routed.llm.bull.route[1].model = "nemotron-3-ultra-550b";
+  assert.ok(ask.check(ask.answer(routed, "model")).ok, JSON.stringify(ask.check(ask.answer(routed, "model"))));
   for (const d of LEDGER.filter((x) => x.llm && x.llm.bull && x.llm.bull.route)) assert.ok(ask.check(ask.answer(d, "model")).ok, `#${d.seq}`);
   const old = LEDGER.find((d) => d.llm && d.llm.bull && d.llm.bull.served_by && !d.llm.bull.route);
   assert.match(textOf(ask.answer(old, "model")), /before the gateway logged its route/);

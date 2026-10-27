@@ -526,6 +526,7 @@
         policy = block.routing_policy;
         refs.push(b.cite(`llm.${part}.routing_policy`, "routing policy", `sha256 ${policy.sha256} as_of_seq ${policy.as_of_seq}`));
       }
+      if (block.served_by) refs.push(b.cite(`llm.${part}.served_by`, "model that answered", block.served_by));
       b.say(`The ${names[part]}: ${steps}${block.served_by ? `; the reply named ${block.served_by}` : ""}.`, refs);
     }
     if (policy) {
@@ -551,7 +552,7 @@
     }
     if (ex && ex.tx && ex.status === "executed" && has(ex.amount_in) && has(ex.amount_out)) {
       const sent = units(ex.amount_in, ex.token_in), got = units(ex.amount_out, ex.token_out);
-      b.say(`The swap sent ${sent.text} and received ${got.text} on the Uniswap v3 test pool, whose price is not the market price.`,
+      b.say(`The swap sent ${sent.text} and received ${got.text} on the Uniswap test pool, whose price is not the market price.`,
         [b.cite("execution.amounts", "swap amounts, raw on-chain units", `${sent.source}; ${got.source}`)]);
     }
     if (ex && ex.tx && ex.status !== "failed" && ex.decision_digest) {

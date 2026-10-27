@@ -87,6 +87,32 @@ class NumbersTest(unittest.TestCase):
     def test_before_the_desk_existed_there_is_no_sepolia_line(self):
         self.assertNotIn("Sepolia testnet", scoreboard.render(build(seq=200)).split("Three witnesses")[0])
 
+    def test_analyst_calls_are_split_at_the_first_dossier_that_records_a_route(self):
+        calls = build(seq=LEDGER[-1]["seq"])["claims"]["calls"]
+        sides = [(d["seq"], part) for d in LEDGER for side in ("bull", "bear") if (part := (d.get("llm") or {}).get(side))]
+        routed_from = next((seq for seq, part in sides if "route" in part), None)
+        self.assertEqual(calls["routed_from"], routed_from)
+        errors = [seq for seq, part in sides if part.get("error")]
+        after = [part for seq, part in sides if routed_from and seq >= routed_from]
+        self.assertEqual(calls["failed_before"] + (len(after) - calls["answered"]), len(errors))
+        self.assertEqual(calls["routed"], len(after))
+
+    def test_before_routing_existed_the_line_does_not_mention_it(self):
+        data = build(seq=200)
+        self.assertIsNone(data["claims"]["calls"]["routed_from"])
+        line = next(l for l in scoreboard.render(data).splitlines() if "analyst claims accepted" in l)
+        self.assertNotIn("routing", line)
+        self.assertIn("one provider at a time", line)
+
+    def test_after_routing_the_line_gives_the_answered_share_up_to_the_cited_dossier(self):
+        data = build(seq=LEDGER[-1]["seq"])
+        calls = data["claims"]["calls"]
+        if calls["routed_from"] is None:
+            self.skipTest("the ledger has no routed dossier yet")
+        line = next(l for l in scoreboard.render(data).splitlines() if "analyst claims accepted" in l)
+        self.assertIn(f"(dossiers {calls['routed_from']} to {data['seq']}), {calls['answered']} of {calls['routed']} analyst calls were answered", line)
+        self.assertIn(f"{calls['failed_before']} analyst calls failed before routing", line)
+
     def test_the_practice_result_is_the_sum_of_the_settled_positions(self):
         data = build(seq=200)["practice"]
         self.assertAlmostEqual(data["realized"], data["take"] * 200.0 - data["stop"] * 100.0, places=2)

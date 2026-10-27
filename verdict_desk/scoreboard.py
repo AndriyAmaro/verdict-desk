@@ -84,13 +84,35 @@ def _sepolia(root: Path, ledger: list[dict], tx: str | None):
     return None
 
 
+def _analyst_calls(prefix: list[dict]) -> dict:
+    """Falhas antes do roteamento e chamadas respondidas depois dele. O roteamento comeca no primeiro dossier
+    que grava a rota tentada; um timeout depois disso conta como chamada nao respondida da era roteada."""
+    sides = [(d["seq"], part) for d in prefix for side in ("bull", "bear") if (part := (d.get("llm") or {}).get(side))]
+    routed_from = next((seq for seq, part in sides if "route" in part), None)
+    before = [seq for seq, part in sides if part.get("error") and (routed_from is None or seq < routed_from)]
+    routed = [part for seq, part in sides if routed_from is not None and seq >= routed_from]
+    return {"failed_before": len(before), "failed_first": min(before, default=None), "failed_last": max(before, default=None),
+            "routed_from": routed_from, "routed": len(routed), "answered": sum(1 for part in routed if not part.get("error"))}
+
+
+def _calls_sentence(calls: dict, seq: int) -> str:
+    text = ""
+    if calls["failed_before"]:
+        text = (f"{calls['failed_before']} analyst calls failed {'before routing, ' if calls['routed_from'] else ''}when one provider at a time "
+                f"served the analysts (dossiers {calls['failed_first']} to {calls['failed_last']}), each failure recorded in its dossier. ")
+    if calls["routed_from"]:
+        text += (f"Since routing across several models began (dossiers {calls['routed_from']} to {seq}), "
+                 f"{calls['answered']} of {calls['routed']} analyst calls were answered. ")
+    return text
+
+
 def compute(ledger: list[dict], seq: int, root: Path, tests: int | None, anchor_pins: dict | None = None) -> dict:
     """Os numeros do bloco, no dossier `seq`. `anchor_pins` fixa quais ancoras citar (usado pela checagem)."""
     root = Path(root)
     prefix = ledger[:seq]
     pins = anchor_pins or {}
     era = livestats.llm_era(prefix, first_seq=1)
-    failed_calls = sum(1 for d in prefix for side in ("bull", "bear") if ((d.get("llm") or {}).get(side) or {}).get("error"))
+    calls = _analyst_calls(prefix)
     matched = sum(1 for d in prefix if dossier.replay(d, rules_version=d.get("verdict", {}).get("rules_version", "v1"))["matches"])
     anchors = {"bitcoin": _bitcoin(root, pins.get("bitcoin"), seq), "sigstore": _sigstore(root, pins.get("sigstore"), seq),
                "sepolia": _sepolia(root, ledger, pins.get("sepolia"))}
@@ -111,7 +133,7 @@ def compute(ledger: list[dict], seq: int, root: Path, tests: int | None, anchor_
                "first_seq": next((d["seq"] for d in prefix if d.get("execution")), None)}
     sepolia["simulated_only"] = positions - sepolia["executed"] - sepolia["recorded"]
     return {"seq": prefix[-1]["seq"], "hash": prefix[-1]["hash"], "dossiers": len(prefix), "sepolia": sepolia,
-            "claims": {"accepted": era["accepted"], "rejected": era["rejected"], "reasons": era["rejection_reasons"], "failed_calls": failed_calls},
+            "claims": {"accepted": era["accepted"], "rejected": era["rejected"], "reasons": era["rejection_reasons"], "calls": calls},
             "replay": {"matched": matched, "total": len(prefix)}, "practice": practice, "tests": tests, "anchors": anchors}
 
 
@@ -125,7 +147,7 @@ def render(data: dict) -> str:
         "Rebuild and check it yourself: python3 -m verdict_desk scoreboard --check docs/scoreboard.txt. The check fails if any figure differs; no number here is typed by hand.",
         "",
         f"- {data['dossiers']} dossiers, hash-chained. Proves integrity after recording: an edit, deletion or swap anywhere breaks every later hash.",
-        f"- {c['accepted']} analyst claims accepted and {c['rejected']} refused by the citation validator ({reasons}); {c['failed_calls']} analyst calls failed (provider outages, recorded in each dossier). "
+        f"- {c['accepted']} analyst claims accepted and {c['rejected']} refused by the citation validator ({reasons}); " + _calls_sentence(c["calls"], data["seq"]) +
         "Proves an audit trail: a refused claim is kept with its reason, so the record shows what was rejected and not only what survived.",
         f"- {r['matched']} of {r['total']} dossiers re-derive to the same verdict from their own frozen evidence. Proves repeatability: anyone can run the replay and get the same answer.",
         f"- {p['closed']} practice positions closed by their own rule ({p['take']} at the target, {p['stop']} at the stop) and {p['open']} still open: simulated {result} on ${p['start']:,.0f} before fees and {net} after a {p['fee_pct']}% taker fee per side (slippage excluded), worst drawdown {p['drawdown']}%. "

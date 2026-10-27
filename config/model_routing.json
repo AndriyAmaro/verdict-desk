@@ -7,21 +7,21 @@
   "2026-10-30T00:00:00+00:00",
   "2026-11-01T00:00:00+00:00"
  ],
- "as_of_seq": 383,
+ "as_of_seq": 455,
  "ranked": [
   "gpt-oss-120b",
   "agnes-3.0-flash"
  ],
  "observing": [
-  "dots3-note-preview",
+  "dots3-note-preview"
+ ],
+ "dropped": [
   "nemotron-3-ultra-550b"
  ],
- "dropped": [],
  "order": [
   "gpt-oss-120b",
   "agnes-3.0-flash",
-  "dots3-note-preview",
-  "nemotron-3-ultra-550b"
+  "dots3-note-preview"
  ],
  "aliases": {
   "gpt-oss-120b": [

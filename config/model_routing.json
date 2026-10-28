@@ -7,21 +7,28 @@
   "2026-10-30T00:00:00+00:00",
   "2026-11-01T00:00:00+00:00"
  ],
- "as_of_seq": 455,
+ "as_of_seq": 527,
  "ranked": [
   "gpt-oss-120b",
   "agnes-3.0-flash"
  ],
  "observing": [
-  "dots3-note-preview"
+  "dots3-note-preview",
+  "gemini-3.6-flash",
+  "deepseek/deepseek-v4-flash-0731free:free",
+  "gemini-3.5-flash"
  ],
  "dropped": [
-  "nemotron-3-ultra-550b"
+  "nemotron-3-ultra-550b",
+  "agnes-2.5-pro-alpha"
  ],
  "order": [
   "gpt-oss-120b",
   "agnes-3.0-flash",
-  "dots3-note-preview"
+  "dots3-note-preview",
+  "gemini-3.6-flash",
+  "deepseek/deepseek-v4-flash-0731free:free",
+  "gemini-3.5-flash"
  ],
  "aliases": {
   "gpt-oss-120b": [
@@ -35,9 +42,21 @@
    "dots-studio/dots-3-note-preview:free",
    "dots3-note-preview"
   ],
+  "gemini-3.6-flash": [
+   "gemini-3.6-flash"
+  ],
+  "deepseek/deepseek-v4-flash-0731free:free": [
+   "deepseek/deepseek-v4-flash-0731free:free"
+  ],
+  "gemini-3.5-flash": [
+   "gemini-3.5-flash"
+  ],
   "nemotron-3-ultra-550b": [
    "nvidia/nemotron-3-ultra-550b-a55b",
    "nemotron-3-ultra-550b"
+  ],
+  "agnes-2.5-pro-alpha": [
+   "agnes-2.5-pro-alpha"
   ]
  }
 }

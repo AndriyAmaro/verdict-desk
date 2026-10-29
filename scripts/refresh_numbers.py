@@ -170,7 +170,10 @@ def differentiators(ledger: list[dict], snap: dict) -> tuple[str, str]:
     matched = sum(1 for r in replays if r["matches"])
     wit = battery.witness_index(ROOT / "ledger" / "timestamps", ROOT / "cre" / "deployment.sepolia.json", rekor=ROOT / "ledger" / "rekor")
     cre_battery = json.loads((ROOT / "cre" / "evidence" / "cre-battery.json").read_text(encoding="utf-8"))
-    no_number = e["rejection_reasons"].get("number not in cited evidence", 0)
+    # The whole ledger, not only the LLM era, so the card says what the dashboard's "LLM claims" card says.
+    every = livestats.llm_era(ledger, 1)
+    no_number = every["rejection_reasons"].get("number not in cited evidence", 0)
+    unknown_id = every["rejection_reasons"].get("unknown evidence id", 0)
     anchor = (wit.get("anchor") or {}).get("address", "")
     first = c["first"][:10]
     tried = f"{snap['total_trials']:,}"
@@ -178,7 +181,7 @@ def differentiators(ledger: list[dict], snap: dict) -> tuple[str, str]:
         [
             (f"{c['total']}", "dossiers", f"{c['window_days']} days, hash-chained"),
             (f"{matched}/{len(ledger)}", "verdicts re-derived", "from frozen evidence"),
-            (f"{e['rejected']}", "AI claims refused", "by the citation check"),
+            (f"{every['rejected']}", "AI claims refused", "by the citation check"),
             ("3", "outside witnesses", "Bitcoin, Sigstore, Sepolia"),
             (f"{snap['total_missed']}/{tried}", "attacks missed", "on our own verifier"),
         ],
@@ -190,7 +193,7 @@ def differentiators(ledger: list[dict], snap: dict) -> tuple[str, str]:
 | | The claim | Measured | Check it yourself |
 |:---:|---|---|---|
 | 🔁 | **The verdict is re-derived, not only re-hashed.** The deterministic judge rules again from the frozen evidence, so a record that no longer explains its own decision fails. Chainlink CRE acts as an **independent auditor**: before it anchors a head, the workflow re-derives that verdict inside the CRE runtime and refuses a forged one | **{matched} of {len(ledger)}** verdicts re-derive. CRE check: **{cre_battery['refusedUnderPublishedHead']:,} of {cre_battery['tried']:,}** edits of a dossier refused (dossier {cre_battery['seq']}) | `python3 -m verdict_desk replay` · [`cre/`](cre/README.md) |
-| 🔢 | **Every number an AI analyst states must be in the evidence it cites.** A claim that cites an item id which does not hold that number is refused and kept with its reason | **{e['accepted']:,}** claims accepted, **{e['rejected']}** refused ({no_number} for a number not in the cited evidence) | [Dashboard](https://andriyamaro.github.io/verdict-desk/), open any row |
+| 🔢 | **Every number an AI analyst states must be in the evidence it cites.** A claim that cites an item id which does not hold that number is refused and kept with its reason | **{every['accepted']:,}** claims accepted, **{every['rejected']}** refused ({no_number} for a number not in the cited evidence, {unknown_id} for an evidence id that does not exist) | [Dashboard](https://andriyamaro.github.io/verdict-desk/), open any row |
 | 🛰️ | **Three outside witnesses the operator does not control.** The head is timestamped into Bitcoin through OpenTimestamps (each proof reads pending until a block confirms it), signed in the public Sigstore log by a GitHub workflow (no key of ours), and anchored on Sepolia | **{len(wit['heads'])}** heads timestamped (OpenTimestamps), **{len(wit['rekor'])}** signed in Sigstore, contract [`{anchor[:10]}…`](https://sepolia.etherscan.io/address/{anchor}) | [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) |
 | 📜 | **A long public record, gaps included.** Every hourly decision is kept, the ones that lost money too, and every gap between runs is shown, never filled in | **{c['total']}** dossiers over **{c['window_days']} days** since {first} | `python3 -m verdict_desk stats --git` |
 | 🧨 | **We attack our own verifier and publish the score.** Edits, deletions, swaps, forged heads, a truncated tail and re-hashed history, on a copy of the ledger | **{snap['total_missed']} missed** of **{tried}** attacks (dossier {snap['head']['seq']}) | `python3 -m verdict_desk battery` |

@@ -46,6 +46,11 @@ a.btn[hidden]{display:none}
 .stat .v{font-size:22px;font-weight:700;margin:3px 0 0;line-height:1.1}
 .stat .s{font-size:12px;color:var(--mut);margin-top:3px}
 .hero-diagram{margin:14px 0 0}.hero-diagram img{width:100%;height:auto;border:1px solid var(--line);border-radius:12px}
+.diff{margin:16px 0 4px}.diff h2{font-size:17px;margin:0 0 8px}
+.diff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.diff-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.diff-card .t{font-weight:700;margin:0 0 4px}.diff-card .t span{margin-right:6px}
+.diff-card p{margin:0 0 6px;font-size:14px}.diff-card a{color:var(--accent);font-weight:600;font-size:14px}
 </style></head><body>
 <header class="hero">
   <p class="kicker">BLI Legal Tech Hackathon 2 · Autonomous Agents</p>
@@ -63,6 +68,16 @@ a.btn[hidden]{display:none}
     <a class="btn" href="evidence.html">Evidence for a lawyer</a>
     <a class="btn" href="learn.html">Learn it by breaking it</a>
   </div>
+  <section class="diff" aria-labelledby="diff-title">
+    <h2 id="diff-title">What you can check here that a debate log cannot show</h2>
+    <div class="diff-grid">
+      <div class="diff-card"><p class="t"><span aria-hidden="true">🔁</span>The verdict is re-derived, not only re-hashed</p><p>The deterministic judge rules again from the frozen evidence. Chainlink CRE acts as an independent auditor: before it anchors a head, it re-derives that verdict and refuses a forged one.</p><a href="verify.html">Re-derive a record →</a></div>
+      <div class="diff-card"><p class="t"><span aria-hidden="true">🔢</span>Every number an AI states must be in its evidence</p><p>An analyst claim that cites an item which does not hold its number is refused, and kept with the reason.</p><a href="#ledger-table">Open any row below →</a></div>
+      <div class="diff-card"><p class="t"><span aria-hidden="true">🛰️</span>Three outside witnesses</p><p>The head is timestamped into Bitcoin, signed in the public Sigstore log by a GitHub workflow, and anchored on Sepolia. None of them is ours to rewrite.</p><a href="witnesses.html">Ask the witnesses →</a></div>
+      <div class="diff-card"><p class="t"><span aria-hidden="true">📜</span>A long public record, gaps included</p><p>Every decision is kept, the losing ones too, and every gap between runs is shown, never filled in.</p><a href="#stats">See the cadence →</a></div>
+      <div class="diff-card"><p class="t"><span aria-hidden="true">🧨</span>We attack our own verifier and publish the score</p><p>Edits, deletions, swaps, forged heads, a truncated tail and re-hashed history, on a copy of the ledger, every hour.</p><a href="witnesses.html#battery">See the score →</a></div>
+    </div>
+  </section>
   <div class="stats-grid" id="hero-stats"><div class="stat"><div class="k">Loading</div><div class="v">…</div></div></div>
   <figure class="hero-diagram"><img src="custody.svg" alt="Verdict Desk chain of custody: evidence, debate, validator, judge, dossier, anchored"></figure>
 </header>
@@ -106,7 +121,7 @@ a.btn[hidden]{display:none}
   <p id="portfolio" class="mut"></p>
   <div id="positions"></div>
 </section>
-<div class="scroll"><table><thead><tr><th>#</th><th>Symbol</th><th>Action</th><th>Edge</th><th>LLM claims</th><th>Integrity</th><th>Hash</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="scroll"><table id="ledger-table"><thead><tr><th>#</th><th>Symbol</th><th>Action</th><th>Edge</th><th>LLM claims</th><th>Integrity</th><th>Hash</th></tr></thead><tbody id="rows"></tbody></table></div>
 <section id="detail" hidden></section>
 <script src="canonical.js"></script>
 <script src="stats.js"></script>

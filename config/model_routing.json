@@ -7,28 +7,33 @@
   "2026-10-30T00:00:00+00:00",
   "2026-11-01T00:00:00+00:00"
  ],
- "as_of_seq": 527,
+ "as_of_seq": 599,
  "ranked": [
   "gpt-oss-120b",
-  "agnes-3.0-flash"
+  "agnes-3.0-flash",
+  "nemotron-3-ultra-550b",
+  "agnes-2.5-pro-alpha"
  ],
  "observing": [
   "dots3-note-preview",
   "gemini-3.6-flash",
+  "gemini-3.5-flash",
   "deepseek/deepseek-v4-flash-0731free:free",
-  "gemini-3.5-flash"
+  "gemini-3.5-flash-lite"
  ],
  "dropped": [
-  "nemotron-3-ultra-550b",
-  "agnes-2.5-pro-alpha"
+  "qwen/qwen3.8-27b"
  ],
  "order": [
   "gpt-oss-120b",
   "agnes-3.0-flash",
+  "nemotron-3-ultra-550b",
+  "agnes-2.5-pro-alpha",
   "dots3-note-preview",
   "gemini-3.6-flash",
+  "gemini-3.5-flash",
   "deepseek/deepseek-v4-flash-0731free:free",
-  "gemini-3.5-flash"
+  "gemini-3.5-flash-lite"
  ],
  "aliases": {
   "gpt-oss-120b": [
@@ -38,6 +43,13 @@
   "agnes-3.0-flash": [
    "agnes-3.0-flash"
   ],
+  "nemotron-3-ultra-550b": [
+   "nvidia/nemotron-3-ultra-550b-a55b",
+   "nemotron-3-ultra-550b"
+  ],
+  "agnes-2.5-pro-alpha": [
+   "agnes-2.5-pro-alpha"
+  ],
   "dots3-note-preview": [
    "dots-studio/dots-3-note-preview:free",
    "dots3-note-preview"
@@ -45,18 +57,17 @@
   "gemini-3.6-flash": [
    "gemini-3.6-flash"
   ],
-  "deepseek/deepseek-v4-flash-0731free:free": [
-   "deepseek/deepseek-v4-flash-0731free:free"
-  ],
   "gemini-3.5-flash": [
    "gemini-3.5-flash"
   ],
-  "nemotron-3-ultra-550b": [
-   "nvidia/nemotron-3-ultra-550b-a55b",
-   "nemotron-3-ultra-550b"
+  "deepseek/deepseek-v4-flash-0731free:free": [
+   "deepseek/deepseek-v4-flash-0731free:free"
   ],
-  "agnes-2.5-pro-alpha": [
-   "agnes-2.5-pro-alpha"
+  "gemini-3.5-flash-lite": [
+   "gemini-3.5-flash-lite"
+  ],
+  "qwen/qwen3.8-27b": [
+   "qwen/qwen3.8-27b"
   ]
  }
 }

@@ -9,6 +9,7 @@ and the test count from a real run of the suite. Run it again right before submi
 """
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -18,7 +19,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from verdict_desk import dossier, livestats  # noqa: E402
+from verdict_desk import battery, dossier, livestats  # noqa: E402
+
+sys.path.insert(0, str(ROOT / "scripts"))
+import readme_cards  # noqa: E402
 
 LEDGER = ROOT / "ledger" / "ledger.jsonl"
 README = ROOT / "README.md"
@@ -26,6 +30,10 @@ BUILD_PAGE = ROOT / "SUBMISSAO_DORAHACKS.md"
 JUDGE_PAGE = ROOT / "web" / "judge.html"
 MSG = ROOT / "MSG_ORGANIZADORES.md"
 DESCRICAO_PAGE = ROOT / "DESCRICAO_PAGINA.md"
+FIGURES_CARD = ROOT / "docs" / "readme" / "figures.svg"
+# The tamper battery takes minutes, so its result is kept as a snapshot and only re-run on a full refresh.
+BATTERY_SNAPSHOT = ROOT / "docs" / "readme" / "battery.json"
+BATTERY_TRIALS = 1500  # the same size the hourly workflow publishes to site/battery.json
 
 
 # Private drafting docs (build page, organizer message, page description) live outside this repository; when present they are refreshed too.
@@ -137,6 +145,61 @@ python3 -m verdict_desk stats --json                                 # every num
 """
 
 
+def battery_snapshot(ledger: list[dict], run_now: bool) -> dict:
+    """The tamper battery on this chain: re-run on a full refresh, otherwise read back and checked against the chain."""
+    if run_now:
+        result = battery.run(ledger, ROOT / "ledger" / "timestamps", ledger[-1]["hash"], trials=BATTERY_TRIALS)
+        snap = {key: result[key] for key in ("seed", "dossiers", "head", "total_trials", "total_missed", "all_caught")}
+        BATTERY_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
+        BATTERY_SNAPSHOT.write_text(json.dumps(snap, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        return snap
+    if not BATTERY_SNAPSHOT.exists():
+        raise SystemExit(f"{BATTERY_SNAPSHOT.relative_to(ROOT)} is missing: run scripts/refresh_numbers.py without --skip-battery")
+    snap = json.loads(BATTERY_SNAPSHOT.read_text(encoding="utf-8"))
+    by_seq = {d["seq"]: d["hash"] for d in ledger}
+    if by_seq.get(snap["head"]["seq"]) != snap["head"]["hash"]:
+        raise SystemExit(f"the battery snapshot names dossier {snap['head']['seq']} with a hash this chain does not have")
+    return snap
+
+
+def differentiators(ledger: list[dict], snap: dict) -> tuple[str, str]:
+    """The table of what a reader can check here, and the figures card above it, from one set of counts."""
+    s = livestats.summarize(ledger)
+    c, e, h = s["cadence"], s["llm_era"], s["head"]
+    replays = [dossier.replay(d, rules_version=d.get("verdict", {}).get("rules_version", "v1")) for d in ledger]
+    matched = sum(1 for r in replays if r["matches"])
+    wit = battery.witness_index(ROOT / "ledger" / "timestamps", ROOT / "cre" / "deployment.sepolia.json", rekor=ROOT / "ledger" / "rekor")
+    cre_battery = json.loads((ROOT / "cre" / "evidence" / "cre-battery.json").read_text(encoding="utf-8"))
+    no_number = e["rejection_reasons"].get("number not in cited evidence", 0)
+    anchor = (wit.get("anchor") or {}).get("address", "")
+    first = c["first"][:10]
+    tried = f"{snap['total_trials']:,}"
+    card = readme_cards.figures_svg(
+        [
+            (f"{c['total']}", "dossiers", f"{c['window_days']} days, hash-chained"),
+            (f"{matched}/{len(ledger)}", "verdicts re-derived", "from frozen evidence"),
+            (f"{e['rejected']}", "AI claims refused", "by the citation check"),
+            ("3", "outside witnesses", "Bitcoin, Sigstore, Sepolia"),
+            (f"{snap['total_missed']}/{tried}", "attacks missed", "on our own verifier"),
+        ],
+        f"As of dossier {h['seq']} · every figure counted from ledger/ledger.jsonl by scripts/refresh_numbers.py",
+    )
+    table = f"""<!-- differentiators:start: generated from dossier {h['seq']} by `python3 scripts/refresh_numbers.py` -->
+## What you can check here that a debate log cannot show
+
+| | The claim | Measured | Check it yourself |
+|:---:|---|---|---|
+| 🔁 | **The verdict is re-derived, not only re-hashed.** The deterministic judge rules again from the frozen evidence, so a record that no longer explains its own decision fails. Chainlink CRE acts as an **independent auditor**: before it anchors a head, the workflow re-derives that verdict inside the CRE runtime and refuses a forged one | **{matched} of {len(ledger)}** verdicts re-derive. CRE check: **{cre_battery['refusedUnderPublishedHead']:,} of {cre_battery['tried']:,}** edits of a dossier refused (dossier {cre_battery['seq']}) | `python3 -m verdict_desk replay` · [`cre/`](cre/README.md) |
+| 🔢 | **Every number an AI analyst states must be in the evidence it cites.** A claim that cites an item id which does not hold that number is refused and kept with its reason | **{e['accepted']:,}** claims accepted, **{e['rejected']}** refused ({no_number} for a number not in the cited evidence) | [Dashboard](https://andriyamaro.github.io/verdict-desk/), open any row |
+| 🛰️ | **Three outside witnesses the operator does not control.** The head is timestamped into Bitcoin through OpenTimestamps (each proof reads pending until a block confirms it), signed in the public Sigstore log by a GitHub workflow (no key of ours), and anchored on Sepolia | **{len(wit['heads'])}** heads timestamped (OpenTimestamps), **{len(wit['rekor'])}** signed in Sigstore, contract [`{anchor[:10]}…`](https://sepolia.etherscan.io/address/{anchor}) | [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) |
+| 📜 | **A long public record, gaps included.** Every hourly decision is kept, the ones that lost money too, and every gap between runs is shown, never filled in | **{c['total']}** dossiers over **{c['window_days']} days** since {first} | `python3 -m verdict_desk stats --git` |
+| 🧨 | **We attack our own verifier and publish the score.** Edits, deletions, swaps, forged heads, a truncated tail and re-hashed history, on a copy of the ledger | **{snap['total_missed']} missed** of **{tried}** attacks (dossier {snap['head']['seq']}) | `python3 -m verdict_desk battery` |
+
+All five rows are counted from the ledger by the same script on every refresh; none is typed by hand. The trail shows what was decided and why; it does not show that a decision was right.
+<!-- differentiators:end -->"""
+    return table, card
+
+
 def build_page_line(ledger: list[dict]) -> str:
     s = livestats.summarize(ledger)
     c, e, h = s["cadence"], s["llm_era"], s["head"]
@@ -147,7 +210,7 @@ def build_page_line(ledger: list[dict]) -> str:
     )
 
 
-def refreshed(tests: int | None) -> dict[Path, str]:
+def refreshed(tests: int | None, run_battery: bool = False) -> dict[Path, str]:
     ledger = dossier.read_ledger(LEDGER)
     problems = dossier.verify(ledger)
     if problems:
@@ -157,6 +220,11 @@ def refreshed(tests: int | None) -> dict[Path, str]:
         raise SystemExit("a page names a card the dashboard does not draw: " + "; ".join(card_problems))
     out = {}
     text = README.read_text(encoding="utf-8")
+    table, card = differentiators(ledger, battery_snapshot(ledger, run_battery))
+    text, n = re.subn(r"<!-- differentiators:start.*?<!-- differentiators:end -->", lambda _: table, text, flags=re.S)
+    if n != 1:
+        raise SystemExit("README.md has no differentiators block to refresh")
+    out[FIGURES_CARD] = card
     text, n = re.subn(r"<!-- live-numbers:.*?(?=## Auditing someone else's agent)", lambda _: live_section(ledger), text, flags=re.S)
     if n != 1:
         raise SystemExit("README.md has no live-numbers block to refresh")
@@ -226,10 +294,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="change nothing; exit 1 if a document is out of date with the ledger")
     parser.add_argument("--skip-tests", action="store_true", help="do not run the suite; leave the test counts as they are")
+    parser.add_argument("--skip-battery", action="store_true", help="do not re-run the tamper battery (minutes); use its last snapshot")
     opts = parser.parse_args()
     tests = None if opts.skip_tests else count_tests()
-    updated = refreshed(tests)
-    stale = [path for path, text in updated.items() if text != path.read_text(encoding="utf-8")]
+    updated = refreshed(tests, run_battery=not (opts.check or opts.skip_battery))
+    stale = [path for path, text in updated.items() if not path.exists() or text != path.read_text(encoding="utf-8")]
     if opts.check:
         for path in stale:
             print(f"out of date with the ledger: {path.relative_to(ROOT)}")

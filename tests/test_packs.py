@@ -19,8 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 LEDGER = dossier.read_ledger(ROOT / "ledger" / "ledger.jsonl")
 
 
-def run(outdir, recent, anchored=False):
-    opts = argparse.Namespace(ledger=ROOT / "ledger" / "ledger.jsonl", recent=recent, outdir=outdir, anchored=anchored)
+def run(outdir, recent, anchored=False, also=None):
+    opts = argparse.Namespace(ledger=ROOT / "ledger" / "ledger.jsonl", recent=recent, outdir=outdir, anchored=anchored, also=also)
     with contextlib.redirect_stdout(io.StringIO()):
         return cli.cmd_packs(opts)
 
@@ -30,7 +30,8 @@ class PacksCommandTest(unittest.TestCase):
         out = Path(tempfile.mkdtemp())
         self.assertEqual(run(out, 3), 0)
         names = sorted(p.name for p in out.glob("*.json"))
-        self.assertEqual(names, sorted(f"{d['seq']}.json" for d in LEDGER[-3:]))
+        expected = {d["seq"] for d in LEDGER[-3:]} | cli.always_published()  # the pinned dossiers ride along
+        self.assertEqual(names, sorted(f"{seq}.json" for seq in expected))
 
     def test_each_pack_recomputes_to_the_hash_it_records(self):
         out = Path(tempfile.mkdtemp())
@@ -46,6 +47,32 @@ class PacksCommandTest(unittest.TestCase):
         out = Path(tempfile.mkdtemp())
         run(out, 1, anchored=True)
         self.assertTrue((out / f"{anchored}.json").exists(), sorted(p.name for p in out.glob("*.json")))
+
+    def test_a_dossier_named_with_also_is_written_whatever_its_age(self):
+        old = LEDGER[0]["seq"]
+        out = Path(tempfile.mkdtemp())
+        run(out, 1, also=[old, 10 ** 9])
+        self.assertTrue((out / f"{old}.json").exists())
+        self.assertFalse((out / f"{10 ** 9}.json").exists(), "a seq the chain does not have is skipped, not invented")
+
+    def test_the_use_case_dossier_is_always_published_with_its_exhibit_and_pack(self):
+        """usecase.html walks a lawyer through one dossier by number; the hourly site build must keep serving it."""
+        import re
+        seq = int(re.search(r"var SEQ = (\d+);", (ROOT / "web" / "usecase.html").read_text(encoding="utf-8")).group(1))
+        self.assertIn(seq, cli.always_published())
+        out = Path(tempfile.mkdtemp())
+        run(out, 1)
+        self.assertTrue((out / f"{seq}.json").exists(), "the hourly build writes its pack with no extra flag")
+
+    def test_exhibits_with_also_render_an_old_dossier_next_to_the_recent_ones(self):
+        old = LEDGER[0]["seq"]
+        out = Path(tempfile.mkdtemp())
+        opts = argparse.Namespace(ledger=ROOT / "ledger" / "ledger.jsonl", recent=1, seq=None, outdir=out, out=None,
+                                  anchor=False, rpc=None, address=None, packs=None, also=[old])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.cmd_exhibit(opts), 0)
+        self.assertTrue((out / f"exhibit-{old}.html").exists())
+        self.assertTrue((out / f"exhibit-{LEDGER[-1]['seq']}.html").exists())
 
     def test_without_a_ledger_it_fails_instead_of_writing_nothing_silently(self):
         opts = argparse.Namespace(ledger=Path(tempfile.mkdtemp()) / "none.jsonl", recent=3, outdir=Path(tempfile.mkdtemp()), anchored=False)

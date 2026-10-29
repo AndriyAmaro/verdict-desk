@@ -338,6 +338,13 @@ def cmd_scorecard(opts) -> int:
     return 0
 
 
+def always_published(also=None) -> set[int]:
+    """Dossiers the site keeps serving by number: config/always_published.json plus any --also given."""
+    path = Path(__file__).resolve().parent.parent / "config" / "always_published.json"
+    listed = json.loads(path.read_text(encoding="utf-8")).get("dossiers", []) if path.exists() else []
+    return {int(seq) for seq in listed} | set(also or [])
+
+
 def cmd_exhibit(opts) -> int:
     """Render dossiers as printable decision exhibits (stdout, a file, or a directory)."""
     from . import exhibit
@@ -372,6 +379,11 @@ def cmd_exhibit(opts) -> int:
                     target = [anchored_row] + target
         except (OSError, ValueError, KeyError) as err:
             print(f"anchor: could not read the chain ({err}); exhibits are produced without it", file=sys.stderr)
+
+    if opts.recent:
+        # Dossiers a page links by number (the use case walks through one) keep their exhibit after they leave the recent window.
+        have = {d.get("seq") for d in target}
+        target = [d for d in ledger if d.get("seq") in always_published(getattr(opts, "also", None)) - have] + target
 
     def anchor_for(row):
         onchain = anchor_info.get(row["seq"])
@@ -529,6 +541,9 @@ def cmd_packs(opts) -> int:
         print(f"no ledger at {opts.ledger}", file=sys.stderr)
         return 1
     wanted = {d["seq"] for d in ledger[-opts.recent:]}
+    # Dossiers a page links by number (the use case walks through one) stay served after they leave the recent window.
+    known = {d["seq"] for d in ledger}
+    wanted |= {seq for seq in always_published(getattr(opts, "also", None)) if seq in known}
     if opts.anchored:
         root = Path(opts.ledger).resolve().parent.parent
         found = scoreboard._sepolia(root, ledger, None)
@@ -817,6 +832,7 @@ def main() -> int:
     p.add_argument("--recent", type=int, default=24, metavar="N", help="how many of the newest dossiers (default 24)")
     p.add_argument("--outdir", required=True, metavar="DIR", help="where to write <seq>.json")
     p.add_argument("--anchored", action="store_true", help="also write the dossier anchored on Sepolia")
+    p.add_argument("--also", type=int, action="append", metavar="SEQ", help="also write this dossier, whatever its age (repeatable; config/always_published.json is always included)")
     p.set_defaults(func=cmd_packs)
     p = sub.add_parser("scorecard", help="score the decisions against later prices, from the ledger alone")
     p.add_argument("--out", metavar="FILE", help="write the HTML scorecard to FILE")
@@ -831,6 +847,7 @@ def main() -> int:
     p.add_argument("--rpc", default=anchor.DEFAULT_RPC, help="RPC endpoint for --anchor")
     p.add_argument("--address", default=anchor.DEFAULT_ADDRESS, help="LedgerAnchor address")
     p.add_argument("--packs", metavar="DIR", help="directory of evidence packs written by `packs`; an exhibit links its pack when the file exists")
+    p.add_argument("--also", type=int, action="append", metavar="SEQ", help="with --recent, also render this dossier, whatever its age (repeatable; config/always_published.json is always included)")
     p.set_defaults(func=cmd_exhibit)
     p = sub.add_parser("monitor", help="compare the ledger against the head anchored on Sepolia (read-only)")
     p.add_argument("--rpc", default="https://ethereum-sepolia-rpc.publicnode.com")

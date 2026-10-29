@@ -1,0 +1,11 @@
+{
+ "all_caught": true,
+ "dossiers": 596,
+ "head": {
+  "hash": "85f84749f6dd233bf11000db7a6dc8038c0e0d83c1f93baa267d17258394377b",
+  "seq": 596
+ },
+ "seed": "85f84749f6dd233bf11000db7a6dc8038c0e0d83c1f93baa267d17258394377b",
+ "total_missed": 0,
+ "total_trials": 2966
+}

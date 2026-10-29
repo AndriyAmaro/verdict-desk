@@ -1,8 +1,34 @@
-# Verdict Desk
-
-**An autonomous agent makes a market decision. Verdict Desk turns it into evidence a lawyer can file.**
+<p align="center">
+  <a href="https://andriyamaro.github.io/verdict-desk/"><img src="docs/readme/header.svg" width="100%" alt="Verdict Desk: an autonomous agent makes a market decision; Verdict Desk turns it into evidence a lawyer can file"></a>
+</p>
+<p align="center">
+  <img src="docs/readme/figures.svg" width="100%" alt="Figures counted from the ledger: dossiers, verdicts re-derived, AI claims refused, outside witnesses, attacks missed">
+</p>
+<p align="center">
+  <a href="https://andriyamaro.github.io/verdict-desk/"><img src="docs/readme/button-dashboard.svg" height="42" alt="Live dashboard"></a>
+  <a href="https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo-v6.mp4"><img src="docs/readme/button-video.svg" height="42" alt="Watch the demo"></a>
+  <a href="https://andriyamaro.github.io/verdict-desk/judge.html"><img src="docs/readme/button-judge.svg" height="42" alt="Judge path"></a>
+  <br>
+  <a href="https://andriyamaro.github.io/verdict-desk/ask.html"><img src="docs/readme/button-ask.svg" height="42" alt="Ask the record"></a>
+  <a href="https://andriyamaro.github.io/verdict-desk/evidence.html"><img src="docs/readme/button-lawyer.svg" height="42" alt="Evidence for a lawyer"></a>
+  <a href="https://andriyamaro.github.io/verdict-desk/witnesses.html"><img src="docs/readme/button-witnesses.svg" height="42" alt="Witnesses"></a>
+</p>
 
 Audit-grade, replayable decisions for AI market agents. **Simulated only: no real-money order is ever placed** (from dossier 375 practice trades also go to Sepolia testnet with test tokens). Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
+
+<!-- differentiators:start: generated from dossier 596 by `python3 scripts/refresh_numbers.py` -->
+## What you can check here that a debate log cannot show
+
+| | The claim | Measured | Check it yourself |
+|:---:|---|---|---|
+| 🔁 | **The verdict is re-derived, not only re-hashed.** The deterministic judge rules again from the frozen evidence, so a record that no longer explains its own decision fails. Chainlink CRE acts as an **independent auditor**: before it anchors a head, the workflow re-derives that verdict inside the CRE runtime and refuses a forged one | **596 of 596** verdicts re-derive. CRE check: **3,000 of 3,000** edits of a dossier refused (dossier 356) | `python3 -m verdict_desk replay` · [`cre/`](cre/README.md) |
+| 🔢 | **Every number an AI analyst states must be in the evidence it cites.** A claim that cites an item id which does not hold that number is refused and kept with its reason | **3,558** claims accepted, **270** refused (225 for a number not in the cited evidence, 44 for an evidence id that does not exist) | [Dashboard](https://andriyamaro.github.io/verdict-desk/), open any row |
+| 🛰️ | **Three outside witnesses the operator does not control.** The head is timestamped into Bitcoin through OpenTimestamps (each proof reads pending until a block confirms it), signed in the public Sigstore log by a GitHub workflow (no key of ours), and anchored on Sepolia | **159** heads timestamped (OpenTimestamps), **111** signed in Sigstore, contract [`0x50443D51…`](https://sepolia.etherscan.io/address/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7) | [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) |
+| 📜 | **A long public record, gaps included.** Every hourly decision is kept, the ones that lost money too, and every gap between runs is shown, never filled in | **596** dossiers over **12.5 days** since 2026-10-17 | `python3 -m verdict_desk stats --git` |
+| 🧨 | **We attack our own verifier and publish the score.** Edits, deletions, swaps, forged heads, a truncated tail and re-hashed history, on a copy of the ledger | **0 missed** of **2,966** attacks (dossier 596) | `python3 -m verdict_desk battery` |
+
+All five rows are counted from the ledger by the same script on every refresh; none is typed by hand. The trail shows what was decided and why; it does not show that a decision was right.
+<!-- differentiators:end -->
 
 ## Check it yourself in 60 seconds
 
@@ -10,15 +36,15 @@ Nothing to install and nothing to take on trust: each page below downloads the r
 
 | Open | What your browser does |
 |---|---|
-| [Dashboard](https://andriyamaro.github.io/verdict-desk/) | Recomputes every SHA-256 of the ledger. Press **Test the chain** and watch an edited record turn red. |
-| [Ask the record](https://andriyamaro.github.io/verdict-desk/ask.html) | Talk to a recorded decision next to the chart of the candles it saw: why it acted, what would have changed its mind, the risk, **what happened next** (the later candles drawn and the exit marked, by the scoreboard's own rule), what the AI analysts and judge said, whether it went to Sepolia. No model runs on the page: every answer is built from the frozen record, every number is a chip that shows its source and lights its mark on the chart, and the page refuses any answer with a number no cited source contains. |
-| [Market voices](https://andriyamaro.github.io/verdict-desk/narrative.html) | Recomputes each voice's track record (skill above what luck gives, no lookahead). Tick the voices that agree, set your own risk limit and see the practice position that follows. |
-| [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) | Reads the Bitcoin proof of the ledger head, asks two block explorers for the block, asks the Sigstore transparency log for the hourly signature of the head (signed by a GitHub workflow, no key of ours), reads the Sepolia anchor, and shows how many attacks on our own verifier got through. |
-| [Evidence for a lawyer](https://andriyamaro.github.io/verdict-desk/evidence.html) | What each layer establishes and what it does not, and a foundation declaration drafted from a real dossier. |
-| [Use case](https://andriyamaro.github.io/verdict-desk/usecase.html) | One real decision walked through the way a lawyer would: the exhibit, the evidence pack to download and paste into the verifier, the three outside witnesses, and what the record does not show. |
-| [Cause and effect lab](https://andriyamaro.github.io/verdict-desk/lab.html) | Remove one argument from a real decision and watch the verdict flip. |
-| [Learn it by breaking it](https://andriyamaro.github.io/verdict-desk/learn.html) | Seven short exercises, each one a way to try to fool the system and what it should teach you. |
-| [Judge path](https://andriyamaro.github.io/verdict-desk/judge.html) | Every requirement of both bounties, each mapped to the file, command or transaction that proves it. |
+| 📊 [Dashboard](https://andriyamaro.github.io/verdict-desk/) | Recomputes every SHA-256 of the ledger. Press **Test the chain** and watch an edited record turn red. |
+| 💬 [Ask the record](https://andriyamaro.github.io/verdict-desk/ask.html) | Talk to a recorded decision next to the chart of the candles it saw: why it acted, what would have changed its mind, the risk, **what happened next** (the later candles drawn and the exit marked, by the scoreboard's own rule), what the AI analysts and judge said, whether it went to Sepolia. No model runs on the page: every answer is built from the frozen record, every number is a chip that shows its source and lights its mark on the chart, and the page refuses any answer with a number no cited source contains. |
+| 📣 [Market voices](https://andriyamaro.github.io/verdict-desk/narrative.html) | Recomputes each voice's track record (skill above what luck gives, no lookahead). Tick the voices that agree, set your own risk limit and see the practice position that follows. |
+| 🛡️ [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) | Reads the Bitcoin proof of the ledger head, asks two block explorers for the block, asks the Sigstore transparency log for the hourly signature of the head (signed by a GitHub workflow, no key of ours), reads the Sepolia anchor, and shows how many attacks on our own verifier got through. |
+| ⚖️ [Evidence for a lawyer](https://andriyamaro.github.io/verdict-desk/evidence.html) | What each layer establishes and what it does not, and a foundation declaration drafted from a real dossier. |
+| 📂 [Use case](https://andriyamaro.github.io/verdict-desk/usecase.html) | One real decision walked through the way a lawyer would: the exhibit, the evidence pack to download and paste into the verifier, the three outside witnesses, and what the record does not show. |
+| 🧪 [Cause and effect lab](https://andriyamaro.github.io/verdict-desk/lab.html) | Remove one argument from a real decision and watch the verdict flip. |
+| 🎓 [Learn it by breaking it](https://andriyamaro.github.io/verdict-desk/learn.html) | Seven short exercises, each one a way to try to fool the system and what it should teach you. |
+| ✅ [Judge path](https://andriyamaro.github.io/verdict-desk/judge.html) | Every requirement of both bounties, each mapped to the file, command or transaction that proves it. |
 
 From a terminal: `python3 -m unittest discover -s tests` (the suite), `python3 -m verdict_desk verify` (the chain), `replay` (every verdict re-derived from its frozen evidence), `trust-check` (every frozen voice table recomputed from the dossiers before it) and `battery` (attack a copy of the ledger and count what the verifier misses).
 
@@ -48,9 +74,9 @@ The bounty's spotlight describes an agent that monitors user-selected crypto voi
 
 | Spotlight requirement | What runs today | Measured evidence |
 |---|---|---|
-| Up to 20 user-selected voices | 13 voices in [`config/voices.json`](config/voices.json): 5 newsroom RSS feeds and 8 public Telegram channels (market trackers and analysts), all read without a key. Edit the file to choose up to 20; its SHA-256 is frozen in every dossier (`narrative.config`) together with the voices that returned nothing that hour | up to 8 messages per voice per run; 273 of 281 dossiers carry a narrative layer |
-| Tokens, sentiment, conviction, urgency | LLM extraction per headline into a closed vocabulary, each with a literal quote from the headline | 30 extractions accepted and 31 rejected by the grounding gate in the latest dossier (#281) |
-| Convergence across distinct voices | A narrative needs at least two different voices on the same token **and** the same stance | **530 convergences** recorded across the live ledger, as of dossier 281 |
+| Up to 20 user-selected voices | 13 voices in [`config/voices.json`](config/voices.json): 5 newsroom RSS feeds and 8 public Telegram channels (market trackers and analysts), all read without a key. Edit the file to choose up to 20; its SHA-256 is frozen in every dossier (`narrative.config`) together with the voices that returned nothing that hour | up to 8 messages per voice per run; 588 of 596 dossiers carry a narrative layer |
+| Tokens, sentiment, conviction, urgency | LLM extraction per headline into a closed vocabulary, each with a literal quote from the headline | 24 extractions accepted and 16 rejected by the grounding gate in the latest dossier (#596) |
+| Convergence across distinct voices | A narrative needs at least two different voices on the same token **and** the same stance | **1631 convergences** recorded across the live ledger, as of dossier 596 |
 | Explain the candidates it rejected | Every mentioned token that did not become a narrative is kept with its reason: only one voice, voices disagreeing, or neutral mentions only | `narrative.rejected_candidates`, frozen in the dossier |
 | Practice position under transparent rules and risk limits | The convergence becomes a citable evidence item; the deterministic judge sizes a simulated position inside the risk limit the user sets in the same file (`risk.max_risk_pct`, default 1%, system ceiling 25%, refused loudly above it) with an ATR stop and target | `verdict_desk/agents_v2.py`, `portfolio.py` |
 
@@ -193,7 +219,7 @@ A single window is wrong in both directions: it either accepts a stale price (da
 4. Run it yourself:
 
 ```bash
-python3 -m unittest discover -s tests          # standard library only (459 tests)
+python3 -m unittest discover -s tests          # standard library only (562 tests)
 python3 -m verdict_desk verify                 # hash chain of ledger/ledger.jsonl
 python3 -m verdict_desk replay                 # re-derive every verdict from its frozen evidence
 python3 -m verdict_desk portfolio              # simulated positions marked against later candles
@@ -224,21 +250,21 @@ public data ──> frozen evidence packet ──> bull agent ┐
 
 ## Live operation, measured from the ledger
 
-<!-- live-numbers: generated from dossier 281 by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
-Counted over `ledger/ledger.jsonl` on the chain as of **dossier 281** (head `8a136c95ae72a55d`, collected 2026-10-25 22:17 UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
+<!-- live-numbers: generated from dossier 596 by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
+Counted over `ledger/ledger.jsonl` on the chain as of **dossier 596** (head `85f84749f6dd233b`, collected 2026-10-29 20:51 UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
 
 | What | Number |
 |---|---|
-| Dossiers in the verified chain | 281 (BTCUSDT 106, ETHUSDT 100, SOLUSDT 75) |
-| Operating window, first to last dossier | 204.9 h, 8.5 days (2026-10-17 09:26 to 2026-10-25 22:17 UTC) |
-| Clock hours (UTC) in that window with at least one dossier | 73 of 206 (35.4%) |
+| Dossiers in the verified chain | 596 (BTCUSDT 211, ETHUSDT 205, SOLUSDT 180) |
+| Operating window, first to last dossier | 299.4 h, 12.5 days (2026-10-17 09:26 to 2026-10-29 20:51 UTC) |
+| Clock hours (UTC) in that window with at least one dossier | 166 of 300 (55.3%) |
 | Longest gap between consecutive dossiers of the same symbol | 8 h 34 min (SOLUSDT); 107 gaps over 90 minutes |
-| Recorded by the workflow bot (scheduled or manually dispatched runs) | 266 (dossiers 1-53, 69-281) |
+| Recorded by the workflow bot (scheduled or manually dispatched runs) | 581 (dossiers 1-53, 69-596) |
 | Recorded by other commits | 15 (dossiers 54-68): runs made outside the workflow while the demo tooling and the v2 rules were being built; the ledger is append-only, so they stay |
-| LLM era, dossier 46 onward | 236 dossiers, 231 with analyst output (dossiers 54-58 have no LLM layer) |
-| Claims **accepted** by the citation validator | 1871 (bull 904, bear 967) |
-| Claims **rejected** by the citation validator | 152 (bull 76, bear 76); reason: "no citation" 1, "number not in cited evidence" 151 |
-| Share of claims accepted | 92.5% |
+| LLM era, dossier 46 onward | 551 dossiers, 546 with analyst output (dossiers 54-58 have no LLM layer) |
+| Claims **accepted** by the citation validator | 3558 (bull 1736, bear 1822) |
+| Claims **rejected** by the citation validator | 222 (bull 112, bear 110); reason: "no citation" 1, "number not in cited evidence" 221 |
+| Share of claims accepted | 94.1% |
 
 The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures. From 25 Oct the hourly workflow is triggered four times an hour behind a gate that records at most one set of decisions per 50 minutes, and a second workflow, `pacemaker`, waits 52 minutes, dispatches the next run and queues its own successor, because scheduled runs alone did not fire for six hours that day; these rows will show whether that helped, and they are not rewritten if it did not.
 

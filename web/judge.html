@@ -81,7 +81,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <p class="asks">"…and record the practice trades they would make."</p>
   <ul>
     <li>Every dossier carries entry, size, stop and target, sized from a fixed risk budget; no real order is ever placed</li>
-    <li>It commits instead of hiding behind a HOLD: as of dossier 281, 165 of them carry a sized LONG or SHORT; the other 116 are labelled FLAT (63) or WATCH_REVERSAL (53), each naming the argument or condition that would flip it. The live counts are the <b>Positions</b> card on the <a href="./index.html">dashboard</a></li>
+    <li>It commits instead of hiding behind a HOLD: as of dossier 596, 374 of them carry a sized LONG or SHORT; the other 222 are labelled FLAT (63) or WATCH_REVERSAL (159), each naming the argument or condition that would flip it. The live counts are the <b>Positions</b> card on the <a href="./index.html">dashboard</a></li>
     <li>Positions are marked against later candles; the dashboard shows the simulated result of each one: <code>verdict_desk/portfolio.py</code></li>
     <li>Open any row in the <a href="./index.html">dashboard</a> to see the trade and the reasoning that produced it</li>
   </ul>
@@ -105,7 +105,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
     <li>Dossiers are hash-chained; the dashboard recomputes every SHA-256 in your browser and lets you break the chain yourself with one button</li>
     <li><code>python3 -m verdict_desk replay</code> re-derives every verdict from its own frozen evidence, and all of them match</li>
     <li><code>python3 -m verdict_desk export --seq N --out pack.json</code> hands one dossier to a third party as a self-verifying file</li>
-    <li>The scale behind the page: 459 tests, standard library only, pin the ledger, the pages and the docs to each other - one of them re-runs <code>scripts/refresh_numbers.py --check</code>, so a figure that no longer matches the chain, a link to a renamed card, or a doc that disagrees with the ledger fails the build instead of shipping</li>
+    <li>The scale behind the page: 562 tests, standard library only, pin the ledger, the pages and the docs to each other - one of them re-runs <code>scripts/refresh_numbers.py --check</code>, so a figure that no longer matches the chain, a link to a renamed card, or a doc that disagrees with the ledger fails the build instead of shipping</li>
   </ul>
 </section>
 

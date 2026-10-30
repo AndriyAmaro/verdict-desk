@@ -6,7 +6,7 @@
 </p>
 <p align="center">
   <a href="https://andriyamaro.github.io/verdict-desk/"><img src="docs/readme/button-dashboard.svg" height="42" alt="Live dashboard"></a>
-  <a href="https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo-v6.mp4"><img src="docs/readme/button-video.svg" height="42" alt="Watch the demo"></a>
+  <a href="https://andriyamaro.github.io/verdict-desk/demo/verdict-desk-demo-v8.mp4"><img src="docs/readme/button-video.svg" height="42" alt="Watch the demo"></a>
   <a href="https://andriyamaro.github.io/verdict-desk/judge.html"><img src="docs/readme/button-judge.svg" height="42" alt="Judge path"></a>
   <br>
   <a href="https://andriyamaro.github.io/verdict-desk/ask.html"><img src="docs/readme/button-ask.svg" height="42" alt="Ask the record"></a>
@@ -51,6 +51,8 @@ From a terminal: `python3 -m unittest discover -s tests` (the suite), `python3 -
 **Why it exists.** When an autonomous agent acts, the people who answer for it afterwards (an auditor, a compliance officer, a lawyer) need two things: exactly what the agent saw and decided at that moment, and a way to check that record without taking the operator's word for it. Verdict Desk produces that trail. Each decision is frozen as a **dossier**: the evidence the agent saw, with its sources and times, the arguments for and against, and the verdict. Dossiers are hash-chained, so editing a record leaves a mark that anyone can find by recomputing the hashes in their own browser, with no account and no server in the loop. Rewriting every later hash would hide an edit inside the chain but changes its head, so the head is published where the operator cannot quietly rewrite it: in git history today, and in an on-chain anchor on Sepolia that the CRE workflow wrote on 2026-10-21 (the evidence is below). The reasoning can be re-run from the frozen evidence and either gives the same verdict or shows exactly where it differs. The trail shows what was decided and why; it does not show that a decision was right, and this repository makes no claim about customers or deployments. The agent here trades on paper only, so the mechanism can be tested in public.
 
 How it works in one paragraph: Verdict Desk reads public market evidence, freezes it, lets a bull agent and a bear agent argue over the same facts, and lets a deterministic judge size a *simulated* position inside declared risk limits. Every decision becomes a dossier that is hash-chained to the one before it. Open the dashboard, press **Test the chain**, and break the chain yourself in 30 seconds.
+
+**The five checks, in 75 seconds:** [`web/demo/verdict-desk-demo-v8.mp4`](web/demo/verdict-desk-demo-v8.mp4) (captions: [`.srt`](web/demo/verdict-desk-demo-v8.srt)): the five things a debate log cannot show, on the real pages of the deployed site, recorded on 2026-10-30 at ledger head 671. The voice is synthetic. The Chainlink CRE scene is an excerpt of a `cre workflow simulate` run (no transaction sent), labelled as such on screen.
 
 **What is new, in 96 seconds:** [`web/demo/verdict-desk-demo-v7.mp4`](web/demo/verdict-desk-demo-v7.mp4): the rules v6 AI judge on the real exhibit of dossier 296 (it reads only the claims that passed the citation check and adds 0.75, never enough to open a position alone), then the Chainlink CRE workflow re-deriving that verdict before anchoring it on Sepolia, and refusing a forged head. The exhibit is a real page recorded in a real browser; the terminal is drawn, and every line in it is copied from the logs in [`cre/evidence/`](cre/evidence/).
 

@@ -70,6 +70,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <ul>
     <li>Each decision freezes one evidence packet: candles, funding, news, and public voices, with the source and time of every item: <code>verdict_desk/evidence.py</code></li>
     <li>Two LLM analysts (bull and bear) plus a deterministic indicator engine (RSI, MACD, Bollinger) read that same packet: <code>verdict_desk/agents_v2.py</code></li>
+    <li><b>The verdict is deterministic code, not an LLM’s call:</b> the action is the arithmetic of the weighted arguments in <code>verdict_desk/agents_v2.py</code>; a model’s ruling enters only as one argument, capped at 1.0 against an entry band of 1.5, so it can nudge a verdict and never create one, and the same frozen inputs replay to the same verdict (<code>python3 -m verdict_desk replay</code>). A test fails if that cap ever reaches the band.</li>
     <li>A narrative agent extracts token, stance, conviction and urgency from up to 20 <b>user-selected voices</b> (a file you edit: <code>config/voices.json</code>, whose hash is frozen in every dossier together with the voices that returned nothing that hour; today 5 newsrooms and 8 public Telegram channels) and requires two distinct voices to agree before it reports a convergence: <code>verdict_desk/narrative.py</code>; it also freezes the tokens it <b>rejected</b> and why (one voice only, voices disagreeing, or nobody taking a side)</li>
     <li><b>"Trusted voices converge" is measured, not asserted:</b> each voice's calls are scored against the market's move, set against the hit rate luck alone would give, and weighted by the skill that is left, <b>recomputed in your browser</b> from the raw ledger and with no lookahead (every dossier freezes the table it used, and <code>trust-check</code> recomputes it from the dossiers before it): <a href="narrative.html">Market voices</a>, <code>verdict_desk/trust.py</code></li>
     <li><b>Your limit, your position:</b> on the same page, tick the voices that agree, set your own risk limit and watch the practice position it produces (the formulas are the Python judge's, compared over hundreds of random inputs; a limit above the 25% ceiling is refused)</li>
@@ -84,7 +85,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
   <p class="asks">"…and record the practice trades they would make."</p>
   <ul>
     <li>Every dossier carries entry, size, stop and target, sized from a fixed risk budget; no real order is ever placed</li>
-    <li>It commits instead of hiding behind a HOLD: as of dossier 728, 473 of them carry a sized LONG or SHORT; the other 255 are labelled FLAT (63) or WATCH_REVERSAL (192), each naming the argument or condition that would flip it. The live counts are the <b>Positions</b> card on the <a href="./index.html">dashboard</a></li>
+    <li>It commits instead of hiding behind a HOLD: as of dossier 746, 486 of them carry a sized LONG or SHORT; the other 260 are labelled FLAT (63) or WATCH_REVERSAL (197), each naming the argument or condition that would flip it. The live counts are the <b>Positions</b> card on the <a href="./index.html">dashboard</a></li>
     <li>Positions are marked against later candles; the dashboard shows the simulated result of each one: <code>verdict_desk/portfolio.py</code></li>
     <li>Open any row in the <a href="./index.html">dashboard</a> to see the trade and the reasoning that produced it</li>
   </ul>
@@ -108,7 +109,7 @@ table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1
     <li>Dossiers are hash-chained; the dashboard recomputes every SHA-256 in your browser and lets you break the chain yourself with one button</li>
     <li><code>python3 -m verdict_desk replay</code> re-derives every verdict from its own frozen evidence, and all of them match</li>
     <li><code>python3 -m verdict_desk export --seq N --out pack.json</code> hands one dossier to a third party as a self-verifying file</li>
-    <li>The scale behind the page: 566 tests, standard library only, pin the ledger, the pages and the docs to each other - one of them re-runs <code>scripts/refresh_numbers.py --check</code>, so a figure that no longer matches the chain, a link to a renamed card, or a doc that disagrees with the ledger fails the build instead of shipping</li>
+    <li>The scale behind the page: 567 tests, standard library only, pin the ledger, the pages and the docs to each other - one of them re-runs <code>scripts/refresh_numbers.py --check</code>, so a figure that no longer matches the chain, a link to a renamed card, or a doc that disagrees with the ledger fails the build instead of shipping</li>
   </ul>
 </section>
 

@@ -16,15 +16,15 @@
 
 Audit-grade, replayable decisions for AI market agents. **Simulated only: no real-money order is ever placed** (from dossier 375 practice trades also go to Sepolia testnet with test tokens). Built for the BLI Legal Tech Hackathon 2 (bounty "Autonomous Agents", with a Chainlink CRE workflow for the second bounty).
 
-<!-- differentiators:start: generated from dossier 728 by `python3 scripts/refresh_numbers.py` -->
+<!-- differentiators:start: generated from dossier 746 by `python3 scripts/refresh_numbers.py` -->
 ## What you can check here that a debate log cannot show
 
 | | The claim | Measured | Check it yourself |
 |:---:|---|---|---|
-| 🔁 | **The verdict is re-derived, not only re-hashed.** The deterministic judge rules again from the frozen evidence, so a record that no longer explains its own decision fails. Chainlink CRE acts as an **independent auditor**: before it anchors a head, the workflow re-derives that verdict inside the CRE runtime and refuses a forged one | **728 of 728** verdicts re-derive. CRE check: **3,000 of 3,000** edits of a dossier refused (dossier 356) | `python3 -m verdict_desk replay` · [`cre/`](cre/README.md) |
-| 🔢 | **Every number an AI analyst states must be in the evidence it cites.** A claim that cites an item id which does not hold that number is refused and kept with its reason | **4,237** claims accepted, **297** refused (252 for a number not in the cited evidence, 44 for an evidence id that does not exist) | [Dashboard](https://andriyamaro.github.io/verdict-desk/), open any row |
-| 🛰️ | **Three outside witnesses the operator does not control.** The head is timestamped into Bitcoin through OpenTimestamps (each proof reads pending until a block confirms it), signed in the public Sigstore log by a GitHub workflow (no key of ours), and anchored on Sepolia | **203** heads timestamped (OpenTimestamps), **154** signed in Sigstore, contract [`0x50443D51…`](https://sepolia.etherscan.io/address/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7) | [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) |
-| 📜 | **A long public record, gaps included.** Every hourly decision is kept, the ones that lost money too, and every gap between runs is shown, never filled in | **728** dossiers over **14.3 days** since 2026-10-17 | `python3 -m verdict_desk stats --git` |
+| 🔁 | **The verdict is re-derived, not only re-hashed.** The deterministic judge rules again from the frozen evidence, so a record that no longer explains its own decision fails. Chainlink CRE acts as an **independent auditor**: before it anchors a head, the workflow re-derives that verdict inside the CRE runtime and refuses a forged one | **746 of 746** verdicts re-derive. CRE check: **3,000 of 3,000** edits of a dossier refused (dossier 356) | `python3 -m verdict_desk replay` · [`cre/`](cre/README.md) |
+| 🔢 | **Every number an AI analyst states must be in the evidence it cites.** A claim that cites an item id which does not hold that number is refused and kept with its reason | **4,319** claims accepted, **299** refused (254 for a number not in the cited evidence, 44 for an evidence id that does not exist) | [Dashboard](https://andriyamaro.github.io/verdict-desk/), open any row |
+| 🛰️ | **Three outside witnesses the operator does not control.** The head is timestamped into Bitcoin through OpenTimestamps (each proof reads pending until a block confirms it), signed in the public Sigstore log by a GitHub workflow (no key of ours), and anchored on Sepolia | **209** heads timestamped (OpenTimestamps), **160** signed in Sigstore, contract [`0x50443D51…`](https://sepolia.etherscan.io/address/0x50443D51Db71A61E131B147B1d36aF21d48CDdF7) | [Witnesses](https://andriyamaro.github.io/verdict-desk/witnesses.html) |
+| 📜 | **A long public record, gaps included.** Every hourly decision is kept, the ones that lost money too, and every gap between runs is shown, never filled in | **746** dossiers over **14.6 days** since 2026-10-17 | `python3 -m verdict_desk stats --git` |
 | 🧨 | **We attack our own verifier and publish the score.** Edits, deletions, swaps, forged heads, a truncated tail and re-hashed history, on a copy of the ledger | **0 missed** of **2,981** attacks (dossier 728) | `python3 -m verdict_desk battery` |
 
 All five rows are counted from the ledger by the same script on every refresh; none is typed by hand. The trail shows what was decided and why; it does not show that a decision was right.
@@ -76,9 +76,9 @@ The bounty's spotlight describes an agent that monitors user-selected crypto voi
 
 | Spotlight requirement | What runs today | Measured evidence |
 |---|---|---|
-| Up to 20 user-selected voices | 13 voices in [`config/voices.json`](config/voices.json): 5 newsroom RSS feeds and 8 public Telegram channels (market trackers and analysts), all read without a key. Edit the file to choose up to 20; its SHA-256 is frozen in every dossier (`narrative.config`) together with the voices that returned nothing that hour | up to 8 messages per voice per run; 720 of 728 dossiers carry a narrative layer |
-| Tokens, sentiment, conviction, urgency | LLM extraction per headline into a closed vocabulary, each with a literal quote from the headline | 37 extractions accepted and 9 rejected by the grounding gate in the latest dossier (#728) |
-| Convergence across distinct voices | A narrative needs at least two different voices on the same token **and** the same stance | **2018 convergences** recorded across the live ledger, as of dossier 728 |
+| Up to 20 user-selected voices | 13 voices in [`config/voices.json`](config/voices.json): 5 newsroom RSS feeds and 8 public Telegram channels (market trackers and analysts), all read without a key. Edit the file to choose up to 20; its SHA-256 is frozen in every dossier (`narrative.config`) together with the voices that returned nothing that hour | up to 8 messages per voice per run; 738 of 746 dossiers carry a narrative layer |
+| Tokens, sentiment, conviction, urgency | LLM extraction per headline into a closed vocabulary, each with a literal quote from the headline | 31 extractions accepted and 12 rejected by the grounding gate in the latest dossier (#740) |
+| Convergence across distinct voices | A narrative needs at least two different voices on the same token **and** the same stance | **2078 convergences** recorded across the live ledger, as of dossier 746 |
 | Explain the candidates it rejected | Every mentioned token that did not become a narrative is kept with its reason: only one voice, voices disagreeing, or neutral mentions only | `narrative.rejected_candidates`, frozen in the dossier |
 | Practice position under transparent rules and risk limits | The convergence becomes a citable evidence item; the deterministic judge sizes a simulated position inside the risk limit the user sets in the same file (`risk.max_risk_pct`, default 1%, system ceiling 25%, refused loudly above it) with an ATR stop and target | `verdict_desk/agents_v2.py`, `portfolio.py` |
 
@@ -221,7 +221,7 @@ A single window is wrong in both directions: it either accepts a stale price (da
 4. Run it yourself:
 
 ```bash
-python3 -m unittest discover -s tests          # standard library only (566 tests)
+python3 -m unittest discover -s tests          # standard library only (567 tests)
 python3 -m verdict_desk verify                 # hash chain of ledger/ledger.jsonl
 python3 -m verdict_desk replay                 # re-derive every verdict from its frozen evidence
 python3 -m verdict_desk portfolio              # simulated positions marked against later candles
@@ -252,21 +252,21 @@ public data ──> frozen evidence packet ──> bull agent ┐
 
 ## Live operation, measured from the ledger
 
-<!-- live-numbers: generated from dossier 728 by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
-Counted over `ledger/ledger.jsonl` on the chain as of **dossier 728** (head `48a5263430cad853`, collected 2026-10-31 16:50 UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
+<!-- live-numbers: generated from dossier 746 by `python3 scripts/refresh_numbers.py` (counts: `python3 -m verdict_desk stats --git`) -->
+Counted over `ledger/ledger.jsonl` on the chain as of **dossier 746** (head `ff5f6b33dc39c72d`, collected 2026-10-31 22:50 UTC), after `verify` passed. Nothing is estimated: every figure is a count over ledger lines, plus `git blame` of that file for the author rows. The dashboard recomputes the same numbers in your browser from whatever ledger you load, and a test checks that the Python and the JavaScript agree on this ledger. The chain grows with every run, so these figures are a snapshot; the dashboard and the commands below always show the current chain.
 
 | What | Number |
 |---|---|
-| Dossiers in the verified chain | 728 (BTCUSDT 255, ETHUSDT 249, SOLUSDT 224) |
-| Operating window, first to last dossier | 343.4 h, 14.3 days (2026-10-17 09:26 to 2026-10-31 16:50 UTC) |
-| Clock hours (UTC) in that window with at least one dossier | 210 of 344 (61.0%) |
+| Dossiers in the verified chain | 746 (BTCUSDT 261, ETHUSDT 255, SOLUSDT 230) |
+| Operating window, first to last dossier | 349.4 h, 14.6 days (2026-10-17 09:26 to 2026-10-31 22:50 UTC) |
+| Clock hours (UTC) in that window with at least one dossier | 216 of 350 (61.7%) |
 | Longest gap between consecutive dossiers of the same symbol | 8 h 34 min (SOLUSDT); 107 gaps over 90 minutes |
-| Recorded by the workflow bot (scheduled or manually dispatched runs) | 713 (dossiers 1-53, 69-728) |
+| Recorded by the workflow bot (scheduled or manually dispatched runs) | 731 (dossiers 1-53, 69-746) |
 | Recorded by other commits | 15 (dossiers 54-68): runs made outside the workflow while the demo tooling and the v2 rules were being built; the ledger is append-only, so they stay |
-| LLM era, dossier 46 onward | 683 dossiers, 678 with analyst output (dossiers 54-58 have no LLM layer) |
-| Claims **accepted** by the citation validator | 4237 (bull 2065, bear 2172) |
-| Claims **rejected** by the citation validator | 249 (bull 116, bear 133); reason: "no citation" 1, "number not in cited evidence" 248 |
-| Share of claims accepted | 94.4% |
+| LLM era, dossier 46 onward | 701 dossiers, 696 with analyst output (dossiers 54-58 have no LLM layer) |
+| Claims **accepted** by the citation validator | 4319 (bull 2105, bear 2214) |
+| Claims **rejected** by the citation validator | 251 (bull 117, bear 134); reason: "no citation" 1, "number not in cited evidence" 250 |
+| Share of claims accepted | 94.5% |
 
 The window is not continuous coverage: scheduled GitHub runs are best effort and most hourly slots did not fire, which is why the coverage and gap rows sit next to the window. The dashboard's cadence panel shows the same figures. From 25 Oct the hourly workflow is triggered four times an hour behind a gate that records at most one set of decisions per 50 minutes, and a second workflow, `pacemaker`, waits 52 minutes, dispatches the next run and queues its own successor, because scheduled runs alone did not fire for six hours that day; these rows will show whether that helped, and they are not rewritten if it did not.
 

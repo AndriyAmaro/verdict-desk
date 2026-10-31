@@ -72,6 +72,20 @@ class BatteryTest(unittest.TestCase):
             self.assertEqual(row["chain_alone_missed"], row["trials"], "the chain by itself cannot see this: that is the point of the anchors")
             self.assertEqual(row["missed"], 0)
 
+    def test_a_history_rewrite_always_changes_the_ledger(self):
+        """It re-hashes everything after the edit, so editing "hash" or "prev_hash" would change nothing and
+        be counted as a miss that is no attack (three such false misses showed up at dossier 728)."""
+        for d in (LEDGER[1], LEDGER[len(LEDGER) // 2], LEDGER[-1]):
+            paths = battery.rewrite_paths(d)
+            self.assertTrue(paths)
+            self.assertNotIn(("hash",), paths)
+            self.assertNotIn(("prev_hash",), paths)
+        p = len(LEDGER) - 2
+        for path in battery.rewrite_paths(LEDGER[p])[:40]:
+            edited = copy.deepcopy(LEDGER)
+            edited[p] = battery.edits(edited[p], path)[0][1]
+            self.assertNotEqual(battery._rehash_from(edited, p), LEDGER, path)
+
     def test_the_same_seed_gives_the_same_attacks(self):
         again = battery.run(LEDGER, STAMPS, seed="test-seed", trials=60)
         self.assertEqual(self.result["attacks"], again["attacks"])

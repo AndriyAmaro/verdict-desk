@@ -159,6 +159,11 @@ def _splice_caught(ledger: list[dict], i: int, j: int, new: list[dict], verifier
     return bool(verifier(window, prev=prev))
 
 
+def rewrite_paths(record: dict) -> list[tuple]:
+    """The values a history rewrite may edit: every leaf except the two the rewrite recomputes itself."""
+    return [q for q in leaves(record) if q not in (("hash",), ("prev_hash",))]
+
+
 def _rehash_from(ledger: list[dict], start: int) -> list[dict]:
     out = copy.deepcopy(ledger)
     prev = out[start - 1]["hash"] if start > 0 else dossier.GENESIS
@@ -233,7 +238,9 @@ def run(ledger: list[dict], stamps: Path, seed: str, trials: int = 2000, verifie
     results = []
     for p in sorted(rng.sample(range(1, n), min(max(3, others // 4), n - 1))):
         edited = copy.deepcopy(ledger)
-        path = rng.choice(leaves(edited[p]))
+        # The rewrite recomputes "hash" and "prev_hash" itself, so an edit there leaves the ledger
+        # unchanged: that is no attack, and counting it as one reported three false misses at dossier 728.
+        path = rng.choice(rewrite_paths(edited[p]))
         kind_edits = edits(edited[p], path)
         edited[p] = kind_edits[0][1]
         forged = _rehash_from(edited, p)

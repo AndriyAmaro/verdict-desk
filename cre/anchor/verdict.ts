@@ -402,6 +402,9 @@ export function replayDossier(dossier: Obj): Replay {
 	const pos = sizing(f, out.action, recorded.risk_pct ?? 1.0)
 	if (pos && out.action === recorded.action) {
 		numbersMatch &&= pos.entry === recorded.entry && pos.stop === recorded.stop && pos.take_profit === recorded.take_profit && pos.size === recorded.size
+	} else if (!pos) {
+		// A decision that sizes no position must not carry one: otherwise a WATCH or FLAT head could gain a size and still replay.
+		numbersMatch &&= ['entry', 'stop', 'take_profit', 'size'].every((k) => recorded[k] === undefined || recorded[k] === null)
 	}
 	const matches = featuresMatch && numbersMatch && out.action === recorded.action && out.edge === recorded.edge
 	return {

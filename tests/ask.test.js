@@ -131,7 +131,8 @@ test("records without an LLM layer or a sensitivity table answer plainly instead
 });
 
 // ---------------------------------------------------------------- phase 2: the chart, what happened next, sources, voices
-const EXECUTED = latest((d) => d.execution);
+const EXECUTED = latest((d) => d.execution && d.execution.tx); // the newest send that reached the chain
+const FAILED_SEND = latest((d) => d.execution && !d.execution.tx); // a send the chain refused is answered from the record too
 const VOICED = latest((d) => d.evidence.narrative && (d.evidence.narrative.convergence || []).length);
 const later = (d, rows) => rows.map((r, k) => ({ t: d.evidence.market.candles.at(-1).t + (k + 1) * 3600000, o: r[2], h: r[0], l: r[1], c: r[2], v: 1 }));
 
@@ -181,7 +182,7 @@ test("the chart answer reads the record's own indicators and lights them", () =>
 
 test("sources, voices and the Sepolia execution are answered from the record, and old records say what they lack", () => {
   for (const intent of ["saw", "voices", "executed"]) {
-    for (const d of [POSITION, DECLINED, OLD, VOICED, EXECUTED]) {
+    for (const d of [POSITION, DECLINED, OLD, VOICED, EXECUTED, FAILED_SEND].filter(Boolean)) {
       const a = ask.answer(d, intent);
       assert.ok(a.parts.length > 0, `${intent} #${d.seq}`);
       assert.ok(ask.check(a).ok, `${intent} #${d.seq} ${JSON.stringify(ask.check(a))}`);

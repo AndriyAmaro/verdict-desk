@@ -66,6 +66,16 @@ describe('the check the workflow runs before it anchors', () => {
 		expect(() => verifyHeadDossier(JSON.stringify(forged), headOf(forged))).toThrow('does not replay')
 	})
 
+	test('refuses a decision that sizes no position but carries one, even with a consistent hash', () => {
+		const declined = [...LEDGER].reverse().find((d: any) => d.verdict?.entry === undefined && d.verdict?.rules_version === 'v6')
+		expect(declined).toBeDefined()
+		expect(() => verifyHeadDossier(JSON.stringify(declined), headOf(declined))).not.toThrow()
+		const forged = clone(declined)
+		forged.verdict.size = 1
+		forged.hash = dossierHash(forged)
+		expect(() => verifyHeadDossier(JSON.stringify(forged), headOf(forged))).toThrow('does not replay')
+	})
+
 	test('refuses text that is not JSON', () => {
 		expect(() => verifyHeadDossier('nope', headOf(head))).toThrow('not valid JSON')
 	})

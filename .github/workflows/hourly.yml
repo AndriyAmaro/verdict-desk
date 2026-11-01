@@ -165,7 +165,11 @@ jobs:
           # The LLM gateway follows config/model_routing.json; re-ranked by its fixed rule once a day (72 dossiers,
           # three per run), never by hand.
           python -m verdict_desk models --route config/model_routing.json --every 72
-          git add ledger config/model_routing.json
+          # Keep the published figures in step with the ledger we are about to commit, so the freshness
+          # gate cannot sit red between this push and the next refresh. Numbers only, and non-fatal:
+          # if it cannot run, warn and publish the ledger anyway.
+          python scripts/refresh_numbers.py --skip-tests || echo "::warning::could not refresh the published figures"
+          git add ledger config/model_routing.json README.md web/judge.html docs/readme/figures.svg docs/readme/battery.json
           if git diff --cached --quiet; then
             echo "nothing recorded this hour"
             exit 0
@@ -189,7 +193,8 @@ jobs:
             python -m verdict_desk verify || exit 1
             python -m verdict_desk head --out ledger/head.json
             python -m verdict_desk models --route config/model_routing.json --every 72
-            git add ledger config/model_routing.json
+            python scripts/refresh_numbers.py --skip-tests || echo "::warning::could not refresh the published figures"
+            git add ledger config/model_routing.json README.md web/judge.html docs/readme/figures.svg docs/readme/battery.json
             if git diff --cached --quiet; then
               echo "the freshest head already has this hour's decisions"
               exit 0

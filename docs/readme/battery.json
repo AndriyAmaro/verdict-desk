@@ -1,11 +1,11 @@
 {
  "all_caught": true,
- "dossiers": 1589,
+ "dossiers": 1592,
  "head": {
-  "hash": "472b1b3edcab5331de05e9c868602e872e075011245be8db57a058010b2da025",
-  "seq": 1589
+  "hash": "834a76480dfcf53a680d5621cb00cc091c151f55c9ced69b1927169a3d404fe8",
+  "seq": 1592
  },
- "seed": "472b1b3edcab5331de05e9c868602e872e075011245be8db57a058010b2da025",
+ "seed": "834a76480dfcf53a680d5621cb00cc091c151f55c9ced69b1927169a3d404fe8",
  "total_missed": 0,
- "total_trials": 3029
+ "total_trials": 3027
 }

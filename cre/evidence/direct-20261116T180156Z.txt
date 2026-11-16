@@ -1,0 +1,6 @@
+Anchoring ledger head from https://raw.githubusercontent.com/AndriyAmaro/verdict-desk/main/ledger/head.json and https://andriyamaro.github.io/verdict-desk/ledger/head.json (direct, GitHub Actions; not the CRE runtime)
+Replayed dossier #1856 under rules v6: WATCH_REVERSAL edge 0.94, the same as recorded
+Data Feed BTC / USD 0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43: 64825.948 (updatedAt 1794849120)
+Cross-chain check: BTC / USD on Sepolia 64825.948, BTC / USD on ethereum-mainnet 64880.214, gap 8 bps (limit 500)
+Anchored seq 1856 head 0b52751acf5522643d65ae6ff2132abbf2caa545343009a7e5a3112d13db1238 at tx 0xc137cafa059c5c9775959217eb14462554a778dc62a93473be03c684ed8c1e0d (block 12148967)
+{"status":"anchored","via":"gh-actions","seq":1856,"head":"0b52751acf5522643d65ae6ff2132abbf2caa545343009a7e5a3112d13db1238","symbol":"SOLUSDT","replayed":{"rules":"v6","action":"WATCH_REVERSAL","edge":0.94},"feed":"BTC / USD","price":"64825.948","crossChain":{"sepolia":"64825.948","mainnet":"64880.214","deviationBps":8},"txHash":"0xc137cafa059c5c9775959217eb14462554a778dc62a93473be03c684ed8c1e0d"}
